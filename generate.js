@@ -205,8 +205,202 @@ const emailSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
   <polyline points="22,6 12,13 2,6"></polyline>
 </svg>`;
 
-// ========== FUNCIÓN PARA PROCESAR AUTORES CON SUS ICONOS ==========
-function processAuthorsWithIcons(authors, authorToSlug = {}, lang = 'es') {
+// ========== CARGA DE TEAM.JSON CON MATCHING ROBUSTO ==========
+let authorMap = {}; // Mapa por uid
+let authorByNameMap = {}; // Mapa por nombre normalizado
+let authorBySlugMap = {}; // Mapa por slug
+
+async function loadTeamData() {
+  try {
+    const TEAM_JSON_URL = 'https://www.revistacienciasestudiantes.com/team/Team.json';
+    console.log(`🌐 Cargando equipo desde: ${TEAM_JSON_URL}`);
+
+    const response = await fetch(TEAM_JSON_URL);
+    if (!response.ok) {
+      throw new Error(`Error HTTP ${response.status} al cargar Team.json`);
+    }
+
+    const team = await response.json();
+
+    if (Array.isArray(team)) {
+      team.forEach(member => {
+        // Guardar por UID (para matching exacto)
+        if (member.uid) {
+          authorMap[member.uid] = {
+            uid: member.uid,
+            displayName: member.displayName,
+            slug: member.slug,
+            orcid: member.orcid,
+            email: member.publicEmail,
+            firstName: member.firstName,
+            lastName: member.lastName,
+            institution: member.institution,
+            imageUrl: member.imageUrl
+          };
+        }
+        
+        // Guardar por slug
+        if (member.slug) {
+          authorBySlugMap[member.slug] = {
+            ...authorMap[member.uid],
+            uid: member.uid,
+            displayName: member.displayName,
+            slug: member.slug,
+            orcid: member.orcid,
+            email: member.publicEmail
+          };
+        }
+        
+        // Guardar por displayName (nombre exacto)
+        if (member.displayName) {
+          authorByNameMap[member.displayName] = {
+            ...authorMap[member.uid],
+            uid: member.uid,
+            displayName: member.displayName,
+            slug: member.slug,
+            orcid: member.orcid,
+            email: member.publicEmail
+          };
+        }
+        
+        // También guardar versiones normalizadas del nombre para matching fuzzy
+        // (sin tildes, minúsculas, etc.)
+        const normalizedName = member.displayName ? 
+          member.displayName.toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
+        
+        if (normalizedName && !authorByNameMap[normalizedName]) {
+          authorByNameMap[normalizedName] = {
+            ...authorMap[member.uid],
+            uid: member.uid,
+            displayName: member.displayName,
+            slug: member.slug,
+            orcid: member.orcid,
+            email: member.publicEmail,
+            normalizedName
+          };
+        }
+        
+        // Guardar por combinación de nombre y apellido
+        if (member.firstName || member.lastName) {
+          const fullName = `${member.firstName || ''} ${member.lastName || ''}`.trim();
+          if (fullName && !authorByNameMap[fullName]) {
+            authorByNameMap[fullName] = {
+              ...authorMap[member.uid],
+              uid: member.uid,
+              displayName: member.displayName,
+              slug: member.slug,
+              orcid: member.orcid,
+              email: member.publicEmail
+            };
+          }
+        }
+      });
+      
+      console.log(`📚 ${Object.keys(authorMap).length} autores cargados por UID`);
+      console.log(`📚 ${Object.keys(authorByNameMap).length} variantes de nombres indexadas`);
+    } else {
+      console.log('⚠️ El JSON cargado no es un array.');
+    }
+
+  } catch (e) {
+    console.log('⚠️ No se pudo cargar Team.json desde la URL, los autores no tendrán enlaces. Error:', e.message);
+  }
+}
+
+// ========== FUNCIÓN DE MATCHING DE AUTORES ==========
+function findAuthorInfo(author, articleAuthorId = null) {
+  if (!author) return null;
+  
+  // Obtener el nombre para mostrar
+  let displayName = '';
+  if (typeof author === 'string') {
+    displayName = author;
+  } else if (author.name) {
+    displayName = author.name;
+  } else if (author.firstName || author.lastName) {
+    displayName = `${author.firstName || ''} ${author.lastName || ''}`.trim();
+  } else {
+    return null;
+  }
+  
+  // 1. INTENTAR POR UID (matching más exacto)
+  if (articleAuthorId && authorMap[articleAuthorId]) {
+    console.log(`✅ Match por UID: ${articleAuthorId} -> ${authorMap[articleAuthorId].displayName}`);
+    return authorMap[articleAuthorId];
+  }
+  
+  // 2. INTENTAR POR NOMBRE EXACTO
+  if (authorByNameMap[displayName]) {
+    console.log(`✅ Match por nombre exacto: ${displayName}`);
+    return authorByNameMap[displayName];
+  }
+  
+  // 3. INTENTAR POR SLUG (si el autor tiene slug en el artículo)
+  if (author.slug && authorBySlugMap[author.slug]) {
+    console.log(`✅ Match por slug: ${author.slug}`);
+    return authorBySlugMap[author.slug];
+  }
+  
+  // 4. INTENTAR MATCHING INTELIGENTE PARA NOMBRES CON NÚMEROS (ej: "nombre-apellido2")
+  // Esto maneja casos donde hay duplicados como "Juan Pérez" y "Juan Pérez2"
+  const baseNameMatch = displayName.replace(/\d+$/, '').trim(); // Quita números al final
+  if (baseNameMatch !== displayName) {
+    // Buscar el nombre base en el mapa
+    for (const [key, value] of Object.entries(authorByNameMap)) {
+      if (key.startsWith(baseNameMatch) || baseNameMatch.startsWith(key)) {
+        console.log(`✅ Match por nombre base: ${displayName} -> ${key}`);
+        return value;
+      }
+    }
+  }
+  
+  // 5. INTENTAR NORMALIZACIÓN AVANZADA
+  const normalized = displayName.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+  
+  const normalizedWithoutNumbers = normalized.replace(/\d+/g, '');
+  
+  for (const [key, value] of Object.entries(authorByNameMap)) {
+    const keyNormalized = key.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '');
+    
+    const keyWithoutNumbers = keyNormalized.replace(/\d+/g, '');
+    
+    // Comparar versiones normalizadas
+    if (keyNormalized === normalized || 
+        keyWithoutNumbers === normalizedWithoutNumbers ||
+        keyNormalized.includes(normalized) || 
+        normalized.includes(keyNormalized)) {
+      console.log(`✅ Match por normalización: ${displayName} -> ${key}`);
+      return value;
+    }
+  }
+  
+  // 6. ÚLTIMO RECURSO: Intentar por apellido si es que tenemos firstName/lastName
+  if (typeof author !== 'string' && (author.firstName || author.lastName)) {
+    const lastName = author.lastName || '';
+    const firstName = author.firstName || '';
+    
+    for (const [key, value] of Object.entries(authorMap)) {
+      if (value.lastName && value.lastName.toLowerCase() === lastName.toLowerCase()) {
+        // Coincidencia por apellido
+        if (value.firstName && value.firstName.toLowerCase().startsWith(firstName.toLowerCase().charAt(0))) {
+          console.log(`✅ Match por apellido + inicial: ${displayName}`);
+          return value;
+        }
+      }
+    }
+  }
+  
+  console.log(`❌ No se encontró match para: ${displayName}`);
+  return null;
+}
+
+// ========== FUNCIÓN PARA PROCESAR AUTORES CON ICONOS (MEJORADA) ==========
+function processAuthorsWithIcons(authors, article = null, lang = 'es') {
   if (!authors) return 'Autor desconocido';
   
   let authorsArray = [];
@@ -219,7 +413,7 @@ function processAuthorsWithIcons(authors, authorToSlug = {}, lang = 'es') {
     });
   }
   
-  return authorsArray.map(author => {
+  const authorElements = authorsArray.map((author, index) => {
     // Obtener nombre para mostrar
     let displayName = '';
     if (typeof author === 'string') {
@@ -232,28 +426,51 @@ function processAuthorsWithIcons(authors, authorToSlug = {}, lang = 'es') {
       displayName = 'Autor';
     }
     
+    // Obtener el authorId del artículo si existe
+    // Asumiendo que el artículo tiene un array de authorIds en el mismo orden que los autores
+    const articleAuthorId = article && article.authorIds ? article.authorIds[index] : null;
+    
+    // Buscar información del autor usando nuestra función de matching
+    const authorInfo = findAuthorInfo(author, articleAuthorId);
+    
     // Construir HTML del autor
     let authorHtml = '';
     
-    // Verificar si tiene slug en team
-    const slug = authorToSlug[displayName] || author.slug;
-    if (slug) {
-      authorHtml += `<a href="/team/${slug}.html" class="author-link">${displayName}</a>`;
+    if (authorInfo && authorInfo.slug) {
+      // Tiene slug, crear enlace
+      authorHtml += `<a href="/team/${authorInfo.slug}.html" class="author-link"`;
+      
+      // Añadir atributos de datos para metadata
+      if (authorInfo.uid) {
+        authorHtml += ` data-author-uid="${authorInfo.uid}"`;
+      }
+      if (authorInfo.orcid) {
+        authorHtml += ` data-author-orcid="${authorInfo.orcid}"`;
+      }
+      
+      authorHtml += `>${displayName}</a>`;
     } else {
-      authorHtml += `<span class="author-name">${displayName}</span>`;
+      // No tiene slug, solo texto
+      authorHtml += `<span class="author-name"`;
+      if (authorInfo && authorInfo.uid) {
+        authorHtml += ` data-author-uid="${authorInfo.uid}"`;
+      }
+      authorHtml += `>${displayName}</span>`;
     }
     
     // Añadir iconos
     const icons = [];
     
-    // ORCID (verde)
-    if (author.orcid) {
-      icons.push(`<a href="https://orcid.org/${author.orcid}" target="_blank" rel="noopener noreferrer" class="author-icon orcid-icon" title="ORCID">${orcidSvg}</a>`);
+    // ORCID (verde) - Priorizar información del team.json
+    const orcid = (authorInfo && authorInfo.orcid) || author.orcid;
+    if (orcid && orcid.trim() !== '') {
+      icons.push(`<a href="https://orcid.org/${orcid}" target="_blank" rel="noopener noreferrer" class="author-icon orcid-icon" title="ORCID">${orcidSvg}</a>`);
     }
     
     // Email (azul)
-    if (author.email) {
-      icons.push(`<a href="mailto:${author.email}" class="author-icon email-icon" title="Email">${emailSvg}</a>`);
+    const email = (authorInfo && authorInfo.email) || author.email || author.publicEmail;
+    if (email && email.trim() !== '') {
+      icons.push(`<a href="mailto:${email}" class="author-icon email-icon" title="Email">${emailSvg}</a>`);
     }
     
     if (icons.length > 0) {
@@ -261,7 +478,9 @@ function processAuthorsWithIcons(authors, authorToSlug = {}, lang = 'es') {
     }
     
     return authorHtml;
-  }).join('<span class="author-separator">, </span>');
+  });
+  
+  return authorElements.join('<span class="author-separator">, </span>');
 }
 
 // ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML ==========
@@ -346,40 +565,12 @@ async function generateAll() {
     const articles = JSON.parse(fs.readFileSync(ARTICLES_JSON, 'utf8'));
     console.log(`📄 ${articles.length} artículos cargados`);
 
-    // 2. Intentar cargar team.json para slugs de autores (si existe)
-// 2. Cargar team.json desde la URL para slugs de autores
-let authorToSlug = {};
-try {
-  const TEAM_JSON_URL = 'https://www.revistacienciasestudiantes.com/team/Team.json';
-  console.log(`🌐 Cargando equipo desde: ${TEAM_JSON_URL}`);
-
-  const response = await fetch(TEAM_JSON_URL);
-  if (!response.ok) {
-    throw new Error(`Error HTTP ${response.status} al cargar Team.json`);
-  }
-
-  const team = await response.json();
-
-  if (Array.isArray(team)) {
-    team.forEach(member => {
-      // Usa 'displayName' que es el campo que viste en el JSON
-      if (member.displayName) {
-        authorToSlug[member.displayName] = member.slug;
-      }
-    });
-    console.log(`📚 ${Object.keys(authorToSlug).length} autores encontrados en team online`);
-  } else {
-    console.log('⚠️ El JSON cargado no es un array.');
-  }
-
-} catch (e) {
-  console.log('⚠️ No se pudo cargar Team.json desde la URL, los autores no tendrán enlaces. Error:', e.message);
-  // El script continúa sin los enlaces
-}
+    // 2. Cargar team.json desde la URL para slugs de autores
+    await loadTeamData();
 
     // 3. Generar HTML para cada artículo
     for (const article of articles) {
-      await generateArticleHtml(article, authorToSlug);
+      await generateArticleHtml(article);
     }
 
     // 4. Generar índices
@@ -393,7 +584,7 @@ try {
   }
 }
 
-async function generateArticleHtml(article, authorToSlug) {
+async function generateArticleHtml(article) {
   // Procesar autores para meta tags de citación
   let authorsList = [];
   if (typeof article.autores === 'string') {
@@ -405,8 +596,9 @@ async function generateArticleHtml(article, authorToSlug) {
   
   const articleSlug = `${generateSlug(article.titulo)}-${article.numeroArticulo}`;
 
-  // Construir autores con iconos
-  const authorsDisplay = processAuthorsWithIcons(article.autores, authorToSlug);
+  // Construir autores con iconos - AHORA PASAMOS EL ARTÍCULO COMPLETO
+  const authorsDisplayEs = processAuthorsWithIcons(article.autores, article, 'es');
+  const authorsDisplayEn = processAuthorsWithIcons(article.autores, article, 'en');
 
   const finalAuthorsDisplay = formatAuthorsDisplay(article.autores, 'es');
   const authorsAPA = formatAuthorsAPA(article.autores);
@@ -454,7 +646,7 @@ async function generateArticleHtml(article, authorToSlug) {
     article,
     articleSlug,
     authorMetaTags,
-    authorsDisplay,
+    authorsDisplay: authorsDisplayEs,
     finalAuthorsDisplay,
     authorsAPA,
     authorsChicagoEs,
@@ -485,7 +677,7 @@ async function generateArticleHtml(article, authorToSlug) {
     article,
     articleSlug,
     authorMetaTags,
-    authorsDisplay,
+    authorsDisplay: authorsDisplayEn,
     finalAuthorsDisplay,
     authorsAPA,
     authorsChicagoEs,
@@ -538,9 +730,33 @@ function generateHtmlTemplate({
 }) {
   const isSpanish = lang === 'es';
   
-  // Título y metadatos según idioma
-  const title = isSpanish ? article.titulo : (article.tituloEnglish || article.titulo);
-  const altTitle = isSpanish ? article.tituloEnglish : article.titulo;
+  // Título y metadatos según idioma - LÓGICA MEJORADA PARA TÍTULOS BILINGÜES
+  // Determinar títulos disponibles
+  const hasSpanishTitle = article.titulo && article.titulo.trim() !== '';
+  const hasEnglishTitle = article.tituloEnglish && article.tituloEnglish.trim() !== '';
+  
+  // Título principal según idioma actual
+  let title = '';
+  let altTitle = '';
+  
+  if (isSpanish) {
+    // Versión en español
+    title = hasSpanishTitle ? article.titulo : (hasEnglishTitle ? article.tituloEnglish : '');
+    
+    // Título alternativo (solo si hay título en inglés)
+    if (hasEnglishTitle && hasSpanishTitle) {
+      altTitle = article.tituloEnglish;
+    }
+  } else {
+    // Versión en inglés
+    title = hasEnglishTitle ? article.tituloEnglish : (hasSpanishTitle ? article.titulo : '');
+    
+    // Título alternativo (solo si hay título en español)
+    if (hasSpanishTitle && hasEnglishTitle) {
+      altTitle = article.titulo;
+    }
+  }
+  
   const articleType = isSpanish ? tipoEs : typeEn;
   const abstractContent = isSpanish ? resumenParagraphs : abstractParagraphs;
   const altAbstract = isSpanish ? abstractParagraphs : resumenParagraphs;
@@ -661,8 +877,10 @@ function generateHtmlTemplate({
       --bg-soft: #f8f9fa;
       --bg-hover: #f3f4f6;
       --accent: #c2410c;
-      --code-bg: #f6f8fa;
-      --code-border: #e1e4e8;
+      --code-bg: #1a1b26;
+      --code-text: #cfc9c2;
+      --code-border: #2c2e3a;
+      --code-header-bg: #232530;
       --sidebar-width: 260px;
       --aside-width: 280px;
       --content-max-width: 800px;
@@ -1019,37 +1237,36 @@ function generateHtmlTemplate({
       margin: 1.5rem 0;
     }
 
-    /* Code Blocks */
+    /* ===== CODE BLOCKS - ESTILO ÉPICO ===== */
     .code-block-wrapper {
-      margin: 1.5rem 0;
-      border: 1px solid var(--code-border);
-      border-radius: 6px;
-      overflow: hidden;
+      margin: 2.5rem 0;
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
       background: var(--code-bg);
+      overflow: hidden;
     }
 
     .code-header {
+      background: var(--code-header-bg);
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      padding: 0.75rem 1.25rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 0.5rem 1rem;
-      background: #fff;
-      border-bottom: 1px solid var(--code-border);
-      font-family: 'Inter', sans-serif;
-      font-size: 0.8rem;
     }
 
     .code-language {
-      color: var(--text-muted);
+      color: #a9b1d6;
+      font-weight: 700;
+      letter-spacing: 1px;
+      font-size: 0.8rem;
       text-transform: uppercase;
-      font-weight: 600;
-      font-size: 0.7rem;
-      letter-spacing: 0.5px;
     }
 
     .code-copy-btn {
-      background: transparent;
-      border: 1px solid var(--border-color);
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
       border-radius: 4px;
       padding: 0.3rem 0.8rem;
       font-size: 0.7rem;
@@ -1058,7 +1275,7 @@ function generateHtmlTemplate({
       display: inline-flex;
       align-items: center;
       gap: 0.4rem;
-      color: var(--text-light);
+      color: #a9b1d6;
       transition: all 0.2s;
     }
 
@@ -1075,45 +1292,138 @@ function generateHtmlTemplate({
 
     .code-block {
       margin: 0;
-      padding: 1rem;
-      background: var(--code-bg);
+      padding: 1.5rem;
+      background: transparent;
+      color: var(--code-text);
+      line-height: 1.6;
+      font-size: 0.85rem;
       overflow-x: auto;
+      scrollbar-color: #444 transparent;
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.9rem;
-      line-height: 1.5;
     }
 
     .code-block code {
       font-family: 'JetBrains Mono', monospace;
+      text-shadow: 0 0 2px rgba(0,0,0,0.3);
     }
 
-    /* Tables */
+    /* ===== TABLES - ESTILO ACADÉMICO BOOKTABS ===== */
     .table-wrapper {
       overflow-x: auto;
-      margin: 1.5rem 0;
+      margin: 3rem 0;
+      border-top: 2px solid var(--nature-black);
+      border-bottom: 2px solid var(--nature-black);
+      padding: 0.5rem 0;
     }
 
     .article-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.95rem;
-    }
-
-    .article-table th,
-    .article-table td {
-      padding: 0.75rem;
-      border: 1px solid var(--border-color);
-      text-align: left;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
+      color: var(--text-main);
+      max-width: 100%;
+      overflow-x: auto;
+      display: block;
     }
 
     .article-table th {
-      background: var(--bg-soft);
-      font-weight: 600;
+      border-bottom: 1.5px solid var(--nature-black);
+      background: transparent;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 12px 15px;
+      color: var(--nature-black);
+      text-align: left;
+    }
+
+    .article-table td {
+      padding: 12px 15px;
+      border: none;
+      border-bottom: 1px solid #eee;
+    }
+
+    .article-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .article-table tr:hover {
+      background-color: var(--bg-soft);
+    }
+
+    /* ===== EQUATIONS - SOBRÍAS Y PROTAGONISTAS ===== */
+    .MathJax_Display, .math-container {
+      margin: 3rem 0 !important;
+      padding: 2rem;
+      background: linear-gradient(to right, transparent, var(--bg-soft), transparent);
+      border-top: 1px solid var(--border-color);
+      border-bottom: 1px solid var(--border-color);
+      transition: transform 0.3s ease;
+      overflow-x: auto;
+    }
+
+    .math-container:hover {
+      transform: scale(1.01);
+    }
+
+    /* ===== LISTS - DESPLAZADAS A LA DERECHA ===== */
+    .article-content ol, 
+    .article-content ul {
+      margin: 1.5rem 0 1.5rem 4rem;
+      padding-left: 0;
+    }
+
+    .article-content li {
+      margin-bottom: 0.75rem;
+      position: relative;
+    }
+
+    .article-content ol {
+      counter-reset: my-counter;
+      list-style: none;
+    }
+
+    .article-content ol li::before {
+      content: counter(my-counter) ".";
+      counter-increment: my-counter;
+      position: absolute;
+      left: -2.5rem;
+      font-weight: 700;
+      color: var(--nature-blue);
       font-family: 'Inter', sans-serif;
     }
 
-    .article-table tr:nth-child(even) {
-      background: var(--bg-soft);
+    /* ===== BLOCKQUOTES - ESTILO EDITORIAL ===== */
+    blockquote {
+      margin: 3rem 4rem;
+      padding: 0 1.5rem;
+      border-left: 3px solid var(--accent);
+      font-style: italic;
+      font-size: 1.2rem;
+      color: var(--text-light);
+      position: relative;
+    }
+
+    blockquote::before {
+      content: '"';
+      position: absolute;
+      top: -10px;
+      left: -10px;
+      font-size: 4rem;
+      color: var(--bg-soft);
+      font-family: 'Playfair Display', serif;
+      z-index: -1;
+    }
+
+    blockquote cite {
+      display: block;
+      margin-top: 1rem;
+      font-size: 0.9rem;
+      font-style: normal;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: var(--nature-black);
+      letter-spacing: 1px;
     }
 
     /* Figures */
@@ -1378,6 +1688,13 @@ function generateHtmlTemplate({
       h1 {
         font-size: 2rem;
       }
+      .article-content ol, 
+      .article-content ul {
+        margin: 1.5rem 0 1.5rem 2rem;
+      }
+      blockquote {
+        margin: 2rem 1.5rem;
+      }
     }
 
     @media (max-width: 600px) {
@@ -1399,6 +1716,13 @@ function generateHtmlTemplate({
       }
       .authors {
         font-size: 1rem;
+      }
+      .article-content ol, 
+      .article-content ul {
+        margin: 1.5rem 0 1.5rem 1rem;
+      }
+      blockquote {
+        margin: 1.5rem 1rem;
       }
     }
   </style>
@@ -1422,7 +1746,7 @@ function generateHtmlTemplate({
         <header class="article-header">
           <div class="article-type">${articleType}</div>
           
-          <!-- Título bilingüe -->
+          <!-- Título bilingüe - LÓGICA MEJORADA -->
           <h1 id="main-title">${title}</h1>
           ${altTitle ? `
           <div class="alt-title-container">
