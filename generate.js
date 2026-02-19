@@ -400,6 +400,7 @@ function findAuthorInfo(author, articleAuthorId = null) {
 }
 
 // ========== FUNCIÓN PARA PROCESAR AUTORES CON ICONOS (MEJORADA) ==========
+// ========== FUNCIÓN PARA PROCESAR AUTORES CON ICONOS (MEJORADA CON IDIOMA) ==========
 function processAuthorsWithIcons(authors, article = null, lang = 'es') {
   if (!authors) return 'Autor desconocido';
   
@@ -412,6 +413,8 @@ function processAuthorsWithIcons(authors, article = null, lang = 'es') {
       return a; // ya es objeto
     });
   }
+  
+  const isSpanish = lang === 'es';
   
   const authorElements = authorsArray.map((author, index) => {
     // Obtener nombre para mostrar
@@ -427,7 +430,6 @@ function processAuthorsWithIcons(authors, article = null, lang = 'es') {
     }
     
     // Obtener el authorId del artículo si existe
-    // Asumiendo que el artículo tiene un array de authorIds en el mismo orden que los autores
     const articleAuthorId = article && article.authorIds ? article.authorIds[index] : null;
     
     // Buscar información del autor usando nuestra función de matching
@@ -437,8 +439,9 @@ function processAuthorsWithIcons(authors, article = null, lang = 'es') {
     let authorHtml = '';
     
     if (authorInfo && authorInfo.slug) {
-      // Tiene slug, crear enlace
-      authorHtml += `<a href="/team/${authorInfo.slug}.html" class="author-link"`;
+      // Tiene slug, crear enlace - ¡VERSIÓN CORREGIDA PARA IDIOMA!
+      const authorFile = isSpanish ? `${authorInfo.slug}.html` : `${authorInfo.slug}EN.html`;
+      authorHtml += `<a href="/team/${authorFile}" class="author-link"`;
       
       // Añadir atributos de datos para metadata
       if (authorInfo.uid) {
