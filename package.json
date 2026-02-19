@@ -1,0 +1,15 @@
+{
+  "name": "articles-generator",
+  "version": "1.0.0",
+  "description": "Generador estático de artículos para la revista",
+  "main": "generate.js",
+  "scripts": {
+    "generate": "node generate.js",
+    "build": "node generate.js"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.12",
+    "fs-extra": "^11.2.0"
+  },
+  "type": "commonjs"
+}
