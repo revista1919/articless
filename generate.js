@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const cheerio = require('cheerio');
 // ... al inicio del archivo, junto a los otros require
-const fetch = require('node-fetch');
+import fetch from 'node-fetch';
 // ========== CONFIGURACIÓN ==========
 const ARTICLES_JSON = path.join(__dirname, 'articles.json');
 const OUTPUT_HTML_DIR = path.join(__dirname, 'articles');
