@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const cheerio = require('cheerio');
-
+// ... al inicio del archivo, junto a los otros require
+const fetch = require('node-fetch');
 // ========== CONFIGURACIÓN ==========
 const ARTICLES_JSON = path.join(__dirname, 'articles.json');
 const OUTPUT_HTML_DIR = path.join(__dirname, 'articles');
@@ -346,21 +347,35 @@ async function generateAll() {
     console.log(`📄 ${articles.length} artículos cargados`);
 
     // 2. Intentar cargar team.json para slugs de autores (si existe)
-    let authorToSlug = {};
-    try {
-      const teamJsonPath = path.join(__dirname, '..', 'team', 'Team.json');
-      if (fs.existsSync(teamJsonPath)) {
-        const team = JSON.parse(fs.readFileSync(teamJsonPath, 'utf8'));
-        team.forEach(member => {
-          if (member.displayName) {
-            authorToSlug[member.displayName] = member.slug;
-          }
-        });
-        console.log(`📚 ${Object.keys(authorToSlug).length} autores encontrados en team`);
+// 2. Cargar team.json desde la URL para slugs de autores
+let authorToSlug = {};
+try {
+  const TEAM_JSON_URL = 'https://www.revistacienciasestudiantes.com/team/Team.json';
+  console.log(`🌐 Cargando equipo desde: ${TEAM_JSON_URL}`);
+
+  const response = await fetch(TEAM_JSON_URL);
+  if (!response.ok) {
+    throw new Error(`Error HTTP ${response.status} al cargar Team.json`);
+  }
+
+  const team = await response.json();
+
+  if (Array.isArray(team)) {
+    team.forEach(member => {
+      // Usa 'displayName' que es el campo que viste en el JSON
+      if (member.displayName) {
+        authorToSlug[member.displayName] = member.slug;
       }
-    } catch (e) {
-      console.log('ℹ️ No se pudo cargar Team.json, los autores no tendrán enlaces');
-    }
+    });
+    console.log(`📚 ${Object.keys(authorToSlug).length} autores encontrados en team online`);
+  } else {
+    console.log('⚠️ El JSON cargado no es un array.');
+  }
+
+} catch (e) {
+  console.log('⚠️ No se pudo cargar Team.json desde la URL, los autores no tendrán enlaces. Error:', e.message);
+  // El script continúa sin los enlaces
+}
 
     // 3. Generar HTML para cada artículo
     for (const article of articles) {
