@@ -440,7 +440,7 @@ function processAuthorsWithIcons(authors, article = null, lang = 'es') {
     
     if (authorInfo && authorInfo.slug) {
       // Tiene slug, crear enlace - ¡VERSIÓN CORREGIDA PARA IDIOMA!
-      const authorFile = isSpanish ? `${authorInfo.slug}.html` : `${authorInfo.slug}EN.html`;
+      const authorFile = isSpanish ? `${authorInfo.slug}.html` : `${authorInfo.slug}.EN.html`;
       authorHtml += `<a href="/team/${authorFile}" class="author-link"`;
       
       // Añadir atributos de datos para metadata
