@@ -1245,9 +1245,10 @@ function generateHtmlTemplate({
 
     /* Article Content */
     .article-content {
-      font-size: 1.05rem;
-      line-height: 1.7;
-    }
+  font-size: 1.05rem;
+  line-height: 1.7;
+  text-align: justify;  /* ← AÑADE ESTA LÍNEA */
+}
 
     .article-content p {
       margin-bottom: 1.2rem;
