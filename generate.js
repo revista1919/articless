@@ -205,6 +205,8 @@ const emailSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
   <polyline points="22,6 12,13 2,6"></polyline>
 </svg>`;
 
+const ccLogoSvg = `<img src="https://www.static.tu.berlin/fileadmin/www/_processed_/5/e/csm_by_74fa853263.png" alt="CC BY 4.0" style="height: 1.2em; width: auto; vertical-align: middle;">`;
+
 // ========== CARGA DE TEAM.JSON CON MATCHING ROBUSTO ==========
 let authorMap = {}; // Mapa por uid
 let authorByNameMap = {}; // Mapa por nombre normalizado
@@ -539,6 +541,8 @@ function processCodeBlocks(html) {
     const $el = $(el);
     const alt = $el.attr('alt') || '';
     const src = $el.attr('src') || '';
+    const style = $el.attr('style') || '';
+    const align = $el.attr('align') || '';
     
     if (src && !src.startsWith('http') && !src.startsWith('data:')) {
       // Imagen local - mantener ruta relativa
@@ -546,9 +550,20 @@ function processCodeBlocks(html) {
     }
     
     $el.addClass('article-image');
+    
+    // Determinar si la imagen debe flotar
+    let floatClass = '';
+    if (style.includes('float: left') || align === 'left') {
+      floatClass = ' float-left';
+    } else if (style.includes('float: right') || align === 'right') {
+      floatClass = ' float-right';
+    }
+    
     if (alt) {
-      $el.wrap('<figure class="image-figure"></figure>');
+      $el.wrap(`<figure class="image-figure${floatClass}"></figure>`);
       $el.after(`<figcaption class="image-caption">${alt}</figcaption>`);
+    } else {
+      $el.wrap(`<figure class="image-figure${floatClass}"></figure>`);
     }
   });
   
@@ -667,7 +682,8 @@ async function generateArticleHtml(article) {
     domain: DOMAIN,
     oaSvg,
     orcidSvg,
-    emailSvg
+    emailSvg,
+    ccLogoSvg
   });
 
   const filePathEs = path.join(OUTPUT_HTML_DIR, `article-${articleSlug}.html`);
@@ -698,7 +714,8 @@ async function generateArticleHtml(article) {
     domain: DOMAIN,
     oaSvg,
     orcidSvg,
-    emailSvg
+    emailSvg,
+    ccLogoSvg
   });
 
   const filePathEn = path.join(OUTPUT_HTML_DIR, `article-${articleSlug}EN.html`);
@@ -729,7 +746,8 @@ function generateHtmlTemplate({
   domain,
   oaSvg,
   orcidSvg,
-  emailSvg
+  emailSvg,
+  ccLogoSvg
 }) {
   const isSpanish = lang === 'es';
   
@@ -804,7 +822,8 @@ function generateHtmlTemplate({
       downloadBibTeX: 'Descargar BibTeX',
       contents: 'CONTENIDO',
       copyCode: 'Copiar código',
-      codeCopied: '✓ Copiado'
+      codeCopied: '✓ Copiado',
+      license: 'Licencia'
     },
     en: {
       backToCatalog: 'Back to catalog',
@@ -835,7 +854,8 @@ function generateHtmlTemplate({
       downloadBibTeX: 'Download BibTeX',
       contents: 'CONTENTS',
       copyCode: 'Copy code',
-      codeCopied: '✓ Copied'
+      codeCopied: '✓ Copied',
+      license: 'License'
     }
   };
 
@@ -1317,6 +1337,7 @@ function generateHtmlTemplate({
       border-top: 2px solid var(--nature-black);
       border-bottom: 2px solid var(--nature-black);
       padding: 0.5rem 0;
+      -webkit-overflow-scrolling: touch;
     }
 
     .article-table {
@@ -1325,9 +1346,7 @@ function generateHtmlTemplate({
       font-family: 'Inter', sans-serif;
       font-size: 0.9rem;
       color: var(--text-main);
-      max-width: 100%;
-      overflow-x: auto;
-      display: block;
+      min-width: 100%;
     }
 
     .article-table th {
@@ -1354,7 +1373,48 @@ function generateHtmlTemplate({
       background-color: var(--bg-soft);
     }
 
-    /* ===== EQUATIONS - SOBRÍAS Y PROTAGONISTAS ===== */
+    /* ===== FIGURES AND FLOATING ELEMENTS ===== */
+    .image-figure {
+      margin: 1.5rem 0;
+      text-align: center;
+      max-width: 100%;
+    }
+    
+    .image-figure.float-left {
+      float: left;
+      margin: 0 1.5rem 1rem 0;
+      max-width: 50%;
+    }
+    
+    .image-figure.float-right {
+      float: right;
+      margin: 0 0 1rem 1.5rem;
+      max-width: 50%;
+    }
+
+    .article-image {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+      display: block;
+    }
+
+    .image-caption {
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      font-style: italic;
+      text-align: center;
+    }
+
+    /* Clear floats */
+    .clearfix::after {
+      content: "";
+      clear: both;
+      display: table;
+    }
+
+    /* ===== EQUATIONS ===== */
     .MathJax_Display, .math-container {
       margin: 3rem 0 !important;
       padding: 2rem;
@@ -1363,38 +1423,79 @@ function generateHtmlTemplate({
       border-bottom: 1px solid var(--border-color);
       transition: transform 0.3s ease;
       overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
     }
 
     .math-container:hover {
       transform: scale(1.01);
     }
 
-    /* ===== LISTS - DESPLAZADAS A LA DERECHA ===== */
-    .article-content ol, 
-    .article-content ul {
-      margin: 1.5rem 0 1.5rem 4rem;
+    /* ===== LISTS - VERSÁTILES Y ANIDADAS ===== */
+    .article-content ul, 
+    .article-content ol {
+      margin: 1.5rem 0 1.5rem 2rem;
       padding-left: 0;
     }
 
     .article-content li {
-      margin-bottom: 0.75rem;
+      margin-bottom: 0.5rem;
       position: relative;
     }
 
-    .article-content ol {
-      counter-reset: my-counter;
-      list-style: none;
+    /* Listas anidadas con diferentes estilos */
+    .article-content ul ul {
+      list-style-type: circle;
+      margin-top: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    .article-content ul ul ul {
+      list-style-type: square;
+    }
+    
+    .article-content ul ul ul ul {
+      list-style-type: disc;
     }
 
-    .article-content ol li::before {
-      content: counter(my-counter) ".";
-      counter-increment: my-counter;
-      position: absolute;
-      left: -2.5rem;
-      font-weight: 700;
-      color: var(--nature-blue);
-      font-family: 'Inter', sans-serif;
+    .article-content ol {
+      list-style-type: decimal;
     }
+    
+    .article-content ol ol {
+      list-style-type: lower-alpha;
+    }
+    
+    .article-content ol ol ol {
+      list-style-type: lower-roman;
+    }
+    
+    .article-content ol ol ol ol {
+      list-style-type: upper-alpha;
+    }
+    
+    .article-content ol ol ol ol ol {
+      list-style-type: upper-roman;
+    }
+
+    /* Listas mixtas */
+    .article-content ul ol, 
+    .article-content ol ul {
+      margin-top: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    /* Listas con viñetas personalizadas */
+    .article-content ul[type="disc"] { list-style-type: disc; }
+    .article-content ul[type="circle"] { list-style-type: circle; }
+    .article-content ul[type="square"] { list-style-type: square; }
+    .article-content ul[type="none"] { list-style-type: none; }
+    
+    .article-content ol[type="1"] { list-style-type: decimal; }
+    .article-content ol[type="A"] { list-style-type: upper-alpha; }
+    .article-content ol[type="a"] { list-style-type: lower-alpha; }
+    .article-content ol[type="I"] { list-style-type: upper-roman; }
+    .article-content ol[type="i"] { list-style-type: lower-roman; }
 
     /* ===== BLOCKQUOTES - ESTILO EDITORIAL ===== */
     blockquote {
@@ -1427,25 +1528,6 @@ function generateHtmlTemplate({
       text-transform: uppercase;
       color: var(--nature-black);
       letter-spacing: 1px;
-    }
-
-    /* Figures */
-    .image-figure {
-      margin: 2rem 0;
-      text-align: center;
-    }
-
-    .article-image {
-      max-width: 100%;
-      height: auto;
-      border-radius: 4px;
-    }
-
-    .image-caption {
-      margin-top: 0.5rem;
-      font-size: 0.9rem;
-      color: var(--text-muted);
-      font-style: italic;
     }
 
     /* Math */
@@ -1661,6 +1743,36 @@ function generateHtmlTemplate({
       margin: 1.5rem 0;
     }
 
+    /* License Section */
+    .license-section {
+      margin-top: 3rem;
+      padding: 1.5rem;
+      border-top: 2px solid var(--border-color);
+      background: var(--bg-soft);
+      border-radius: 8px;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
+      color: var(--text-light);
+      text-align: center;
+    }
+    
+    .license-section a {
+      color: var(--nature-blue);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    
+    .license-section a:hover {
+      text-decoration: underline;
+    }
+    
+    .license-section img {
+      height: 1.5em;
+      width: auto;
+      vertical-align: middle;
+      margin: 0 0.5rem;
+    }
+
     /* Mobile info section */
     .mobile-info {
       display: none;
@@ -1691,12 +1803,18 @@ function generateHtmlTemplate({
       h1 {
         font-size: 2rem;
       }
-      .article-content ol, 
-      .article-content ul {
-        margin: 1.5rem 0 1.5rem 2rem;
+      .article-content ul, 
+      .article-content ol {
+        margin: 1.5rem 0 1.5rem 1.5rem;
       }
       blockquote {
         margin: 2rem 1.5rem;
+      }
+      .image-figure.float-left,
+      .image-figure.float-right {
+        float: none;
+        margin: 1.5rem 0;
+        max-width: 100%;
       }
     }
 
@@ -1720,12 +1838,23 @@ function generateHtmlTemplate({
       .authors {
         font-size: 1rem;
       }
-      .article-content ol, 
-      .article-content ul {
+      .article-content ul, 
+      .article-content ol {
         margin: 1.5rem 0 1.5rem 1rem;
       }
       blockquote {
         margin: 1.5rem 1rem;
+        font-size: 1rem;
+      }
+      .table-wrapper {
+        margin: 2rem 0;
+      }
+      .article-table {
+        font-size: 0.8rem;
+      }
+      .article-table th,
+      .article-table td {
+        padding: 8px 10px;
       }
     }
   </style>
@@ -1850,6 +1979,22 @@ function generateHtmlTemplate({
           </div>
         </section>
         ` : ''}
+
+        <!-- License Section -->
+        <section id="license" class="license-section">
+          <p>
+            <strong>${t.license}:</strong> 
+            Este artículo se publica bajo la licencia 
+            <a href="https://creativecommons.org/licenses/by/4.0/deed.${isSpanish ? 'es' : 'en'}" target="_blank" rel="license noopener noreferrer">
+              ${ccLogoSvg} CC BY 4.0
+            </a>
+          </p>
+          <p style="margin-top: 0.5rem; font-size: 0.8rem;">
+            <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="license noopener noreferrer">
+              Creative Commons Attribution 4.0 International License
+            </a>
+          </p>
+        </section>
       </article>
 
       <!-- Mobile Info Section -->
