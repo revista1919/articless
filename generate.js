@@ -205,7 +205,7 @@ const emailSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
   <polyline points="22,6 12,13 2,6"></polyline>
 </svg>`;
 
-const ccLogoSvg = `<img src="https://www.static.tu.berlin/fileadmin/www/_processed_/5/e/csm_by_74fa853263.png" alt="CC BY 4.0" style="height: 1.2em; width: auto; vertical-align: middle;">`;
+const ccLogoSvg = `<img src="https://bibliotecas.ucn.cl/wp-content/uploads/2025/04/by1.png" alt="CC BY 4.0" style="height: 1.2em; width: auto; vertical-align: middle;">`;
 
 // ========== CARGA DE TEAM.JSON CON MATCHING ROBUSTO ==========
 let authorMap = {}; // Mapa por uid
