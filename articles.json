@@ -728,10 +728,13 @@
       {
         "name": "José Ignacio Carter",
         "authorId": "GKTVvsA50bVp0o6UakN5xxPCdoz2",
-        "email": "",
-        "institution": "Colegio Curimon"
+        "email": "joseignaciocarterpalma@gmail.com",
+        "institution": "Colegio Curimon",
+        "orcid": null
       }
-    ]
+    ],
+    "updatedAt": "2026-02-21T04:41:03.382Z",
+    "updatedBy": "Wp9AbMocILX4UOy6il09qluhrL23"
   },
   {
     "titulo": "Análisis de experiencia comparada sobre programas de protección para hijos de personas privadas de libertad en relación al caso del Programa Abriendo Caminos de Chile",
