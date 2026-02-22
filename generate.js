@@ -526,26 +526,27 @@ function processCodeBlocks(html) {
     const codeId = `code-${Math.random().toString(36).substr(2, 9)}`;
     
     // NUEVO HTML con numeración de líneas y estructura VS Code
-    const codeHtml = `
-      <div class="code-block-wrapper">
-        <div class="code-header">
-          <span class="code-language">${language || 'código'}</span>
-          <button class="code-copy-btn" onclick="copyCode('${codeId}', this)" title="Copiar código (Ctrl+C)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-            Copiar
-          </button>
-        </div>
-        <div class="code-block-container">
-          <div class="code-line-numbers">
-            ${lineNumbersHtml}
-          </div>
-          <pre id="${codeId}" class="code-block ${language ? `language-${language}` : ''}"><code>${wrappedLines}</code></pre>
-        </div>
+    // NUEVO HTML con numeración de líneas y estructura VS Code - MEJORADO PARA MÓVIL
+const codeHtml = `
+  <div class="code-block-wrapper">
+    <div class="code-header">
+      <span class="code-language">${language || 'código'}</span>
+      <button class="code-copy-btn" onclick="copyCode('${codeId}', this)" title="Copiar código (Ctrl+C)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+        <span class="copy-text">Copiar</span>
+      </button>
+    </div>
+    <div class="code-block-container">
+      <div class="code-line-numbers" aria-hidden="true">
+        ${lineNumbersHtml}
       </div>
-    `;
+      <pre id="${codeId}" class="code-block ${language ? `language-${language}` : ''}"><code class="${language ? `language-${language}` : ''}">${wrappedLines}</code></pre>
+    </div>
+  </div>
+`;
     
     $el.parent().replaceWith(codeHtml);
   });
@@ -927,7 +928,17 @@ function generateHtmlTemplate({
       --aside-width: 280px;
       --content-max-width: 800px;
     }
+/* Garantizar que nada desborde el viewport */
+* {
+  max-width: 100vw;
+  box-sizing: border-box;
+}
 
+body {
+  overflow-x: hidden;
+  width: 100%;
+  position: relative;
+}
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
@@ -1353,6 +1364,35 @@ function generateHtmlTemplate({
   background: #1e1e1e;
   position: relative;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100vw;
+  width: 100%;
+}
+
+/* Asegurar que el código no fuerce el ancho */
+.code-block {
+  flex: 1;
+  margin: 0;
+  padding: 1.2rem 0 1.2rem 1.5rem;
+  background: transparent;
+  color: #d4d4d4;
+  line-height: 1.6;
+  font-size: 0.85rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  tab-size: 2;
+  white-space: pre;
+  word-break: normal;
+  max-width: 100%;
+  min-width: 0; /* Importante para flexbox */
+}
+
+.code-block code {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  text-shadow: none;
+  display: inline-block;
+  min-width: min-content;
 }
 
 /* Numeración de líneas */
@@ -1633,17 +1673,53 @@ function generateHtmlTemplate({
     }
 
     /* ===== EQUATIONS ===== */
-    .MathJax_Display, .math-container {
-      margin: 3rem 0 !important;
-      padding: 2rem;
-      background: linear-gradient(to right, transparent, var(--bg-soft), transparent);
-      border-top: 1px solid var(--border-color);
-      border-bottom: 1px solid var(--border-color);
-      transition: transform 0.3s ease;
-      overflow-x: auto;
-      overflow-y: hidden;
-      -webkit-overflow-scrolling: touch;
-    }
+    /* ===== EQUATIONS - CON SCROLL EN MÓVIL ===== */
+.MathJax_Display, .math-container {
+  margin: 2rem 0 !important;
+  padding: 1.5rem 0.5rem;
+  background: linear-gradient(to right, transparent, var(--bg-soft), transparent);
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  scrollbar-width: thin;
+  scrollbar-color: var(--nature-blue) var(--border-color);
+}
+
+.MathJax_Display::-webkit-scrollbar,
+.math-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.MathJax_Display::-webkit-scrollbar-track,
+.math-container::-webkit-scrollbar-track {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+.MathJax_Display::-webkit-scrollbar-thumb,
+.math-container::-webkit-scrollbar-thumb {
+  background: var(--nature-blue);
+  border-radius: 3px;
+}
+
+.MathJax_Display:hover,
+.math-container:hover {
+  transform: none; /* Quitamos el scale que podía causar problemas */
+}
+
+/* Forzar que MathJax respete el contenedor */
+.MathJax {
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+}
+
+.MJX-TEX {
+  white-space: nowrap !important;
+}
 
     .math-container:hover {
       transform: scale(1.01);
@@ -2074,7 +2150,7 @@ function generateHtmlTemplate({
       .article-table td {
         padding: 8px 10px;
       }
-        /* AÑADE ESTO DENTRO DE @media (max-width: 600px) */
+
 .code-block-wrapper {
   margin: 1.5rem 0;
   font-size: 0.75rem;
@@ -2108,6 +2184,102 @@ function generateHtmlTemplate({
   padding: 0.8rem 0 0.8rem 1rem;
   font-size: 0.75rem;
 }
+  .code-block-wrapper {
+    margin: 1rem 0;
+    border-radius: 8px;
+    max-width: 100%;
+  }
+  
+  .code-block-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .code-line-numbers {
+    min-width: 30px;
+    padding: 0.8rem 0 0.8rem 0.5rem;
+    font-size: 0.7rem;
+    position: sticky;
+    left: 0;
+    background: #1e1e1e;
+    z-index: 2;
+  }
+  
+  .code-block {
+    padding: 0.8rem 1rem;
+    font-size: 0.7rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    min-width: 0;
+  }
+  
+  /* Ecuaciones en móvil */
+  .MathJax_Display, .math-container {
+    margin: 1.5rem 0 !important;
+    padding: 1rem 0.25rem;
+    font-size: 0.9rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: calc(100vw - 2rem);
+  }
+  
+  /* Tablas en móvil */
+  .table-wrapper {
+    margin: 1.5rem 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+  
+  .article-table {
+    min-width: 100%;
+    font-size: 0.8rem;
+  }
+  
+  .article-table th,
+  .article-table td {
+    padding: 8px 10px;
+    white-space: nowrap; /* Opcional: permite scroll horizontal en tablas */
+  }
+  
+  /* Imágenes flotantes en móvil */
+  .image-figure.float-left,
+  .image-figure.float-right {
+    float: none;
+    margin: 1rem 0;
+    max-width: 100%;
+  }
+  
+  /* Ajustar el contenedor principal */
+  .main-wrapper {
+    padding: 1rem;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+  
+  .article-container {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  
+  .article-content {
+    max-width: 100%;
+    overflow-x: hidden;
+    word-wrap: break-word;
+  }
+  
+  /* Evitar que nada se desborde */
+  img, svg, iframe, embed, object {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+  
+  /* Código en línea */
+  code:not(pre code) {
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-width: 100%;
+  }
     }
   </style>
 </head>
