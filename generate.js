@@ -489,6 +489,7 @@ function processAuthorsWithIcons(authors, article = null, lang = 'es') {
 }
 
 // ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML ==========
+// ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML ==========
 function processCodeBlocks(html) {
   if (!html) return html;
   
@@ -498,8 +499,10 @@ function processCodeBlocks(html) {
   $('pre code, pre').each((i, el) => {
     const $el = $(el);
     const code = $el.text();
+    const lines = code.split('\n');
+    const lineCount = lines.length;
     
-    // Detectar lenguaje (simplificado)
+    // Detectar lenguaje
     let language = '';
     const classAttr = $el.attr('class') || '';
     if (classAttr.includes('language-')) {
@@ -508,13 +511,26 @@ function processCodeBlocks(html) {
       language = classAttr.split('lang-')[1].split(' ')[0];
     }
     
-    // Envolver en contenedor con botón de copiar
+    // Generar números de línea
+    let lineNumbersHtml = '';
+    for (let i = 1; i <= lineCount; i++) {
+      lineNumbersHtml += `<span class="code-line-number">${i}</span>`;
+    }
+    
+    // Escapar código y envolver cada línea para hover
+    const escapedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const wrappedLines = lines.map(line => 
+      `<span class="line">${line || ' '}</span>`
+    ).join('\n');
+    
     const codeId = `code-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // NUEVO HTML con numeración de líneas y estructura VS Code
     const codeHtml = `
       <div class="code-block-wrapper">
         <div class="code-header">
           <span class="code-language">${language || 'código'}</span>
-          <button class="code-copy-btn" onclick="copyCode('${codeId}', this)" title="Copiar código">
+          <button class="code-copy-btn" onclick="copyCode('${codeId}', this)" title="Copiar código (Ctrl+C)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -522,7 +538,12 @@ function processCodeBlocks(html) {
             Copiar
           </button>
         </div>
-        <pre id="${codeId}" class="code-block ${language ? `language-${language}` : ''}"><code>${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>
+        <div class="code-block-container">
+          <div class="code-line-numbers">
+            ${lineNumbersHtml}
+          </div>
+          <pre id="${codeId}" class="code-block ${language ? `language-${language}` : ''}"><code>${wrappedLines}</code></pre>
+        </div>
       </div>
     `;
     
@@ -545,13 +566,11 @@ function processCodeBlocks(html) {
     const align = $el.attr('align') || '';
     
     if (src && !src.startsWith('http') && !src.startsWith('data:')) {
-      // Imagen local - mantener ruta relativa
       $el.attr('src', src);
     }
     
     $el.addClass('article-image');
     
-    // Determinar si la imagen debe flotar
     let floatClass = '';
     if (style.includes('float: left') || align === 'left') {
       floatClass = ' float-left';
@@ -1261,76 +1280,274 @@ function generateHtmlTemplate({
       margin: 1.5rem 0;
     }
 
-    /* ===== CODE BLOCKS - ESTILO ÉPICO ===== */
-    .code-block-wrapper {
-      margin: 2.5rem 0;
-      border: none;
-      border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-      background: var(--code-bg);
-      overflow: hidden;
-    }
+/* ===== BLOQUES DE CÓDIGO ESTILO VS CODE DARK+ ===== */
+.code-block-wrapper {
+  margin: 2.5rem 0;
+  border-radius: 12px;
+  background: #1e1e1e;
+  box-shadow: 0 15px 30px -10px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Courier New', monospace;
+  border: 1px solid #3c3c3c;
+}
 
-    .code-header {
-      background: var(--code-header-bg);
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-      padding: 0.75rem 1.25rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
+.code-header {
+  background: #2d2d2d;
+  padding: 0.6rem 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #3c3c3c;
+  color: #cccccc;
+  font-family: 'Inter', sans-serif;
+}
 
-    .code-language {
-      color: #a9b1d6;
-      font-weight: 700;
-      letter-spacing: 1px;
-      font-size: 0.8rem;
-      text-transform: uppercase;
-    }
+.code-language {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #9cdcfe;
+}
 
-    .code-copy-btn {
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 4px;
-      padding: 0.3rem 0.8rem;
-      font-size: 0.7rem;
-      font-family: 'Inter', sans-serif;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      color: #a9b1d6;
-      transition: all 0.2s;
-    }
+.code-language::before {
+  content: "●";
+  color: #4ec9b0;
+  font-size: 1rem;
+  margin-right: 4px;
+}
 
-    .code-copy-btn:hover {
-      background: var(--nature-blue);
-      border-color: var(--nature-blue);
-      color: white;
-    }
+.code-copy-btn {
+  background: #3c3c3c;
+  border: 1px solid #555555;
+  border-radius: 4px;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.7rem;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #cccccc;
+  transition: all 0.2s ease;
+}
 
-    .code-copy-btn svg {
-      width: 14px;
-      height: 14px;
-    }
+.code-copy-btn:hover {
+  background: #4ec9b0;
+  border-color: #4ec9b0;
+  color: #1e1e1e;
+}
 
-    .code-block {
-      margin: 0;
-      padding: 1.5rem;
-      background: transparent;
-      color: var(--code-text);
-      line-height: 1.6;
-      font-size: 0.85rem;
-      overflow-x: auto;
-      scrollbar-color: #444 transparent;
-      font-family: 'JetBrains Mono', monospace;
-    }
+.code-copy-btn svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+}
 
-    .code-block code {
-      font-family: 'JetBrains Mono', monospace;
-      text-shadow: 0 0 2px rgba(0,0,0,0.3);
-    }
+.code-block-container {
+  display: flex;
+  background: #1e1e1e;
+  position: relative;
+  overflow-x: auto;
+}
 
+/* Numeración de líneas */
+.code-line-numbers {
+  display: flex;
+  flex-direction: column;
+  padding: 1.2rem 0 1.2rem 1rem;
+  text-align: right;
+  background: #1e1e1e;
+  color: #6d8a9e;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  font-family: 'JetBrains Mono', monospace;
+  user-select: none;
+  border-right: 1px solid #3c3c3c;
+  min-width: 45px;
+  letter-spacing: 0.5px;
+}
+
+.code-line-number {
+  display: block;
+  padding-right: 0.8rem;
+  color: #6d8a9e;
+  font-size: 0.8rem;
+  transition: color 0.2s;
+}
+
+.code-block-container:hover .code-line-number {
+  color: #9cdcfe;
+}
+
+/* Contenedor del código */
+.code-block {
+  flex: 1;
+  margin: 0;
+  padding: 1.2rem 0 1.2rem 1.5rem;
+  background: transparent;
+  color: #d4d4d4;
+  line-height: 1.6;
+  font-size: 0.85rem;
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  tab-size: 2;
+  white-space: pre;
+  word-break: normal;
+  position: relative;
+}
+
+.code-block code {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  text-shadow: none;
+  display: block;
+}
+
+/* Highlight.js VS Code Dark+ colors */
+.code-block .hljs {
+  background: transparent;
+  color: #d4d4d4;
+}
+
+.code-block .hljs-keyword,
+.code-block .hljs-built_in {
+  color: #569cd6;
+  font-weight: 600;
+}
+
+.code-block .hljs-title,
+.code-block .hljs-function {
+  color: #dcdcaa;
+}
+
+.code-block .hljs-string {
+  color: #ce9178;
+}
+
+.code-block .hljs-number {
+  color: #b5cea8;
+}
+
+.code-block .hljs-comment {
+  color: #6a9955;
+  font-style: italic;
+}
+
+.code-block .hljs-variable,
+.code-block .hljs-name {
+  color: #9cdcfe;
+}
+
+.code-block .hljs-operator {
+  color: #d4d4d4;
+}
+
+.code-block .hljs-type {
+  color: #4ec9b0;
+}
+
+.code-block .hljs-params {
+  color: #d4d4d4;
+}
+
+.code-block .hljs-attribute {
+  color: #9cdcfe;
+}
+
+.code-block .hljs-tag {
+  color: #569cd6;
+}
+
+.code-block .hljs-class {
+  color: #4ec9b0;
+}
+
+.code-block .hljs-selector-class {
+  color: #d7ba7d;
+}
+
+.code-block .hljs-meta {
+  color: #d4d4d4;
+}
+
+.code-block .hljs-regexp {
+  color: #d16969;
+}
+
+.code-block .hljs-symbol {
+  color: #d4d4d4;
+}
+
+.code-block .hljs-bullet {
+  color: #d4d4d4;
+}
+
+.code-block .hljs-link {
+  color: #569cd6;
+  text-decoration: underline;
+}
+
+.code-block .hljs-emphasis {
+  font-style: italic;
+}
+
+.code-block .hljs-strong {
+  font-weight: bold;
+}
+
+/* Scrollbars personalizados */
+.code-block::-webkit-scrollbar,
+.code-line-numbers::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.code-block::-webkit-scrollbar-track,
+.code-line-numbers::-webkit-scrollbar-track {
+  background: #2d2d2d;
+}
+
+.code-block::-webkit-scrollbar-thumb,
+.code-line-numbers::-webkit-scrollbar-thumb {
+  background: #555555;
+  border-radius: 4px;
+}
+
+.code-block::-webkit-scrollbar-thumb:hover,
+.code-line-numbers::-webkit-scrollbar-thumb:hover {
+  background: #666666;
+}
+
+/* Línea destacada al hover */
+.code-block code .line:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Tooltip para el botón */
+.code-copy-btn[title] {
+  position: relative;
+}
+
+.code-copy-btn[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2d2d2d;
+  color: #cccccc;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  border: 1px solid #3c3c3c;
+  margin-bottom: 8px;
+  z-index: 100;
+}
     /* ===== TABLES - ESTILO ACADÉMICO BOOKTABS ===== */
     .table-wrapper {
       overflow-x: auto;
@@ -1857,6 +2074,40 @@ function generateHtmlTemplate({
       .article-table td {
         padding: 8px 10px;
       }
+        /* AÑADE ESTO DENTRO DE @media (max-width: 600px) */
+.code-block-wrapper {
+  margin: 1.5rem 0;
+  font-size: 0.75rem;
+}
+
+.code-header {
+  padding: 0.4rem 0.8rem;
+}
+
+.code-language {
+  font-size: 0.7rem;
+}
+
+.code-copy-btn {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.65rem;
+}
+
+.code-line-numbers {
+  min-width: 35px;
+  padding: 0.8rem 0 0.8rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.code-line-number {
+  padding-right: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.code-block {
+  padding: 0.8rem 0 0.8rem 1rem;
+  font-size: 0.75rem;
+}
     }
   </style>
 </head>
