@@ -1018,14 +1018,14 @@ body {
     }
 
     .issn-badge {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.75rem;
-      background: var(--bg-soft);
-      padding: 4px 12px;
-      border-radius: 20px;
-      border: 1px solid var(--border-color);
-      color: var(--text-light);
-    }
+  font-family: 'Inter', sans-serif; /* Cambiado de JetBrains Mono a Inter */
+  font-size: 0.75rem;
+  background: var(--bg-soft);
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+  color: var(--text-light);
+}
 
     /* Main Layout */
     .main-wrapper {
@@ -2349,7 +2349,7 @@ body {
 <body>
   <nav class="top-nav">
     <a href="/" class="journal-name">Revista Nacional de las Ciencias para Estudiantes</a>
-    <div class="issn-badge">ISSN: 3087-2839 (Online)</div>
+    <div class="issn-badge">ISSN: 3087-2839</div>
   </nav>
 
   <div class="main-wrapper">
