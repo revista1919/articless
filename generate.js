@@ -192,7 +192,7 @@ function generateBibTeX(article) {
 }
 
 // ========== ICONOS SVG ==========
-const oaSvg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="72" height="72" viewBox="0 0 300 120" style="vertical-align: middle;">
+const oaSvg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="120" height="48" viewBox="0 0 300 120" style="vertical-align: middle;">
   <g transform="matrix(0.25 0 0 -0.25 0 120)">
     <defs>
       <path id="a" d="M-90-36h900v360H-90z"/>
