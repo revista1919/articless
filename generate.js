@@ -192,7 +192,7 @@ function generateBibTeX(article) {
 }
 
 // ========== ICONOS SVG ==========
-const oaSvg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="72" height="72" viewBox="200 50 500 260" style="vertical-align: middle;">
+const oaSvg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="2500" height="1000" viewBox="0 0 900 360" style="vertical-align: middle;">
   <g transform="matrix(1.25 0 0 -1.25 0 360)">
     <defs>
       <path id="a" d="M-90-36h900v360H-90z"/>
@@ -2340,7 +2340,7 @@ body {
               ${isSpanish ? 'Abrir PDF' : 'Open PDF'}
             </a>
             <span class="oa-label">
-              ${oaSvg}Open Access
+              ${oaSvg}
             </span>
           </div>
         </header>
