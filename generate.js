@@ -1209,6 +1209,7 @@ body {
       font-weight: 500;
       font-size: 0.9rem;
       font-family: 'Inter', sans-serif;
+      gap: 4px;
     }
 
     h2 {
