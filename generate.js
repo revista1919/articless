@@ -1881,12 +1881,33 @@ body {
       border-bottom: 1px solid #005a7d;
     }
 
-    /* Right Sidebar with Tabs */
-    .right-sidebar {
+        .right-sidebar {
       position: sticky;
       top: 100px;
-      height: fit-content;
+      max-height: calc(100vh - 120px); /* Altura máxima: 100% del viewport menos el espacio del top-nav y un margen */
+      overflow-y: auto; /* ¡Activa la barra de desplazamiento vertical! */
       font-family: 'Inter', sans-serif;
+      scrollbar-width: thin; /* Para Firefox: barra más delgada */
+      padding-right: 0.5rem; /* Pequeño padding para que el texto no toque la barra */
+    }
+
+    /* Estilo para la barra de desplazamiento en navegadores WebKit (Chrome, Safari, Edge) */
+    .right-sidebar::-webkit-scrollbar {
+      width: 6px; /* Ancho de la barra */
+    }
+
+    .right-sidebar::-webkit-scrollbar-track {
+      background: var(--bg-soft); /* Color de fondo de la pista */
+      border-radius: 3px;
+    }
+
+    .right-sidebar::-webkit-scrollbar-thumb {
+      background: var(--border-color); /* Color del "pulgón" de la barra */
+      border-radius: 3px;
+    }
+
+    .right-sidebar::-webkit-scrollbar-thumb:hover {
+      background: var(--text-muted); /* Color al pasar el mouse */
     }
 
     .info-tabs {
