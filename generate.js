@@ -192,7 +192,7 @@ function generateBibTeX(article) {
 }
 
 // ========== ICONOS SVG ==========
-const oaSvg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="140" height="56" viewBox="0 0 300 120" style="vertical-align: middle; display: inline-block;">
+const oaSvg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="90" height="36" viewBox="0 0 300 120" style="vertical-align: middle; display: inline-block;">
   <g transform="matrix(0.25 0 0 -0.25 0 120)">
     <defs>
       <path id="a" d="M-90-36h900v360H-90z"/>
@@ -1202,7 +1202,7 @@ body {
       background: var(--nature-blue-dark);
     }
 
-    .oa-label {
+.oa-label {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
@@ -1211,12 +1211,11 @@ body {
   font-size: 0.9rem;
   font-family: 'Inter', sans-serif;
   line-height: 1;
-  height: 100%;
 }
 
 .oa-label svg {
   display: block;
-  height: 42px;  /* Controla la altura del SVG */
+  height: 1.2em;  /* Cambiado de 42px a 1.2em para que escale con el texto */
   width: auto;
 }
 
