@@ -1215,7 +1215,7 @@ body {
 
 .oa-label svg {
   display: block;
-  height: 2.5em; /* Cambiado de 1.2em a 2.5em para hacerlo mucho más grande */
+  height: 4em; /* Cambiado de 1.2em a 2.5em para hacerlo mucho más grande */
   width: auto;
 }
 
