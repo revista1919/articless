@@ -1205,7 +1205,7 @@ body {
     .oa-label {
       display: inline-flex;
       align-items: center;
-      gap: 0.25rem;  
+      gap: 0.10rem;  
       color: #F48120;
       font-weight: 500;
       font-size: 0.9rem;
@@ -2340,7 +2340,7 @@ body {
               ${isSpanish ? 'Abrir PDF' : 'Open PDF'}
             </a>
             <span class="oa-label">
-              ${oaSvg}OPEN ACCESS
+              ${oaSvg}Open Access
             </span>
           </div>
         </header>
