@@ -984,7 +984,7 @@ body {
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'PT Serif', 'Noto Sans Math', serif;
+      font-family: 'Lora', serif;
       line-height: 1.7;
       color: var(--text-main);
       background-color: #fff;
