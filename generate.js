@@ -148,49 +148,81 @@ function formatAuthorsDisplay(authors, language = 'es') {
 
 function generateBibTeX(article) {
   const year = new Date(article.fecha).getFullYear();
-  
-  // Obtener primer autor
-  let firstAuthor = '';
-  if (typeof article.autores === 'string') {
-    firstAuthor = article.autores.split(';')[0].split(' ').pop().toLowerCase();
-  } else if (Array.isArray(article.autores) && article.autores.length > 0) {
-    const first = article.autores[0];
-    if (typeof first === 'string') {
-      firstAuthor = first.split(' ').pop().toLowerCase();
-    } else if (first.name) {
-      firstAuthor = first.name.split(' ').pop().toLowerCase();
-    } else if (first.lastName) {
-      firstAuthor = first.lastName.toLowerCase();
+
+  function escapeBibTeX(text) {
+    if (!text) return '';
+
+    const charMap = {
+      'á': "{\\'a}", 'é': "{\\'e}", 'í': "{\\'i}", 'ó': "{\\'o}", 'ú': "{\\'u}",
+      'Á': "{\\'A}", 'É': "{\\'E}", 'Í': "{\\'I}", 'Ó': "{\\'O}", 'Ú': "{\\'U}",
+      'ä': "{\\\"a}", 'ë': "{\\\"e}", 'ï': "{\\\"i}", 'ö': "{\\\"o}", 'ü': "{\\\"u}",
+      'Ä': "{\\\"A}", 'Ë': "{\\\"E}", 'Ï': "{\\\"I}", 'Ö': "{\\\"O}", 'Ü': "{\\\"U}",
+      'ñ': "{\\~n}", 'Ñ': "{\\~N}",
+      'ç': "{\\c{c}}", 'Ç': "{\\c{C}}",
+      '&': "\\&", '%': "\\%", '$': "\\$", '#': "\\#", '_': "\\_"
+    };
+
+    let escaped = text;
+    for (const [char, latex] of Object.entries(charMap)) {
+      escaped = escaped.replace(new RegExp(char, 'g'), latex);
     }
+
+    return escaped;
   }
-  
-  // Formatear autores para BibTeX
-  let authorsForBib = '';
+
+  function formatAuthor(name) {
+    if (!name) return '';
+
+    const parts = name.trim().split(/\s+/);
+
+    if (parts.length === 1) {
+      return escapeBibTeX(parts[0]);
+    }
+
+    const lastName = parts.pop();
+    const firstNames = parts.join(' ');
+
+    return `${escapeBibTeX(lastName)}, ${escapeBibTeX(firstNames)}`;
+  }
+
+  let authors = [];
+
   if (typeof article.autores === 'string') {
-    authorsForBib = article.autores.replace(/;/g, ' and ');
+    authors = article.autores.split(';').map(a => formatAuthor(a.trim()));
   } else if (Array.isArray(article.autores)) {
-    authorsForBib = article.autores.map(a => {
-      if (typeof a === 'string') return a;
-      if (a.name) return a.name;
-      if (a.firstName || a.lastName) return `${a.firstName || ''} ${a.lastName || ''}`.trim();
+    authors = article.autores.map(a => {
+      if (typeof a === 'string') return formatAuthor(a);
+      if (a.name) return formatAuthor(a.name);
+      if (a.firstName || a.lastName) {
+        return formatAuthor(`${a.firstName || ''} ${a.lastName || ''}`.trim());
+      }
       return '';
-    }).join(' and ');
+    });
   }
-  
-  const key = `${firstAuthor}${year}${article.numeroArticulo}`;
+
+  const authorsForBib = authors.filter(Boolean).join(' and ');
+
+  const firstAuthorLast = authors.length
+    ? authors[0].split(',')[0].toLowerCase().replace(/[^a-z]/g, '')
+    : 'article';
+
+  const key = `${firstAuthorLast}${year}${article.numeroArticulo}`;
+
+  const escapedTitle = escapeBibTeX(article.titulo);
+  const journalName = "Revista Nacional de las Ciencias para Estudiantes";
+
   return `@article{${key},
   author = {${authorsForBib}},
-  title = {${article.titulo}},
-  journal = {Revista Nacional de las Ciencias para Estudiantes},
+  title = {${escapedTitle}},
+  journal = {${journalName}},
   year = {${year}},
   volume = {${article.volumen}},
   number = {${article.numero}},
-  pages = {${article.primeraPagina}-${article.ultimaPagina}},
+  pages = {${article.primeraPagina}--${article.ultimaPagina}},
   issn = {3087-2839},
   url = {${DOMAIN}/articles/article-${generateSlug(article.titulo)}-${article.numeroArticulo}.html}
 }`.trim();
 }
-
 // ========== ICONOS SVG ==========
 const oaSvg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="72" height="72" viewBox="90 50 500 260" style="vertical-align: middle;">
   <g transform="matrix(1.25 0 0 -1.25 0 360)">
