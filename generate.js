@@ -1205,17 +1205,17 @@ body {
 .oa-label {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.5rem; /* Aumentado de 0.25rem a 0.5rem para mejor espaciado con SVG más grande */
   color: #F48120;
   font-weight: 500;
-  font-size: 0.9rem;
+  font-size: 1rem; /* Ajustado de 0.9rem a 1rem */
   font-family: 'Inter', sans-serif;
   line-height: 1;
 }
 
 .oa-label svg {
   display: block;
-  height: 1.2em;  /* Cambiado de 42px a 1.2em para que escale con el texto */
+  height: 2.5em; /* Cambiado de 1.2em a 2.5em para hacerlo mucho más grande */
   width: auto;
 }
 
