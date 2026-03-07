@@ -7,7 +7,10 @@ const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch
 const ARTICLES_JSON = path.join(__dirname, 'articles.json');
 const OUTPUT_HTML_DIR = path.join(__dirname, 'articles');
 const DOMAIN = 'https://www.revistacienciasestudiantes.com';
-
+const JOURNAL_NAME_ES = 'Revista Nacional de las Ciencias para Estudiantes';
+const JOURNAL_NAME_EN = 'The National Review of Sciences for Students';
+const LOGO_ES = 'https://www.revistacienciasestudiantes.com/assets/logo.png';
+const LOGO_EN = 'https://www.revistacienciasestudiantes.com/logoEN.png';
 // Asegurar que existe el directorio de salida
 if (!fs.existsSync(OUTPUT_HTML_DIR)) {
   fs.mkdirSync(OUTPUT_HTML_DIR, { recursive: true });
@@ -678,10 +681,6 @@ async function generateArticleHtml(article) {
   // Construir autores con iconos - AHORA PASAMOS EL ARTÍCULO COMPLETO
   const authorsDisplayEs = processAuthorsWithIcons(article.autores, article, 'es');
   const authorsDisplayEn = processAuthorsWithIcons(article.autores, article, 'en');
-const JOURNAL_NAME_ES = 'Revista Nacional de las Ciencias para Estudiantes';
-const JOURNAL_NAME_EN = 'The National Review of Sciences for Students';
-const LOGO_ES = 'https://www.revistacienciasestudiantes.com/assets/logo.png';
-const LOGO_EN = 'https://www.revistacienciasestudiantes.com/logoEN.png';
   const finalAuthorsDisplay = formatAuthorsDisplay(article.autores, 'es');
   const authorsAPA = formatAuthorsAPA(article.autores);
   const authorsChicagoEs = formatAuthorsChicagoOrMLA(article.autores, 'es');
