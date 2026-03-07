@@ -900,7 +900,8 @@ function generateHtmlTemplate({
       contents: 'CONTENIDO',
       copyCode: 'Copiar código',
       codeCopied: '✓ Copiado',
-      license: 'Licencia'
+      license: 'Licencia',
+      contact: 'Contacto'
     },
     en: {
       backToCatalog: 'Back to catalog',
@@ -932,7 +933,8 @@ function generateHtmlTemplate({
       contents: 'CONTENTS',
       copyCode: 'Copy code',
       codeCopied: '✓ Copied',
-      license: 'License'
+      license: 'License',
+      contact: 'Contact'
     }
   };
 
