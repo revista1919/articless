@@ -250,7 +250,21 @@ const emailSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
 </svg>`;
 
 const ccLogoSvg = `<img src="https://bibliotecas.ucn.cl/wp-content/uploads/2025/04/by1.png" alt="CC BY 4.0" style="height: 1.2em; width: auto; vertical-align: middle;">`;
+// ========== SVG ICONS PARA REDES SOCIALES ==========
+const socialIcons = {
+  instagram: `<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>`,
+  youtube: `<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>`,
+  tiktok: `<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12.53.02C13.84 0 15.14.01 16.44 0c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>`,
+  spotify: `<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.508 17.308c-.221.362-.689.473-1.05.252-2.983-1.823-6.738-2.237-11.162-1.226-.411.094-.823-.162-.917-.573-.094-.412.162-.823.573-.917 4.847-1.108 8.995-.635 12.305 1.386.36.221.472.69.251 1.05zm1.47-3.255c-.278.452-.865.594-1.317.316-3.414-2.098-8.62-2.706-12.657-1.479-.508.154-1.04-.136-1.194-.644-.154-.508.136-1.04.644-1.194 4.613-1.399 10.366-.719 14.256 1.67.452.278.594.865.316 1.317zm.126-3.374C14.653 7.64 7.29 7.394 3.05 8.681c-.604.183-1.246-.166-1.429-.77-.183-.604.166-1.246.77-1.429 4.883-1.482 13.014-1.201 18.238 1.902.544.323.72 1.034.397 1.578-.323.544-1.034.72-1.578.397z"/></svg>`
+};
 
+// ========== SOCIAL LINKS ==========
+const socialLinks = {
+  instagram: 'https://www.instagram.com/revistanacionalcienciae',
+  youtube: 'https://www.youtube.com/@RevistaNacionaldelasCienciaspa',
+  tiktok: 'https://www.tiktok.com/@revistacienciaestudiante',
+  spotify: 'https://open.spotify.com/show/6amsgUkNXgUTD219XpuqOe?si=LPzCNpusQjSLGBq_pPrVTw'
+};
 // ========== CARGA DE TEAM.JSON CON MATCHING ROBUSTO ==========
 let authorMap = {}; // Mapa por uid
 let authorByNameMap = {}; // Mapa por nombre normalizado
@@ -1500,6 +1514,173 @@ body {
     fill: var(--text-main);
   }
 }
+      /* Footer Styles (igual que en news) */
+    .footer {
+      background: #1a1a1a;
+      color: white;
+      padding: 60px 20px 30px;
+      margin-top: 60px;
+      border-top: 1px solid #333;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .footer-container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .footer-social {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      margin-bottom: 40px;
+      flex-wrap: wrap;
+    }
+
+    .social-icon {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      color: #999;
+      text-decoration: none;
+      transition: all 0.3s;
+    }
+
+    .social-icon:hover {
+      color: white;
+      transform: translateY(-3px);
+    }
+
+    .social-icon svg {
+      width: 24px;
+      height: 24px;
+      fill: currentColor;
+    }
+
+    .social-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      font-weight: 500;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .social-icon:hover .social-label {
+      opacity: 1;
+    }
+
+    .footer-contact {
+      text-align: center;
+      margin: 40px 0;
+      padding: 20px 0;
+      border-top: 1px solid #333;
+      border-bottom: 1px solid #333;
+    }
+
+    .contact-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      color: #666;
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    .contact-email {
+      color: white;
+      text-decoration: none;
+      font-size: 1rem;
+      transition: color 0.3s;
+    }
+
+    .contact-email:hover {
+      color: #005a7d;
+    }
+
+    .footer-nav-links {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      margin: 30px 0;
+      flex-wrap: wrap;
+    }
+
+    .footer-nav-link {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #999;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: color 0.3s;
+    }
+
+    .footer-nav-link:hover {
+      color: white;
+    }
+
+    .footer-nav-link svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
+
+    .footer-bottom {
+      text-align: center;
+      font-size: 9px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 4px;
+      padding-top: 30px;
+    }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin: 20px 0;
+      font-size: 9px;
+    }
+
+    .footer-links a {
+      color: #777;
+      text-decoration: none;
+      transition: color 0.3s;
+    }
+
+    .footer-links a:hover {
+      color: white;
+    }
+
+    /* Versiones desktop/mobile para email */
+    .mobile-only {
+      display: none;
+    }
+    .desktop-only {
+      display: inline-block;
+    }
+
+    @media (max-width: 768px) {
+      .footer-social {
+        gap: 20px;
+      }
+      
+      .footer-nav-links {
+        flex-direction: column;
+        align-items: center;
+        gap: 15px;
+      }
+      
+      .desktop-only {
+        display: none;
+      }
+      .mobile-only {
+        display: inline-block;
+      }
+    }
 .sd-journal-titles {
   display: flex;
   flex-direction: column;
@@ -3331,15 +3512,83 @@ body {
     </aside>
   </div>
 
-  <footer style="text-align: center; padding: 3rem 2rem; border-top: 1px solid var(--border-color); font-family: 'Inter', sans-serif; font-size: 0.8rem; color: var(--text-light);">
-    <p>&copy; ${new Date().getFullYear()} Revista Nacional de las Ciencias para Estudiantes. ISSN 3087-2839</p>
-    <p style="margin-top: 0.5rem;">
-      <a href="${isSpanish ? '/es/article' : '/en/article'}" style="color: var(--nature-blue); text-decoration: none;">${t.backToCatalog}</a> 
-      <span style="margin: 0 0.5rem;">|</span> 
-      <a href="/" style="color: var(--nature-blue); text-decoration: none;">${t.backToHome}</a>
-      <span style="margin: 0 0.5rem;">|</span> 
-      <a href="/articles/article-${articleSlug}${isSpanish ? 'EN' : ''}.html" style="color: var(--nature-blue); text-decoration: none;">${t.viewOtherLang}</a>
-    </p>
+   <!-- Footer con Redes Sociales y Contacto (igual que en news) -->
+  <footer class="footer">
+    <div class="footer-container">
+      <!-- Redes Sociales -->
+      <div class="footer-social">
+        <a href="${socialLinks.instagram}" target="_blank" rel="noopener" class="social-icon">
+          ${socialIcons.instagram}
+          <span class="social-label">Instagram</span>
+        </a>
+        <a href="${socialLinks.youtube}" target="_blank" rel="noopener" class="social-icon">
+          ${socialIcons.youtube}
+          <span class="social-label">YouTube</span>
+        </a>
+        <a href="${socialLinks.tiktok}" target="_blank" rel="noopener" class="social-icon">
+          ${socialIcons.tiktok}
+          <span class="social-label">TikTok</span>
+        </a>
+        <a href="${socialLinks.spotify}" target="_blank" rel="noopener" class="social-icon">
+          ${socialIcons.spotify}
+          <span class="social-label">Spotify</span>
+        </a>
+      </div>
+
+      <!-- Contacto - Versión ultra simple sin JavaScript -->
+      <div class="footer-contact">
+        <span class="contact-label">${t.contact}</span>
+        
+        <!-- Versión para escritorio (Gmail) - visible solo en pantallas grandes -->
+        <a href="https://mail.google.com/mail/?view=cm&fs=1&to=contact@revistacienciasestudiantes.com" 
+           target="_blank" 
+           class="contact-email desktop-only"
+           rel="noopener">
+          contact@revistacienciasestudiantes.com
+        </a>
+        
+        <!-- Versión para móvil (mailto) - visible solo en pantallas pequeñas -->
+        <a href="mailto:contact@revistacienciasestudiantes.com" 
+           class="contact-email mobile-only"
+           rel="noopener">
+          contact@revistacienciasestudiantes.com
+        </a>
+      </div>
+
+      <!-- Navegación adicional: Volver al catálogo, Volver al home, Ver en otro idioma -->
+      <div class="footer-nav-links">
+        <a href="${isSpanish ? '/articles/index.html' : '/articles/index.EN.html'}" class="footer-nav-link">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
+          </svg>
+          ${t.backToCatalog}
+        </a>
+        <a href="/" class="footer-nav-link">
+          ${t.backToHome}
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
+          </svg>
+        </a>
+        <a href="/articles/article-${articleSlug}${isSpanish ? 'EN' : ''}.html" class="footer-nav-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12.87 15.07l-2.54-2.51.03-.03c1.68-1.68 2.77-3.85 2.96-6.03h3.68V3h-8V1h-2v2H3v2h11.17C13.93 6.69 12.69 8.45 11 10.22c-.74-.74-1.36-1.59-1.86-2.52h-2c.59 1.43 1.46 2.78 2.55 3.88L3 20.59 4.41 22 12 14.41l3.29 3.29L17 15.06l-4.13-3.99z"/>
+          </svg>
+          ${t.viewOtherLang}
+        </a>
+      </div>
+
+      <!-- Copyright y enlaces legales -->
+      <div class="footer-bottom">
+        <div class="footer-links">
+          <a href="/privacy.html">Privacidad</a>
+          <span>|</span>
+          <a href="/terms.html">Términos</a>
+          <span>|</span>
+          <a href="/credits.html">Créditos</a>
+        </div>
+        <p>© ${new Date().getFullYear()} ${isSpanish ? JOURNAL_NAME_ES : JOURNAL_NAME_EN} · ISSN 3087-2839</p>
+      </div>
+    </div>
   </footer>
 
 <script>
