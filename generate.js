@@ -2286,7 +2286,270 @@ body {
     -webkit-overflow-scrolling: touch;
     max-width: calc(100vw - 2rem);
   }
+  /* ===== HEADER ===== */
+.sd-header {
+  background: #fff;
+  border-bottom: 1px solid var(--border-color);
+  font-family: 'Inter', sans-serif;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  width: 100%;
+}
+
+.sd-header-top {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0.75rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+}
+
+/* Brand / Logo Section */
+.sd-journal-logo {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  text-decoration: none;
+  color: var(--nature-black);
+}
+
+.sd-logo-img {
+  height: 48px;
+  width: auto;
+  display: block;
+  object-fit: contain;
+}
+
+.sd-journal-titles {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #e0e0e0;
+  padding-left: 15px;
+}
+
+.sd-journal-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  color: var(--nature-black);
+}
+
+.sd-issn {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Search Bar - Funcional */
+.sd-search-wrapper {
+  flex: 1;
+  max-width: 500px;
+}
+
+.sd-search-bar {
+  display: flex;
+  align-items: center;
+  background: #f0f2f4;
+  border-radius: 4px;
+  padding: 4px 4px 4px 12px;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.sd-search-bar:focus-within {
+  background: #fff;
+  border-color: var(--nature-blue);
+  box-shadow: 0 0 0 3px rgba(0, 90, 125, 0.1);
+}
+
+.sd-search-icon {
+  color: var(--text-muted);
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.sd-search-bar input {
+  border: none;
+  background: transparent;
+  width: 100%;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  outline: none;
+  color: var(--text-main);
+  padding: 6px 0;
+}
+
+.sd-search-bar input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.sd-search-submit {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
+.sd-search-submit:hover {
+  color: var(--nature-blue);
+  background: #e0e4e8;
+}
+
+.sd-search-submit svg {
+  display: block;
+}
+
+/* User Navigation */
+.sd-user-nav {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.sd-nav-link {
+  text-decoration: none;
+  color: var(--text-main);
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.2s;
+  white-space: nowrap;
+}
+
+.sd-nav-link:hover {
+  color: var(--nature-blue);
+}
+
+.sd-nav-link svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.sd-nav-link:hover svg {
+  opacity: 1;
+}
+
+.sd-account {
+  /* Estilo especial si quieres destacar la cuenta, pero por ahora solo hereda */
+}
+
+/* ===== RESPONSIVE PARA MÓVIL ===== */
+@media (max-width: 1100px) {
+  .sd-header-top {
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding: 0.75rem 1.5rem;
+  }
   
+  .sd-brand-container {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .sd-journal-logo {
+    justify-content: center;
+  }
+  
+  .sd-search-wrapper {
+    max-width: 100%;
+    width: 100%;
+    order: 3;
+  }
+  
+  .sd-user-nav {
+    width: 100%;
+    justify-content: center;
+    order: 2;
+    gap: 2rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .sd-header-top {
+    padding: 0.75rem 1rem;
+    gap: 0.75rem;
+  }
+  
+  .sd-journal-logo {
+    gap: 10px;
+  }
+  
+  .sd-logo-img {
+    height: 40px;
+  }
+  
+  .sd-journal-titles {
+    padding-left: 10px;
+  }
+  
+  .sd-journal-name {
+    font-size: 0.8rem;
+  }
+  
+  .sd-issn {
+    font-size: 0.65rem;
+  }
+  
+  .sd-user-nav {
+    gap: 1.25rem;
+    flex-wrap: wrap;
+    justify-content: space-around;
+  }
+  
+  .sd-nav-link {
+    font-size: 0.75rem;
+    gap: 4px;
+  }
+  
+  .sd-nav-link svg {
+    width: 16px;
+    height: 16px;
+  }
+  
+  .sd-search-bar {
+    padding: 2px 2px 2px 8px;
+  }
+  
+  .sd-search-bar input {
+    font-size: 0.8rem;
+    padding: 4px 0;
+  }
+  
+  .sd-search-submit {
+    padding: 6px;
+  }
+}
+
+/* Ajuste para pantallas muy pequeñas */
+@media (max-width: 380px) {
+  .sd-user-nav {
+    gap: 0.75rem;
+  }
+  
+  .sd-nav-link span {
+    display: none; /* Oculta el texto, solo íconos */
+  }
+  
+  .sd-nav-link {
+    gap: 0;
+  }
+}
   /* Tablas en móvil */
   .table-wrapper {
     margin: 1.5rem 0;
@@ -2348,10 +2611,59 @@ body {
   </style>
 </head>
 <body>
-  <nav class="top-nav">
-    <a href="/" class="journal-name">Revista Nacional de las Ciencias para Estudiantes</a>
-    <div class="issn-badge">ISSN: 3087-2839</div>
-  </nav>
+  <header class="sd-header">
+  <div class="sd-header-top">
+    {/* Sección del Logo y Títulos */}
+    <div class="sd-brand-container">
+      <a href="/" class="sd-journal-logo">
+        <img src="https://www.revistacienciasestudiantes.com/assets/logo.png" alt="Logo RNCE" class="sd-logo-img">
+        <div class="sd-journal-titles">
+          <span class="sd-journal-name">
+            {isSpanish ? 'Revista Nacional de las Ciencias para Estudiantes' : 'The National Review of Sciences for Students'}
+          </span>
+          <span class="sd-issn">ISSN: 3087-2839</span>
+        </div>
+      </a>
+    </div>
+
+    {/* Barra de Búsqueda - ¡Totalmente funcional! */}
+    <div class="sd-search-wrapper">
+      <form action="/article" method="GET" class="sd-search-bar">
+        <svg class="sd-search-icon" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input 
+          type="text" 
+          name="article_search" 
+          placeholder={isSpanish ? 'Buscar artículos...' : 'Search articles...'} 
+          aria-label={isSpanish ? 'Buscar' : 'Search'}
+        />
+        <button type="submit" class="sd-search-submit" aria-label="Buscar">
+          <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        </button>
+      </form>
+    </div>
+
+    {/* Navegación de Usuario: Envíos, Ayuda, Mi cuenta */}
+    <div class="sd-user-nav">
+      {/* Enlace a Envíos */}
+      <a href={isSpanish ? '/submit' : '/en/submit'} class="sd-nav-link">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14m-7-7h14"/></svg>
+        {isSpanish ? 'Envíos' : 'Submissions'}
+      </a>
+      {/* Enlace a Ayuda/FAQ */}
+      <a href={isSpanish ? '/faq' : '/en/faq'} class="sd-nav-link">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        {isSpanish ? 'Ayuda' : 'Help'}
+      </a>
+      {/* Enlace a Mi Cuenta/Login */}
+      <a href={isSpanish ? '/login' : '/en/login'} class="sd-nav-link sd-account">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
+        {isSpanish ? 'Mi cuenta' : 'My account'}
+      </a>
+    </div>
+  </div>
+
+  {/* LA BARRA DE NAVEGACIÓN INFERIOR HA SIDO ELIMINADA */}
+</header>
 
   <div class="main-wrapper">
     <!-- Left Sidebar - Table of Contents -->
