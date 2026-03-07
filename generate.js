@@ -2613,28 +2613,26 @@ body {
 <body>
   <header class="sd-header">
   <div class="sd-header-top">
-    {/* Sección del Logo y Títulos */}
+    <!-- Sección del Logo y Títulos -->
     <div class="sd-brand-container">
       <a href="/" class="sd-journal-logo">
         <img src="https://www.revistacienciasestudiantes.com/assets/logo.png" alt="Logo RNCE" class="sd-logo-img">
         <div class="sd-journal-titles">
-          <span class="sd-journal-name">
-            {isSpanish ? 'Revista Nacional de las Ciencias para Estudiantes' : 'The National Review of Sciences for Students'}
-          </span>
+          <span class="sd-journal-name">${isSpanish ? 'Revista Nacional de las Ciencias para Estudiantes' : 'The National Review of Sciences for Students'}</span>
           <span class="sd-issn">ISSN: 3087-2839</span>
         </div>
       </a>
     </div>
 
-    {/* Barra de Búsqueda - ¡Totalmente funcional! */}
+    <!-- Barra de Búsqueda -->
     <div class="sd-search-wrapper">
       <form action="/article" method="GET" class="sd-search-bar">
         <svg class="sd-search-icon" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
         <input 
           type="text" 
           name="article_search" 
-          placeholder={isSpanish ? 'Buscar artículos...' : 'Search articles...'} 
-          aria-label={isSpanish ? 'Buscar' : 'Search'}
+          placeholder="${isSpanish ? 'Buscar artículos...' : 'Search articles...'}" 
+          aria-label="${isSpanish ? 'Buscar' : 'Search'}"
         />
         <button type="submit" class="sd-search-submit" aria-label="Buscar">
           <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
@@ -2642,27 +2640,26 @@ body {
       </form>
     </div>
 
-    {/* Navegación de Usuario: Envíos, Ayuda, Mi cuenta */}
+    <!-- Navegación de Usuario -->
     <div class="sd-user-nav">
-      {/* Enlace a Envíos */}
-      <a href={isSpanish ? '/submit' : '/en/submit'} class="sd-nav-link">
+      <!-- Enlace a Envíos -->
+      <a href="${isSpanish ? '/submit' : '/en/submit'}" class="sd-nav-link">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14m-7-7h14"/></svg>
-        {isSpanish ? 'Envíos' : 'Submissions'}
+        ${isSpanish ? 'Envíos' : 'Submissions'}
       </a>
-      {/* Enlace a Ayuda/FAQ */}
-      <a href={isSpanish ? '/faq' : '/en/faq'} class="sd-nav-link">
+      <!-- Enlace a Ayuda/FAQ -->
+      <a href="${isSpanish ? '/faq' : '/en/faq'}" class="sd-nav-link">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        {isSpanish ? 'Ayuda' : 'Help'}
+        ${isSpanish ? 'Ayuda' : 'Help'}
       </a>
-      {/* Enlace a Mi Cuenta/Login */}
-      <a href={isSpanish ? '/login' : '/en/login'} class="sd-nav-link sd-account">
+      <!-- Enlace a Mi Cuenta/Login -->
+      <a href="${isSpanish ? '/login' : '/en/login'}" class="sd-nav-link sd-account">
         <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
-        {isSpanish ? 'Mi cuenta' : 'My account'}
+        ${isSpanish ? 'Mi cuenta' : 'My account'}
       </a>
     </div>
   </div>
-
-  {/* LA BARRA DE NAVEGACIÓN INFERIOR HA SIDO ELIMINADA */}
+  <!-- LA BARRA DE NAVEGACIÓN INFERIOR HA SIDO ELIMINADA -->
 </header>
 
   <div class="main-wrapper">
