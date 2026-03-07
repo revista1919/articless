@@ -3515,7 +3515,7 @@ body {
   </div>
 
    <!-- Footer con Redes Sociales y Contacto (igual que en news) -->
-  <footer class="footer">
+   <footer class="footer">
     <div class="footer-container">
       <!-- Redes Sociales -->
       <div class="footer-social">
@@ -3582,11 +3582,12 @@ body {
       <!-- Copyright y enlaces legales -->
       <div class="footer-bottom">
         <div class="footer-links">
-          <a href="/privacy.html">Privacidad</a>
+          <%-- Enlaces de privacidad que cambian según el idioma --%>
+          <a href="/privacy${isSpanish ? '' : '.EN'}.html">Privacidad</a>
           <span>|</span>
-          <a href="/terms.html">Términos</a>
+          <a href="/terms${isSpanish ? '' : '.EN'}.html">Términos</a>
           <span>|</span>
-          <a href="/credits.html">Créditos</a>
+          <a href="/credits${isSpanish ? '' : '.EN'}.html">Créditos</a>
         </div>
         <p>© ${new Date().getFullYear()} ${isSpanish ? JOURNAL_NAME_ES : JOURNAL_NAME_EN} · ISSN 3087-2839</p>
       </div>
