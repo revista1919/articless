@@ -992,7 +992,7 @@ body {
 }
 /* --- Estilos I --- */
 /* ===== HEADER MEJORADO PARA MÓVIL ===== */
-/* ===== HEADER COMPACTADO PARA MÓVIL ===== */
+/* ===== HEADER CON MENÚ HAMBURGUESA PARA MÓVIL ===== */
 .sd-header {
   background: #fff;
   border-bottom: 1px solid var(--border-color);
@@ -1024,105 +1024,386 @@ body {
 
 /* LOGO - TAMAÑO BASE (ESCRITORIO) */
 .sd-logo-img {
-  height: 42px;  /* Reducido de 48px a 42px */
+  height: 42px;
   width: auto;
   display: block;
   object-fit: contain;
   transition: height 0.2s ease;
 }
 
-/* Tablets */
+.sd-journal-titles {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #e0e0e0;
+  padding-left: 15px;
+}
+
+.sd-journal-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+
+.sd-issn {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Search Bar - Minimalist (solo desktop) */
+.sd-search-wrapper {
+  flex: 1;
+  max-width: 500px;
+}
+
+.sd-search-bar {
+  display: flex;
+  align-items: center;
+  background: #f0f2f4;
+  border-radius: 4px;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.sd-search-bar:focus-within {
+  background: #fff;
+  border-color: var(--nature-blue);
+  box-shadow: 0 0 0 3px rgba(0, 90, 125, 0.1);
+}
+
+.sd-search-icon {
+  color: var(--text-muted);
+  margin-right: 8px;
+}
+
+.sd-search-bar input {
+  border: none;
+  background: transparent;
+  width: 100%;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  outline: none;
+  color: var(--text-main);
+}
+
+/* User Utility Nav (solo desktop) */
+.sd-user-nav {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.sd-nav-link {
+  text-decoration: none;
+  color: var(--text-main);
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.2s;
+}
+
+.sd-nav-link:hover {
+  color: var(--nature-blue);
+}
+
+/* ===== MENÚ HAMBURGUESA PARA MÓVIL ===== */
+.sd-mobile-controls {
+  display: none;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sd-mobile-search-btn {
+  display: none;
+  background: none;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  color: var(--text-main);
+}
+
+.sd-mobile-search-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+.sd-mobile-menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  color: var(--text-main);
+}
+
+.sd-mobile-menu-btn svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+/* Overlay para el menú móvil */
+.sd-mobile-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.sd-mobile-overlay.active {
+  display: block;
+  opacity: 1;
+}
+
+/* Menú lateral móvil */
+.sd-mobile-menu {
+  position: fixed;
+  top: 0;
+  right: -100%;
+  width: 85%;
+  max-width: 350px;
+  height: 100vh;
+  background: white;
+  z-index: 1000;
+  overflow-y: auto;
+  transition: right 0.3s ease;
+  box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+  font-family: 'Inter', sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+.sd-mobile-menu.active {
+  right: 0;
+}
+
+/* Header del menú móvil */
+.sd-mobile-menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sd-mobile-menu-title {
+  font-weight: 600;
+  color: var(--nature-blue);
+  font-size: 0.9rem;
+}
+
+.sd-mobile-close-btn {
+  background: none;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  color: var(--text-main);
+}
+
+.sd-mobile-close-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+/* Búsqueda en menú móvil */
+.sd-mobile-search {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sd-mobile-search-bar {
+  display: flex;
+  align-items: center;
+  background: #f0f2f4;
+  border-radius: 4px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+}
+
+.sd-mobile-search-bar:focus-within {
+  border-color: var(--nature-blue);
+  background: #fff;
+}
+
+.sd-mobile-search-bar input {
+  border: none;
+  background: transparent;
+  width: 100%;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9rem;
+  outline: none;
+  margin-left: 8px;
+}
+
+/* Navegación en menú móvil */
+.sd-mobile-nav {
+  flex: 1;
+  padding: 1rem 0;
+}
+
+.sd-mobile-nav-section {
+  margin-bottom: 1.5rem;
+}
+
+.sd-mobile-nav-section-title {
+  padding: 0.5rem 1rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  background: var(--bg-soft);
+}
+
+.sd-mobile-nav-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sd-mobile-nav-item {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sd-mobile-nav-item:last-child {
+  border-bottom: none;
+}
+
+.sd-mobile-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 1rem;
+  text-decoration: none;
+  color: var(--text-main);
+  font-size: 0.95rem;
+  transition: background 0.2s;
+}
+
+.sd-mobile-nav-link:hover {
+  background: var(--bg-hover);
+}
+
+.sd-mobile-nav-link svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+  color: var(--text-muted);
+}
+
+.sd-mobile-nav-badge {
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+/* Footer del menú móvil */
+.sd-mobile-menu-footer {
+  padding: 1rem;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ===== RESPONSIVE ===== */
+
+/* Tablets (900px) */
 @media (max-width: 900px) {
   .sd-header-top {
     padding: 0.6rem 1.5rem;
   }
   
   .sd-logo-img {
-    height: 36px;  /* De 48px → 36px */
+    height: 36px;
   }
   
-  .sd-journal-titles {
-    padding-left: 10px;
+  .sd-search-wrapper,
+  .sd-user-nav {
+    display: none;
   }
   
-  .sd-journal-name {
-    font-size: 0.85rem;
-    line-height: 1.2;
+  .sd-mobile-controls {
+    display: flex;
   }
   
-  .sd-issn {
-    font-size: 0.65rem;
+  .sd-mobile-search-btn,
+  .sd-mobile-menu-btn {
+    display: block;
   }
 }
 
-/* Móviles */
+/* Móviles (600px) */
 @media (max-width: 600px) {
   .sd-header-top {
-    padding: 0.4rem 1rem;  /* Padding reducido */
-    gap: 0.75rem;
+    padding: 0.4rem 1rem;
   }
   
+  /* LOGO OCULTO EN MÓVIL - se muestra solo el título */
   .sd-logo-img {
-    height: 28px;  /* MUCHO MÁS PEQUEÑO: 28px en lugar de 36px */
-  }
-  
-  .sd-journal-logo {
-    gap: 8px;  /* Menos espacio entre logo y texto */
+    display: none;
   }
   
   .sd-journal-titles {
-    padding-left: 6px;
-    border-left-width: 1px;
+    border-left: none;
+    padding-left: 0;
   }
   
   .sd-journal-name {
-    font-size: 0.7rem;  /* Texto más pequeño */
+    font-size: 0.75rem;
     font-weight: 600;
-    max-width: 180px;  /* Limitar ancho para que no desborde */
+    max-width: 180px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   
   .sd-issn {
-    font-size: 0.55rem;
-    margin-top: 1px;
+    font-size: 0.6rem;
+  }
+  
+  .sd-mobile-controls {
+    gap: 0.25rem;
+  }
+  
+  .sd-mobile-search-btn svg,
+  .sd-mobile-menu-btn svg {
+    width: 20px;
+    height: 20px;
   }
 }
 
-/* Móviles pequeños (menos de 400px) */
+/* Móviles pequeños (400px) */
 @media (max-width: 400px) {
   .sd-header-top {
     padding: 0.3rem 0.75rem;
   }
   
-  .sd-logo-img {
-    height: 24px;  /* Aún más pequeño */
-  }
-  
   .sd-journal-name {
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     max-width: 140px;
   }
   
   .sd-issn {
-    display: none;  /* Ocultamos el ISSN en pantallas muy pequeñas */
-  }
-  
-  .sd-journal-titles {
-    border-left: none;  /* Quitamos la línea divisoria */
-    padding-left: 0;
+    display: none;
   }
 }
 
-/* Pantallas extremadamente pequeñas (menos de 320px) */
+/* Pantallas extremadamente pequeñas (320px) */
 @media (max-width: 320px) {
-  .sd-logo-img {
-    height: 22px;
-  }
-  
   .sd-journal-name {
-    font-size: 0.6rem;
+    font-size: 0.65rem;
     max-width: 120px;
   }
 }
@@ -2644,22 +2925,148 @@ body {
         </div>
       </a>
     </div>
+    
+    <!-- Search - Solo visible en desktop -->
     <div class="sd-search-wrapper">
       <form id="search-form" class="sd-search-bar">
-        <svg class="sd-search-icon" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <svg class="sd-search-icon" viewBox="0 0 24 24" width="18" height="18">
+          <path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+        </svg>
         <input type="text" id="search-input" placeholder="${isSpanish ? 'Buscar artículos, autores...' : 'Search articles, authors...'}" aria-label="Buscar">
       </form>
     </div>
+    
+    <!-- User Nav - Solo visible en desktop -->
     <div class="sd-user-nav">
       <a href="${isSpanish ? '/submit' : '/en/submit'}" class="sd-nav-link">${isSpanish ? 'Envíos' : 'Submissions'}</a>
       <a href="${isSpanish ? '/faq' : '/en/faq'}" class="sd-nav-link">${isSpanish ? 'Ayuda' : 'Help'}</a>
       <a href="${isSpanish ? '/login' : '/en/login'}" class="sd-nav-link sd-account">
-        <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
+        <svg viewBox="0 0 24 24" width="18" height="18">
+          <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+        </svg>
         ${isSpanish ? 'Mi cuenta' : 'My account'}
       </a>
     </div>
+    
+    <!-- Controles móviles -->
+    <div class="sd-mobile-controls">
+      <button class="sd-mobile-search-btn" onclick="toggleMobileSearch()" aria-label="Buscar">
+        <svg viewBox="0 0 24 24">
+          <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+        </svg>
+      </button>
+      <button class="sd-mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Menú">
+        <svg viewBox="0 0 24 24">
+          <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+        </svg>
+      </button>
+    </div>
   </div>
 </header>
+
+<!-- Overlay para menú móvil -->
+<div class="sd-mobile-overlay" id="mobileOverlay" onclick="closeMobileMenu()"></div>
+
+<!-- Menú móvil -->
+<div class="sd-mobile-menu" id="mobileMenu">
+  <div class="sd-mobile-menu-header">
+    <span class="sd-mobile-menu-title">${isSpanish ? 'MENÚ' : 'MENU'}</span>
+    <button class="sd-mobile-close-btn" onclick="closeMobileMenu()">
+      <svg viewBox="0 0 24 24">
+        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+      </svg>
+    </button>
+  </div>
+  
+  <!-- Búsqueda móvil (oculta inicialmente) -->
+  <div class="sd-mobile-search" id="mobileSearch" style="display: none;">
+    <form id="mobile-search-form" class="sd-mobile-search-bar" onsubmit="handleMobileSearch(event)">
+      <svg width="16" height="16" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+      </svg>
+      <input type="text" id="mobile-search-input" placeholder="${isSpanish ? 'Buscar artículos...' : 'Search articles...'}" aria-label="Buscar">
+    </form>
+  </div>
+  
+  <!-- Sección 1: Contenido -->
+  <div class="sd-mobile-nav-section">
+    <div class="sd-mobile-nav-section-title">${isSpanish ? 'CONTENIDO' : 'CONTENTS'}</div>
+    <ul class="sd-mobile-nav-items">
+      <li class="sd-mobile-nav-item">
+        <a href="${isSpanish ? '/articles/index.html' : '/articles/index.EN.html'}" class="sd-mobile-nav-link">
+          <svg viewBox="0 0 24 24">
+            <path d="M4 6H20v2H4zM4 12H20v2H4zM4 18H20v2H4z"/>
+          </svg>
+          ${isSpanish ? 'Todos los artículos' : 'All articles'}
+          <span class="sd-mobile-nav-badge">${articles ? articles.length : 0}</span>
+        </a>
+      </li>
+      <li class="sd-mobile-nav-item">
+        <a href="${isSpanish ? '/volumes' : '/en/volumes'}" class="sd-mobile-nav-link">
+          <svg viewBox="0 0 24 24">
+            <path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+          </svg>
+          ${isSpanish ? 'Volúmenes' : 'Volumes'}
+        </a>
+      </li>
+      <li class="sd-mobile-nav-item">
+        <a href="${isSpanish ? '/special-issues' : '/en/special-issues'}" class="sd-mobile-nav-link">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+          </svg>
+          ${isSpanish ? 'Números especiales' : 'Special issues'}
+        </a>
+      </li>
+    </ul>
+  </div>
+  
+  <!-- Sección 2: Navegación del sitio -->
+  <div class="sd-mobile-nav-section">
+    <div class="sd-mobile-nav-section-title">${isSpanish ? 'NAVEGACIÓN' : 'NAVIGATION'}</div>
+    <ul class="sd-mobile-nav-items">
+      <li class="sd-mobile-nav-item">
+        <a href="${isSpanish ? '/about' : '/en/about'}" class="sd-mobile-nav-link">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+          </svg>
+          ${isSpanish ? 'Sobre la revista' : 'About the journal'}
+        </a>
+      </li>
+      <li class="sd-mobile-nav-item">
+        <a href="${isSpanish ? '/editorial-board' : '/en/editorial-board'}" class="sd-mobile-nav-link">
+          <svg viewBox="0 0 24 24">
+            <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-1 .05 1.16.84 2 1.87 2 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+          </svg>
+          ${isSpanish ? 'Comité editorial' : 'Editorial board'}
+        </a>
+      </li>
+      <li class="sd-mobile-nav-item">
+        <a href="${isSpanish ? '/for-authors' : '/en/for-authors'}" class="sd-mobile-nav-link">
+          <svg viewBox="0 0 24 24">
+            <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+          </svg>
+          ${isSpanish ? 'Para autores' : 'For authors'}
+        </a>
+      </li>
+      <li class="sd-mobile-nav-item">
+        <a href="${isSpanish ? '/contact' : '/en/contact'}" class="sd-mobile-nav-link">
+          <svg viewBox="0 0 24 24">
+            <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+          </svg>
+          ${isSpanish ? 'Contacto' : 'Contact'}
+        </a>
+      </li>
+    </ul>
+  </div>
+  
+  <!-- Footer del menú móvil -->
+  <div class="sd-mobile-menu-footer">
+    <div>ISSN: 3087-2839</div>
+    <div style="margin-top: 0.5rem; font-size: 0.7rem;">
+      &copy; ${new Date().getFullYear()} ${isSpanish ? 'RNCE' : 'TNRSFS'}
+    </div>
+  </div>
+</div>
 
   <div class="main-wrapper">
     <!-- Left Sidebar - Table of Contents -->
@@ -2949,6 +3356,77 @@ body {
   </footer>
 
   <script>
+  // ========== FUNCIONES PARA MENÚ MÓVIL ==========
+let mobileSearchVisible = false;
+
+function toggleMobileMenu() {
+  const menu = document.getElementById('mobileMenu');
+  const overlay = document.getElementById('mobileOverlay');
+  
+  menu.classList.toggle('active');
+  overlay.classList.toggle('active');
+  
+  // Prevenir scroll del body cuando el menú está abierto
+  if (menu.classList.contains('active')) {
+    document.body.style.overflow = 'hidden';
+  } else {
+    document.body.style.overflow = '';
+  }
+}
+
+function closeMobileMenu() {
+  const menu = document.getElementById('mobileMenu');
+  const overlay = document.getElementById('mobileOverlay');
+  
+  menu.classList.remove('active');
+  overlay.classList.remove('active');
+  document.body.style.overflow = '';
+  
+  // También cerrar la búsqueda si está abierta
+  const mobileSearch = document.getElementById('mobileSearch');
+  if (mobileSearchVisible) {
+    mobileSearch.style.display = 'none';
+    mobileSearchVisible = false;
+  }
+}
+
+function toggleMobileSearch() {
+  const mobileSearch = document.getElementById('mobileSearch');
+  mobileSearchVisible = !mobileSearchVisible;
+  mobileSearch.style.display = mobileSearchVisible ? 'block' : 'none';
+  
+  if (mobileSearchVisible) {
+    setTimeout(() => {
+      document.getElementById('mobile-search-input').focus();
+    }, 100);
+  }
+}
+
+function handleMobileSearch(e) {
+  e.preventDefault();
+  const query = document.getElementById('mobile-search-input').value.trim();
+  if (query) {
+    const encodedQuery = encodeURIComponent(query).replace(/%20/g, '+');
+    window.location.href = '/article?article_search=' + encodedQuery;
+  }
+}
+
+// Cerrar menú al hacer clic en un enlace
+document.addEventListener('DOMContentLoaded', () => {
+  const mobileLinks = document.querySelectorAll('.sd-mobile-nav-link');
+  mobileLinks.forEach(link => {
+    link.addEventListener('click', () => {
+      closeMobileMenu();
+    });
+  });
+  
+  // Cerrar con tecla Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeMobileMenu();
+    }
+  });
+});
   document.addEventListener('DOMContentLoaded', () => {
   const searchForm = document.getElementById('search-form');
   if (searchForm) {
