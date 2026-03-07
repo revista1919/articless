@@ -1249,20 +1249,6 @@ body {
     display: none;
   }
 }
-@media (max-width: 600px) {
-  .sd-logo-img {
-    height: 40px; /* Reduce tamaño para no verse gigante en celulares */
-  }
-  .sd-journal-name {
-    font-size: 0.85rem;
-  }
-  .sd-issn {
-    font-size: 0.65rem;
-  }
-  .sd-header-top {
-    padding: 0.75rem 1rem;
-  }
-}
   
     /* Main Layout */
     .main-wrapper {
