@@ -991,6 +991,7 @@ body {
   overflow-x: hidden;
 }
 /* --- Estilos I --- */
+/* ===== HEADER MEJORADO PARA MÓVIL ===== */
 .sd-header {
   background: #fff;
   border-bottom: 1px solid var(--border-color);
@@ -1000,6 +1001,7 @@ body {
   z-index: 1000;
   width: 100%;
 }
+
 .sd-header-top {
   max-width: 1400px;
   margin: 0 auto;
@@ -1009,20 +1011,170 @@ body {
   justify-content: space-between;
   gap: 2rem;
 }
+
 /* Brand / Logo Section */
 .sd-journal-logo {
   display: flex;
   align-items: center;
-  gap: 15px; /* Espacio elegante entre imagen y texto */
+  gap: 15px;
   text-decoration: none;
   color: var(--nature-black);
 }
+
+/* LOGO - VERSIÓN RESPONSIVE */
 .sd-logo-img {
-  height: 48px; /* Altura ideal para un header sobrio */
-  width: auto; /* Mantiene la proporción */
+  height: 48px;
+  width: auto;
   display: block;
   object-fit: contain;
-  /* Opcional: si el logo tiene colores muy brillantes y quieres que se integre más con la sobriedad académica, puedes añadir: filter: brightness(0.95); */
+  transition: height 0.2s ease;
+}
+
+/* Tablets */
+@media (max-width: 900px) {
+  .sd-logo-img {
+    height: 42px;
+  }
+}
+
+/* Móviles */
+@media (max-width: 600px) {
+  .sd-header-top {
+    padding: 0.5rem 1rem;
+    gap: 1rem;
+  }
+  
+  .sd-logo-img {
+    height: 36px; /* Tamaño óptimo para móvil */
+  }
+  
+  .sd-journal-logo {
+    gap: 10px;
+  }
+  
+  .sd-journal-titles {
+    padding-left: 10px;
+  }
+  
+  .sd-journal-name {
+    font-size: 0.8rem;
+    line-height: 1.2;
+  }
+  
+  .sd-issn {
+    font-size: 0.6rem;
+    margin-top: 1px;
+  }
+}
+
+/* Móviles muy pequeños */
+@media (max-width: 400px) {
+  .sd-logo-img {
+    height: 32px; /* Aún más pequeño si es necesario */
+  }
+  
+  .sd-journal-name {
+    font-size: 0.7rem;
+  }
+  
+  .sd-issn {
+    font-size: 0.55rem;
+  }
+  
+  .sd-journal-titles {
+    padding-left: 8px;
+  }
+}
+
+/* Pantallas extremadamente pequeñas */
+@media (max-width: 350px) {
+  .sd-issn {
+    display: none; /* Oculta el ISSN si no hay espacio */
+  }
+}
+
+/* Search Bar - Minimalist */
+.sd-search-wrapper {
+  flex: 1;
+  max-width: 500px;
+}
+
+.sd-search-bar {
+  display: flex;
+  align-items: center;
+  background: #f0f2f4;
+  border-radius: 4px;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.sd-search-bar:focus-within {
+  background: #fff;
+  border-color: var(--nature-blue);
+  box-shadow: 0 0 0 3px rgba(0, 90, 125, 0.1);
+}
+
+.sd-search-icon {
+  color: var(--text-muted);
+  margin-right: 8px;
+}
+
+.sd-search-bar input {
+  border: none;
+  background: transparent;
+  width: 100%;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  outline: none;
+  color: var(--text-main);
+}
+
+/* User Utility Nav */
+.sd-user-nav {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.sd-nav-link {
+  text-decoration: none;
+  color: var(--text-main);
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.2s;
+}
+
+.sd-nav-link:hover {
+  color: var(--nature-blue);
+}
+
+/* Mobile Adjustments */
+@media (max-width: 900px) {
+  .sd-search-wrapper, 
+  .sd-user-nav {
+    display: none; /* Oculta búsqueda y menú en móvil */
+  }
+}
+
+/* Si quieres mostrar un menú hamburguesa en móvil, añade esto */
+@media (max-width: 900px) {
+  .sd-mobile-menu-btn {
+    display: block; /* Botón de menú hamburguesa */
+    background: none;
+    border: none;
+    padding: 8px;
+    cursor: pointer;
+  }
+  
+  .sd-mobile-menu-btn svg {
+    width: 24px;
+    height: 24px;
+    fill: var(--text-main);
+  }
 }
 .sd-journal-titles {
   display: flex;
