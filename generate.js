@@ -3582,7 +3582,6 @@ body {
       <!-- Copyright y enlaces legales -->
       <div class="footer-bottom">
         <div class="footer-links">
-          <%-- Enlaces de privacidad que cambian según el idioma --%>
           <a href="/privacy${isSpanish ? '' : '.EN'}.html">Privacidad</a>
           <span>|</span>
           <a href="/terms${isSpanish ? '' : '.EN'}.html">Términos</a>
