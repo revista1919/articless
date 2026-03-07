@@ -947,7 +947,6 @@ function generateHtmlTemplate({
   <meta name="keywords" content="${keywords.join(', ')}">
   <title>${title.replace(/"/g, '&quot;')} - Revista Nacional de las Ciencias para Estudiantes</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,700;1,700&family=JetBrains+Mono&family=Lora:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,700;1,700&family=JetBrains+Mono&family=Lora:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
@@ -982,7 +981,16 @@ body {
   width: 100%;
   position: relative;
 }
-/* --- Estilos Inspirados en Elsevier/ScienceDirect --- */
+  /* ESTO ESTÁ FALTANDO - AÑÁDELO EN EL BLOQUE DE ESTILOS */
+body {
+  font-family: 'Lora', serif;
+  line-height: 1.7;
+  color: var(--text-main);
+  background-color: #fff;
+  margin: 0;
+  overflow-x: hidden;
+}
+/* --- Estilos I --- */
 .sd-header {
   background: #fff;
   border-bottom: 1px solid var(--border-color);
@@ -1103,6 +1111,7 @@ body {
     padding: 0.75rem 1rem;
   }
 }
+  
     /* Main Layout */
     .main-wrapper {
       max-width: 1400px;
