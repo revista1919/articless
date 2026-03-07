@@ -992,6 +992,7 @@ body {
 }
 /* --- Estilos I --- */
 /* ===== HEADER MEJORADO PARA MÓVIL ===== */
+/* ===== HEADER COMPACTADO PARA MÓVIL ===== */
 .sd-header {
   background: #fff;
   border-bottom: 1px solid var(--border-color);
@@ -1016,14 +1017,14 @@ body {
 .sd-journal-logo {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 12px;
   text-decoration: none;
   color: var(--nature-black);
 }
 
-/* LOGO - VERSIÓN RESPONSIVE */
+/* LOGO - TAMAÑO BASE (ESCRITORIO) */
 .sd-logo-img {
-  height: 48px;
+  height: 42px;  /* Reducido de 48px a 42px */
   width: auto;
   display: block;
   object-fit: contain;
@@ -1032,24 +1033,12 @@ body {
 
 /* Tablets */
 @media (max-width: 900px) {
-  .sd-logo-img {
-    height: 42px;
-  }
-}
-
-/* Móviles */
-@media (max-width: 600px) {
   .sd-header-top {
-    padding: 0.5rem 1rem;
-    gap: 1rem;
+    padding: 0.6rem 1.5rem;
   }
   
   .sd-logo-img {
-    height: 36px; /* Tamaño óptimo para móvil */
-  }
-  
-  .sd-journal-logo {
-    gap: 10px;
+    height: 36px;  /* De 48px → 36px */
   }
   
   .sd-journal-titles {
@@ -1057,42 +1046,86 @@ body {
   }
   
   .sd-journal-name {
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     line-height: 1.2;
   }
   
   .sd-issn {
-    font-size: 0.6rem;
-    margin-top: 1px;
+    font-size: 0.65rem;
   }
 }
 
-/* Móviles muy pequeños */
-@media (max-width: 400px) {
+/* Móviles */
+@media (max-width: 600px) {
+  .sd-header-top {
+    padding: 0.4rem 1rem;  /* Padding reducido */
+    gap: 0.75rem;
+  }
+  
   .sd-logo-img {
-    height: 32px; /* Aún más pequeño si es necesario */
+    height: 28px;  /* MUCHO MÁS PEQUEÑO: 28px en lugar de 36px */
+  }
+  
+  .sd-journal-logo {
+    gap: 8px;  /* Menos espacio entre logo y texto */
+  }
+  
+  .sd-journal-titles {
+    padding-left: 6px;
+    border-left-width: 1px;
   }
   
   .sd-journal-name {
-    font-size: 0.7rem;
+    font-size: 0.7rem;  /* Texto más pequeño */
+    font-weight: 600;
+    max-width: 180px;  /* Limitar ancho para que no desborde */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   
   .sd-issn {
     font-size: 0.55rem;
+    margin-top: 1px;
+  }
+}
+
+/* Móviles pequeños (menos de 400px) */
+@media (max-width: 400px) {
+  .sd-header-top {
+    padding: 0.3rem 0.75rem;
+  }
+  
+  .sd-logo-img {
+    height: 24px;  /* Aún más pequeño */
+  }
+  
+  .sd-journal-name {
+    font-size: 0.65rem;
+    max-width: 140px;
+  }
+  
+  .sd-issn {
+    display: none;  /* Ocultamos el ISSN en pantallas muy pequeñas */
   }
   
   .sd-journal-titles {
-    padding-left: 8px;
+    border-left: none;  /* Quitamos la línea divisoria */
+    padding-left: 0;
   }
 }
 
-/* Pantallas extremadamente pequeñas */
-@media (max-width: 350px) {
-  .sd-issn {
-    display: none; /* Oculta el ISSN si no hay espacio */
+/* Pantallas extremadamente pequeñas (menos de 320px) */
+@media (max-width: 320px) {
+  .sd-logo-img {
+    height: 22px;
+  }
+  
+  .sd-journal-name {
+    font-size: 0.6rem;
+    max-width: 120px;
   }
 }
-
 /* Search Bar - Minimalist */
 .sd-search-wrapper {
   flex: 1;
@@ -2436,7 +2469,37 @@ body {
       .article-table td {
         padding: 8px 10px;
       }
+/* Optimizaciones adicionales para móvil */
+@media (max-width: 600px) {
+  /* Hacer el header más compacto en general */
+  .sd-header {
+    position: sticky;
+    top: 0;
+  }
+  
+  /* Si tienes un botón de menú hamburguesa, asegúrate de que sea pequeño */
+  .sd-mobile-menu-btn {
+    padding: 4px !important;
+  }
+  
+  .sd-mobile-menu-btn svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+}
 
+/* Para pantallas muy pequeñas, podemos ocultar elementos no críticos */
+@media (max-width: 350px) {
+  .sd-user-nav,
+  .sd-search-wrapper {
+    display: none !important;
+  }
+  
+  /* Mostrar solo el logo y el título en este caso */
+  .sd-header-top {
+    justify-content: flex-start;
+  }
+}
 .code-block-wrapper {
   margin: 1.5rem 0;
   font-size: 0.75rem;
