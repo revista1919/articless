@@ -678,7 +678,10 @@ async function generateArticleHtml(article) {
   // Construir autores con iconos - AHORA PASAMOS EL ARTÍCULO COMPLETO
   const authorsDisplayEs = processAuthorsWithIcons(article.autores, article, 'es');
   const authorsDisplayEn = processAuthorsWithIcons(article.autores, article, 'en');
-
+const JOURNAL_NAME_ES = 'Revista Nacional de las Ciencias para Estudiantes';
+const JOURNAL_NAME_EN = 'The National Review of Sciences for Students';
+const LOGO_ES = 'https://www.revistacienciasestudiantes.com/assets/logo.png';
+const LOGO_EN = 'https://www.revistacienciasestudiantes.com/logoEN.png';
   const finalAuthorsDisplay = formatAuthorsDisplay(article.autores, 'es');
   const authorsAPA = formatAuthorsAPA(article.autores);
   const authorsChicagoEs = formatAuthorsChicagoOrMLA(article.autores, 'es');
@@ -851,18 +854,6 @@ function generateHtmlTemplate({
   const fecha = isSpanish ? formatDateEs(article.fecha) : formatDateEn(article.fecha);
   const receivedDate = isSpanish ? formatDateEs(article.receivedDate) : formatDateEn(article.receivedDate);
   const acceptedDate = isSpanish ? formatDateEs(article.acceptedDate) : formatDateEn(article.acceptedDate);
-// Dentro de generateHtmlTemplate, antes de retornar el HTML completo
-const logoUrl = isSpanish 
-  ? 'https://www.revistacienciasestudiantes.com/assets/logo.png'
-  : 'https://www.revistacienciasestudiantes.com/assets/logoEN.png';
-const homeUrl = isSpanish ? '/' : '/en/';
-const submitUrl = isSpanish ? '/submit' : '/en/submit';
-const faqUrl = isSpanish ? '/faq' : '/en/faq';
-const loginUrl = isSpanish ? '/login' : '/en/login';
-const searchPlaceholder = isSpanish ? 'Buscar artículos, autores...' : 'Search articles, authors...';
-const journalNameDisplay = isSpanish 
-  ? 'Revista Nacional de las Ciencias para Estudiantes'
-  : 'The National Review of Sciences for Students';
 
   // Textos según idioma
   const texts = {
@@ -963,27 +954,37 @@ const journalNameDisplay = isSpanish
   <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
   <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
   <style>
-    :root {
-      --nature-blue: #005a7d;
-      --nature-blue-dark: #003e56;
-      --nature-black: #111111;
-      --text-main: #222222;
-      --text-light: #595959;
-      --text-muted: #6b7280;
-      --border-color: #e5e7eb;
-      --bg-soft: #f8f9fa;
-      --bg-hover: #f3f4f6;
-      --accent: #c2410c;
-      --code-bg: #1a1b26;
-      --code-text: #cfc9c2;
-      --code-border: #2c2e3a;
-      --code-header-bg: #232530;
-      --sidebar-width: 260px;
-      --aside-width: 280px;
-      --content-max-width: 800px;
-    }
-      /* --- HEADER ESTILO ELSEVIER/SCIENCEDIRECT (SOBRIO Y ELEGANTE) --- */
-.journal-header {
+:root {
+  --nature-blue: #005a7d;
+  --nature-blue-dark: #003e56;
+  --nature-black: #111111;
+  --text-main: #222222;
+  --text-light: #595959;
+  --text-muted: #6b7280;
+  --border-color: #e5e7eb;
+  --bg-soft: #f8f9fa;
+  --bg-hover: #f3f4f6;
+  --accent: #c2410c;
+  --code-bg: #1a1b26;
+  --code-text: #cfc9c2;
+  --code-border: #2c2e3a;
+  --code-header-bg: #232530;
+  --sidebar-width: 260px;
+  --aside-width: 280px;
+  --content-max-width: 800px;
+}
+/* Garantizar que nada desborde el viewport */
+* {
+  max-width: 100vw;
+  box-sizing: border-box;
+}
+body {
+  overflow-x: hidden;
+  width: 100%;
+  position: relative;
+}
+/* --- Estilos Inspirados en Elsevier/ScienceDirect --- */
+.sd-header {
   background: #fff;
   border-bottom: 1px solid var(--border-color);
   font-family: 'Inter', sans-serif;
@@ -992,8 +993,7 @@ const journalNameDisplay = isSpanish
   z-index: 1000;
   width: 100%;
 }
-
-.header-container {
+.sd-header-top {
   max-width: 1400px;
   margin: 0 auto;
   padding: 0.75rem 2rem;
@@ -1002,204 +1002,108 @@ const journalNameDisplay = isSpanish
   justify-content: space-between;
   gap: 2rem;
 }
-
-/* Logo + título */
-.header-logo a {
+/* Brand / Logo Section */
+.sd-journal-logo {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 15px; /* Espacio elegante entre imagen y texto */
   text-decoration: none;
   color: var(--nature-black);
 }
-
-.logo-img {
-  height: 48px;
-  width: auto;
+.sd-logo-img {
+  height: 48px; /* Altura ideal para un header sobrio */
+  width: auto; /* Mantiene la proporción */
   display: block;
   object-fit: contain;
+  /* Opcional: si el logo tiene colores muy brillantes y quieres que se integre más con la sobriedad académica, puedes añadir: filter: brightness(0.95); */
 }
-
-.journal-title {
+.sd-journal-titles {
   display: flex;
   flex-direction: column;
-  border-left: 1px solid #e0e0e0;
+  border-left: 1px solid #e0e0e0; /* Línea divisoria sutil estilo Elsevier */
   padding-left: 15px;
 }
-
-.journal-name {
+.sd-journal-name {
   font-weight: 600;
   font-size: 0.95rem;
   line-height: 1.2;
-  color: var(--nature-black);
 }
-
-.issn {
+.sd-issn {
   font-size: 0.7rem;
   color: var(--text-muted);
   margin-top: 2px;
 }
-
-/* Barra de búsqueda */
-.header-search {
+/* Search Bar - Minimalist */
+.sd-search-wrapper {
   flex: 1;
   max-width: 500px;
+}
+.sd-search-bar {
   display: flex;
   align-items: center;
   background: #f0f2f4;
   border-radius: 4px;
+  padding: 6px 12px;
   border: 1px solid transparent;
   transition: all 0.2s;
 }
-
-.header-search:focus-within {
+.sd-search-bar:focus-within {
   background: #fff;
   border-color: var(--nature-blue);
   box-shadow: 0 0 0 3px rgba(0, 90, 125, 0.1);
 }
-
-.header-search input {
-  flex: 1;
+.sd-search-icon {
+  color: var(--text-muted);
+  margin-right: 8px;
+}
+.sd-search-bar input {
   border: none;
   background: transparent;
-  padding: 8px 12px;
+  width: 100%;
   font-family: 'Inter', sans-serif;
   font-size: 0.85rem;
   outline: none;
   color: var(--text-main);
 }
-
-.header-search button {
-  background: transparent;
-  border: none;
-  padding: 0 12px;
-  cursor: pointer;
-  color: var(--text-muted);
+/* User Utility Nav */
+.sd-user-nav {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.2s;
-}
-
-.header-search button:hover {
-  color: var(--nature-blue);
-}
-
-/* Enlaces de navegación */
-.header-links {
-  display: flex;
-  align-items: center;
   gap: 1.5rem;
+  align-items: center;
 }
-
-.header-link {
+.sd-nav-link {
   text-decoration: none;
   color: var(--text-main);
   font-size: 0.85rem;
   font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   transition: color 0.2s;
 }
-
-.header-link:hover {
+.sd-nav-link:hover {
   color: var(--nature-blue);
 }
-
-/* Responsive */
+/* Mobile Adjustments */
 @media (max-width: 900px) {
-  .header-container {
-    flex-wrap: wrap;
-    padding: 0.75rem 1rem;
-    gap: 1rem;
-  }
-  .header-logo {
-    width: 100%;
-    justify-content: center;
-  }
-  .header-search {
-    max-width: none;
-    width: 100%;
-    order: 3;
-  }
-  .header-links {
-    order: 2;
-    margin-left: auto;
+  .sd-search-wrapper, .sd-user-nav {
+    display: none;
   }
 }
-
 @media (max-width: 600px) {
-  .logo-img {
-    height: 36px;
+  .sd-logo-img {
+    height: 40px; /* Reduce tamaño para no verse gigante en celulares */
   }
-  .journal-name {
-    font-size: 0.8rem;
+  .sd-journal-name {
+    font-size: 0.85rem;
   }
-  .issn {
-    font-size: 0.6rem;
+  .sd-issn {
+    font-size: 0.65rem;
   }
-  .header-links {
-    gap: 1rem;
-  }
-  .header-link {
-    font-size: 0.75rem;
+  .sd-header-top {
+    padding: 0.75rem 1rem;
   }
 }
-/* Garantizar que nada desborde el viewport */
-* {
-  max-width: 100vw;
-  box-sizing: border-box;
-}
-
-body {
-  overflow-x: hidden;
-  width: 100%;
-  position: relative;
-}
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      font-family: 'Lora', serif;
-      line-height: 1.7;
-      color: var(--text-main);
-      background-color: #fff;
-      margin: 0;
-      overflow-x: hidden;
-    }
-
-    /* Top Navigation */
-    .top-nav {
-      border-bottom: 1px solid var(--border-color);
-      padding: 1rem 2rem;
-      background: #fff;
-      position: sticky;
-      top: 0;
-      z-index: 1000;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-family: 'Inter', sans-serif;
-    }
-
-    .journal-name {
-      font-weight: 700;
-      font-size: 1rem;
-      color: var(--nature-black);
-      text-decoration: none;
-      letter-spacing: -0.02em;
-    }
-
-    .journal-name:hover {
-      color: var(--nature-blue);
-    }
-
-    .issn-badge {
-  font-family: 'Inter', sans-serif; /* Cambiado de JetBrains Mono a Inter */
-  font-size: 0.75rem;
-  background: var(--bg-soft);
-  padding: 4px 12px;
-  border-radius: 20px;
-  border: 1px solid var(--border-color);
-  color: var(--text-light);
-}
-
     /* Main Layout */
     .main-wrapper {
       max-width: 1400px;
@@ -2520,30 +2424,31 @@ body {
   </style>
 </head>
 <body>
-  <header class="journal-header">
-  <div class="header-container">
-    <div class="header-logo">
-      <a href="${homeUrl}">
-        <img src="${logoUrl}" alt="${journalNameDisplay}" class="logo-img">
-        <div class="journal-title">
-          <span class="journal-name">${journalNameDisplay}</span>
-          <span class="issn">ISSN: 3087-2839</span>
+  <header class="sd-header">
+  <div class="sd-header-top">
+    <div class="sd-brand-container">
+      <a href="/" class="sd-journal-logo">
+        <img src="${isSpanish ? LOGO_ES : LOGO_EN}" alt="Logo ${isSpanish ? 'RNCE' : 'TNRSFS'}" class="sd-logo-img">
+        <div class="sd-journal-titles">
+          <span class="sd-journal-name">${isSpanish ? JOURNAL_NAME_ES : JOURNAL_NAME_EN}</span>
+          <span class="sd-issn">ISSN: 3087-2839</span>
         </div>
       </a>
     </div>
-    <form class="header-search" action="/article" method="GET">
-      <input type="text" name="article_search" placeholder="${searchPlaceholder}" aria-label="${searchPlaceholder}">
-      <button type="submit" aria-label="${searchPlaceholder}">
-        <svg viewBox="0 0 24 24" width="18" height="18">
-          <path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-        </svg>
-      </button>
-    </form>
-    <nav class="header-links">
-      <a href="${submitUrl}" class="header-link">${isSpanish ? 'Envíos' : 'Submit'}</a>
-      <a href="${faqUrl}" class="header-link">${isSpanish ? 'Ayuda' : 'Help'}</a>
-      <a href="${loginUrl}" class="header-link">${isSpanish ? 'Mi cuenta' : 'My account'}</a>
-    </nav>
+    <div class="sd-search-wrapper">
+      <form id="search-form" class="sd-search-bar">
+        <svg class="sd-search-icon" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input type="text" id="search-input" placeholder="${isSpanish ? 'Buscar artículos, autores...' : 'Search articles, authors...'}" aria-label="Buscar">
+      </form>
+    </div>
+    <div class="sd-user-nav">
+      <a href="${isSpanish ? '/submit' : '/en/submit'}" class="sd-nav-link">${isSpanish ? 'Envíos' : 'Submissions'}</a>
+      <a href="${isSpanish ? '/faq' : '/en/faq'}" class="sd-nav-link">${isSpanish ? 'Ayuda' : 'Help'}</a>
+      <a href="${isSpanish ? '/login' : '/en/login'}" class="sd-nav-link sd-account">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
+        ${isSpanish ? 'Mi cuenta' : 'My account'}
+      </a>
+    </div>
   </div>
 </header>
 
@@ -2835,6 +2740,19 @@ body {
   </footer>
 
   <script>
+  document.addEventListener('DOMContentLoaded', () => {
+  const searchForm = document.getElementById('search-form');
+  if (searchForm) {
+    searchForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const query = document.getElementById('search-input').value.trim();
+      if (query) {
+        const encodedQuery = encodeURIComponent(query).replace(/%20/g, '+');
+        window.location.href = '/article?article_search=' + encodedQuery;
+      }
+    });
+  }
+});
     // ========== HIGHLIGHT JS ==========
     document.addEventListener('DOMContentLoaded', () => {
       if (window.hljs) {
@@ -3016,6 +2934,7 @@ body {
     if (window.MathJax) {
       MathJax.typesetPromise();
     }
+      
   </script>
 </body>
 </html>`;
@@ -3184,7 +3103,7 @@ function generateIndexes(articles) {
   </div>
   <footer>
     <p>&copy; ${new Date().getFullYear()} Revista Nacional de las Ciencias para Estudiantes. ISSN 3087-2839</p>
-    <p><a href="${homeUrl}" style="color:var(--nature-blue); text-decoration:none;">${t.backToHome}</a></p>
+    <p><a href="/" style="color:var(--primary-blue); text-decoration:none;">Volver al inicio</a></p>
   </footer>
 </body>
 </html>`;
