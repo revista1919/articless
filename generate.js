@@ -3582,11 +3582,11 @@ body {
       <!-- Copyright y enlaces legales -->
       <div class="footer-bottom">
         <div class="footer-links">
-          <a href="/privacy${isSpanish ? '' : '.EN'}.html">Privacidad</a>
+          <a href="/privacy${isSpanish ? '' : 'EN'}.html">Privacidad</a>
           <span>|</span>
-          <a href="/terms${isSpanish ? '' : '.EN'}.html">Términos</a>
+          <a href="/terms${isSpanish ? '' : 'EN'}.html">Términos</a>
           <span>|</span>
-          <a href="/credits${isSpanish ? '' : '.EN'}.html">Créditos</a>
+          <a href="/credits${isSpanish ? '' : 'EN'}.html">Créditos</a>
         </div>
         <p>© ${new Date().getFullYear()} ${isSpanish ? JOURNAL_NAME_ES : JOURNAL_NAME_EN} · ISSN 3087-2839</p>
       </div>
