@@ -2994,7 +2994,7 @@ body {
       <svg width="16" height="16" viewBox="0 0 24 24">
         <path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
       </svg>
-      <input type="text" id="mobile-search-input" placeholder="${isSpanish ? 'Buscar artículos...' : 'Search articles...'}" aria-label="Buscar" value="${isSpanish ? 'texto de ejemplo' : 'example text'}">
+      <input type="text" id="mobile-search-input" placeholder="${isSpanish ? 'Buscar artículos...' : 'Search articles...'}" aria-label="Buscar" value="${isSpanish ? 'busca autores, artículos, etc...' : 'search authors, articles, etc...'}">
     </form>
   </div>
   
@@ -3380,17 +3380,27 @@ function closeMobileMenu() {
 }
 
 function toggleMobileSearch() {
-  const mobileSearch = document.getElementById('mobileSearch');
-  mobileSearchVisible = !mobileSearchVisible;
-  mobileSearch.style.display = mobileSearchVisible ? 'block' : 'none';
+  // Abrir el menú móvil
+  const menu = document.getElementById('mobileMenu');
+  const overlay = document.getElementById('mobileOverlay');
   
-  if (mobileSearchVisible) {
-    setTimeout(() => {
-      document.getElementById('mobile-search-input').focus();
-    }, 100);
-  }
+  menu.classList.add('active');
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+  
+  // Generar el TOC móvil
+  generateMobileTOC();
+  
+  // Pequeño retraso para asegurar que el menú esté renderizado
+  setTimeout(() => {
+    const mobileSearchInput = document.getElementById('mobile-search-input');
+    if (mobileSearchInput) {
+      mobileSearchInput.focus();
+      // Opcional: seleccionar todo el texto existente
+      mobileSearchInput.select();
+    }
+  }, 300); // 300ms es suficiente para la animación del menú
 }
-
 function handleMobileSearch(e) {
   e.preventDefault();
   const query = document.getElementById('mobile-search-input').value.trim();
