@@ -3351,395 +3351,395 @@ body {
   </footer>
 
 <script>
-  // ========== FUNCIONES PARA MENÚ MÓVIL ==========
-  let mobileSearchVisible = false;
+// ========== FUNCIONES PARA MENÚ MÓVIL ==========
+let mobileSearchVisible = false;
 
-  function toggleMobileMenu() {
-    const menu = document.getElementById('mobileMenu');
-    const overlay = document.getElementById('mobileOverlay');
-    
-    menu.classList.toggle('active');
-    overlay.classList.toggle('active');
-    
-    // Prevenir scroll del body cuando el menú está abierto
-    if (menu.classList.contains('active')) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-  }
-
-  function closeMobileMenu() {
-    const menu = document.getElementById('mobileMenu');
-    const overlay = document.getElementById('mobileOverlay');
-    
-    if (menu) menu.classList.remove('active');
-    if (overlay) overlay.classList.remove('active');
+function toggleMobileMenu() {
+  const menu = document.getElementById('mobileMenu');
+  const overlay = document.getElementById('mobileOverlay');
+  
+  menu.classList.toggle('active');
+  overlay.classList.toggle('active');
+  
+  // Prevenir scroll del body cuando el menú está abierto
+  if (menu.classList.contains('active')) {
+    document.body.style.overflow = 'hidden';
+    // Generar TOC móvil cada vez que se abre el menú
+    generateMobileTOC();
+  } else {
     document.body.style.overflow = '';
-    
-    // También cerrar la búsqueda si está abierta
-    const mobileSearch = document.getElementById('mobileSearch');
-    if (mobileSearchVisible) {
-      mobileSearch.style.display = 'none';
-      mobileSearchVisible = false;
-    }
   }
+}
 
-  function toggleMobileSearch() {
-    const mobileSearch = document.getElementById('mobileSearch');
-    mobileSearchVisible = !mobileSearchVisible;
-    mobileSearch.style.display = mobileSearchVisible ? 'block' : 'none';
-    
-    if (mobileSearchVisible) {
-      setTimeout(() => {
-        document.getElementById('mobile-search-input').focus();
-      }, 100);
-    }
+function closeMobileMenu() {
+  const menu = document.getElementById('mobileMenu');
+  const overlay = document.getElementById('mobileOverlay');
+  
+  if (menu) menu.classList.remove('active');
+  if (overlay) overlay.classList.remove('active');
+  document.body.style.overflow = '';
+  
+  // También cerrar la búsqueda si está abierta
+  const mobileSearch = document.getElementById('mobileSearch');
+  if (mobileSearchVisible) {
+    mobileSearch.style.display = 'none';
+    mobileSearchVisible = false;
   }
+}
 
-  function handleMobileSearch(e) {
-    e.preventDefault();
-    const query = document.getElementById('mobile-search-input').value.trim();
-    if (query) {
-      const encodedQuery = encodeURIComponent(query).replace(/%20/g, '+');
-      window.location.href = '/article?article_search=' + encodedQuery;
-    }
+function toggleMobileSearch() {
+  const mobileSearch = document.getElementById('mobileSearch');
+  mobileSearchVisible = !mobileSearchVisible;
+  mobileSearch.style.display = mobileSearchVisible ? 'block' : 'none';
+  
+  if (mobileSearchVisible) {
+    setTimeout(() => {
+      document.getElementById('mobile-search-input').focus();
+    }, 100);
   }
+}
 
-  // ========== FUNCIÓN DE BÚSQUEDA PRINCIPAL ==========
-  document.addEventListener('DOMContentLoaded', () => {
-    const searchForm = document.getElementById('search-form');
-    if (searchForm) {
-      searchForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const query = document.getElementById('search-input').value.trim();
-        if (query) {
-          const encodedQuery = encodeURIComponent(query).replace(/%20/g, '+');
-          window.location.href = '/article?article_search=' + encodedQuery;
-        }
-      });
-    }
-  });
+function handleMobileSearch(e) {
+  e.preventDefault();
+  const query = document.getElementById('mobile-search-input').value.trim();
+  if (query) {
+    const encodedQuery = encodeURIComponent(query).replace(/%20/g, '+');
+    window.location.href = '/article?article_search=' + encodedQuery;
+  }
+}
 
-  // ========== HIGHLIGHT JS ==========
-  document.addEventListener('DOMContentLoaded', () => {
-    if (window.hljs) {
-      document.querySelectorAll('pre code').forEach((block) => {
-        hljs.highlightElement(block);
-      });
-    }
-  });
-
-  // ========== FUNCIÓN PARA COPIAR CÓDIGO ==========
-  function copyCode(codeId, btn) {
-    const codeElement = document.getElementById(codeId);
-    if (!codeElement) return;
-    
-    const code = codeElement.textContent || codeElement.innerText;
-    
-    navigator.clipboard.writeText(code).then(() => {
-      const originalHtml = btn.innerHTML;
-      
-      btn.innerHTML = '${t.codeCopied}';
-      btn.style.background = '#22c55e';
-      btn.style.color = 'white';
-      btn.style.borderColor = '#22c55e';
-      
-      setTimeout(() => {
-        btn.innerHTML = originalHtml;
-        btn.style.background = '';
-        btn.style.color = '';
-        btn.style.borderColor = '';
-      }, 2000);
-    }).catch(err => {
-      console.error('Error copying code:', err);
-      alert('No se pudo copiar el código');
+// ========== FUNCIÓN DE BÚSQUEDA PRINCIPAL ==========
+document.addEventListener('DOMContentLoaded', () => {
+  const searchForm = document.getElementById('search-form');
+  if (searchForm) {
+    searchForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const query = document.getElementById('search-input').value.trim();
+      if (query) {
+        const encodedQuery = encodeURIComponent(query).replace(/%20/g, '+');
+        window.location.href = '/article?article_search=' + encodedQuery;
+      }
     });
   }
+});
 
-  // ========== TAB SWITCHING ==========
-  function switchTab(device, tabName) {
-    if (device === 'desktop') {
-      document.querySelectorAll('#desktop-citations, #desktop-metadata').forEach(panel => {
-        panel.classList.remove('active');
-      });
-      document.querySelectorAll('.right-sidebar .tab-button').forEach(btn => {
-        btn.classList.remove('active');
-      });
-      document.getElementById('desktop-' + tabName).classList.add('active');
-      if (event) event.target.classList.add('active');
+// ========== GENERAR TABLA DE CONTENIDOS PARA MÓVIL ==========
+function generateMobileTOC() {
+  const mobileTocList = document.getElementById('mobile-toc-list');
+  if (!mobileTocList) return;
+  
+  // Guardar el idioma actual
+  const isSpanish = document.documentElement.lang === 'es';
+  
+  // Limpiar lista existente
+  mobileTocList.innerHTML = '';
+  
+  // Añadir resumen siempre
+  const abstractItem = document.createElement('li');
+  abstractItem.className = 'sd-mobile-nav-item';
+  
+  // Usar concatenación normal en lugar de template string anidado
+  abstractItem.innerHTML = '<a href="#abstract" class="sd-mobile-nav-link mobile-toc-link" data-target="abstract">' +
+    '<svg viewBox="0 0 24 24" width="20" height="20">' +
+      '<path d="M4 6H20v2H4zM4 12H20v2H4zM4 18H20v2H4z"/>' +
+    '</svg>' +
+    (isSpanish ? 'Resumen' : 'Abstract') +
+  '</a>';
+  
+  mobileTocList.appendChild(abstractItem);
+  
+  // Obtener todos los encabezados h2 del artículo
+  const headings = document.querySelectorAll('.article-container h2');
+  
+  headings.forEach((heading, index) => {
+    // Ignorar ciertos encabezados que no queremos en el TOC
+    if (heading.id === 'citations' || heading.closest('.citation-box')) return;
+    
+    // Asegurar que el encabezado tenga un ID
+    const id = heading.id || 'section-' + index;
+    heading.id = id;
+    
+    // Crear elemento de menú
+    const li = document.createElement('li');
+    li.className = 'sd-mobile-nav-item';
+    
+    // Determinar ícono según el tipo de sección
+    let iconPath = '';
+    const headingText = heading.textContent.toLowerCase();
+    
+    if (headingText.includes('referencia') || headingText.includes('reference')) {
+      iconPath = '<path d="M4 6H20v2H4zM4 12H20v2H4zM4 18H20v2H4z"/>';
+    } else if (headingText.includes('agradec') || headingText.includes('acknowledg')) {
+      iconPath = '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>';
+    } else if (headingText.includes('financi') || headingText.includes('funding')) {
+      iconPath = '<path d="M11.5 1L8 12h3.5L8 23 16 9h-4.5L16 1h-4.5z"/>';
+    } else if (headingText.includes('pdf') || headingText.includes('visualiz')) {
+      iconPath = '<path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4V4c0-1.1-.9-2-2-2z"/>';
+    } else if (headingText.includes('licen') || headingText.includes('license')) {
+      iconPath = '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>';
     } else {
-      document.querySelectorAll('#mobile-citations, #mobile-metadata').forEach(panel => {
-        panel.classList.remove('active');
-      });
-      document.querySelectorAll('.mobile-info .tab-button').forEach(btn => {
-        btn.classList.remove('active');
-      });
-      document.getElementById('mobile-' + tabName).classList.add('active');
-      if (event) event.target.classList.add('active');
+      iconPath = '<path d="M4 6H20v2H4zM4 12H20v2H4zM4 18H20v2H4z"/>';
     }
-  }
-
-  // ========== GENERAR TABLE OF CONTENTS PARA ESCRITORIO ==========
-  document.addEventListener('DOMContentLoaded', () => {
-    const tocList = document.getElementById('toc-list');
-    if (tocList) {
-      const headings = document.querySelectorAll('.article-container h2');
-      
-      headings.forEach((heading, index) => {
-        if (heading.id === 'citations' || heading.closest('.citation-box')) return;
-        
-        const id = heading.id || 'section-' + index;
-        heading.id = id;
-        
-        const li = document.createElement('li');
-        li.className = 'toc-item';
-        const link = document.createElement('a');
-        link.href = '#' + id;
-        link.textContent = heading.textContent;
-        link.addEventListener('click', (e) => {
-          e.preventDefault();
-          document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
-        });
-        li.appendChild(link);
-        tocList.appendChild(li);
-      });
-    }
-
-    // Smooth scroll for all internal links
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-      anchor.addEventListener('click', function (e) {
-        const href = this.getAttribute('href');
-        if (href === '#') return;
-        
-        const target = document.querySelector(href);
-        if (target) {
-          e.preventDefault();
-          target.scrollIntoView({ behavior: 'smooth' });
-        }
-      });
-    });
-
-    // Active section highlighting for desktop TOC
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          document.querySelectorAll('.toc-item a').forEach(link => {
-            link.classList.remove('active');
-            if (link.getAttribute('href') === '#' + entry.target.id) {
-              link.classList.add('active');
-            }
-          });
-        }
-      });
-    }, { threshold: 0.3, rootMargin: '-80px 0px -80px 0px' });
-
-    document.querySelectorAll('.article-container h2').forEach(h => observer.observe(h));
+    
+    // Construir el HTML con concatenación
+    li.innerHTML = '<a href="#' + id + '" class="sd-mobile-nav-link mobile-toc-link" data-target="' + id + '">' +
+      '<svg viewBox="0 0 24 24" width="20" height="20">' +
+        iconPath +
+      '</svg>' +
+      heading.textContent +
+    '</a>';
+    
+    mobileTocList.appendChild(li);
   });
+  
+  // Añadir evento de cierre del menú al hacer clic en los enlaces
+  document.querySelectorAll('.mobile-toc-link').forEach(link => {
+    link.addEventListener('click', (e) => {
+      const targetId = link.getAttribute('data-target');
+      if (targetId) {
+        e.preventDefault();
+        const targetElement = document.getElementById(targetId);
+        if (targetElement) {
+          targetElement.scrollIntoView({ behavior: 'smooth' });
+          closeMobileMenu(); // Cerrar el menú después de navegar
+        }
+      }
+    });
+  });
+}
 
-  // ========== GENERAR TABLA DE CONTENIDOS PARA MÓVIL ==========
-  function generateMobileTOC() {
-    const mobileTocList = document.getElementById('mobile-toc-list');
-    if (!mobileTocList) return;
+// ========== HIGHLIGHT JS ==========
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.hljs) {
+    document.querySelectorAll('pre code').forEach((block) => {
+      hljs.highlightElement(block);
+    });
+  }
+});
+
+// ========== FUNCIÓN PARA COPIAR CÓDIGO ==========
+function copyCode(codeId, btn) {
+  const codeElement = document.getElementById(codeId);
+  if (!codeElement) return;
+  
+  const code = codeElement.textContent || codeElement.innerText;
+  
+  navigator.clipboard.writeText(code).then(() => {
+    const originalText = btn.innerText;
+    const originalHtml = btn.innerHTML;
     
-    // Limpiar lista existente
-    mobileTocList.innerHTML = '';
+    btn.innerHTML = '✓ Copiado';
+    btn.style.background = '#22c55e';
+    btn.style.color = 'white';
+    btn.style.borderColor = '#22c55e';
     
-    // Obtener el idioma actual
-    const isSpanish = document.documentElement.lang === 'es';
-    
-    // Añadir resumen siempre
-    const abstractItem = document.createElement('li');
-    abstractItem.className = 'sd-mobile-nav-item';
-    abstractItem.innerHTML = `
-      <a href="#abstract" class="sd-mobile-nav-link mobile-toc-link" data-target="abstract">
-        <svg viewBox="0 0 24 24" width="20" height="20">
-          <path d="M4 6H20v2H4zM4 12H20v2H4zM4 18H20v2H4z"/>
-        </svg>
-        ${isSpanish ? 'Resumen' : 'Abstract'}
-      </a>
-    `;
-    mobileTocList.appendChild(abstractItem);
-    
-    // Obtener todos los encabezados h2 del artículo
+    setTimeout(() => {
+      btn.innerHTML = originalHtml;
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }, 2000);
+  }).catch(err => {
+    console.error('Error copying code:', err);
+    alert('No se pudo copiar el código');
+  });
+}
+
+// ========== TAB SWITCHING ==========
+function switchTab(device, tabName) {
+  if (device === 'desktop') {
+    document.querySelectorAll('#desktop-citations, #desktop-metadata').forEach(panel => {
+      panel.classList.remove('active');
+    });
+    document.querySelectorAll('.right-sidebar .tab-button').forEach(btn => {
+      btn.classList.remove('active');
+    });
+    document.getElementById('desktop-' + tabName).classList.add('active');
+    if (event) event.target.classList.add('active');
+  } else {
+    document.querySelectorAll('#mobile-citations, #mobile-metadata').forEach(panel => {
+      panel.classList.remove('active');
+    });
+    document.querySelectorAll('.mobile-info .tab-button').forEach(btn => {
+      btn.classList.remove('active');
+    });
+    document.getElementById('mobile-' + tabName).classList.add('active');
+    if (event) event.target.classList.add('active');
+  }
+}
+
+// ========== GENERATE DESKTOP TABLE OF CONTENTS ==========
+document.addEventListener('DOMContentLoaded', () => {
+  const tocList = document.getElementById('toc-list');
+  if (tocList) {
     const headings = document.querySelectorAll('.article-container h2');
     
     headings.forEach((heading, index) => {
-      // Ignorar ciertos encabezados que no queremos en el TOC
       if (heading.id === 'citations' || heading.closest('.citation-box')) return;
       
-      // Asegurar que el encabezado tenga un ID
       const id = heading.id || 'section-' + index;
       heading.id = id;
       
-      // Crear elemento de menú
       const li = document.createElement('li');
-      li.className = 'sd-mobile-nav-item';
-      
-      // Determinar ícono según el tipo de sección
-      let iconPath = '';
-      const headingText = heading.textContent.toLowerCase();
-      
-      if (headingText.includes('referencia') || headingText.includes('reference')) {
-        iconPath = '<path d="M4 6H20v2H4zM4 12H20v2H4zM4 18H20v2H4z"/>';
-      } else if (headingText.includes('agradec') || headingText.includes('acknowledg')) {
-        iconPath = '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>';
-      } else if (headingText.includes('financi') || headingText.includes('funding')) {
-        iconPath = '<path d="M11.5 1L8 12h3.5L8 23 16 9h-4.5L16 1h-4.5z"/>';
-      } else if (headingText.includes('conflicto') || headingText.includes('conflict')) {
-        iconPath = '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>';
-      } else if (headingText.includes('disponibilidad') || headingText.includes('data')) {
-        iconPath = '<path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V6h16v12z"/>';
-      } else {
-        iconPath = '<path d="M4 6H20v2H4zM4 12H20v2H4zM4 18H20v2H4z"/>';
-      }
-      
-      li.innerHTML = `
-        <a href="#${id}" class="sd-mobile-nav-link mobile-toc-link" data-target="${id}">
-          <svg viewBox="0 0 24 24" width="20" height="20">
-            ${iconPath}
-          </svg>
-          ${heading.textContent}
-        </a>
-      `;
-      
-      mobileTocList.appendChild(li);
-    });
-    
-    // Añadir evento de cierre del menú al hacer clic en los enlaces
-    document.querySelectorAll('.mobile-toc-link').forEach(link => {
+      li.className = 'toc-item';
+      const link = document.createElement('a');
+      link.href = '#' + id;
+      link.textContent = heading.textContent;
       link.addEventListener('click', (e) => {
-        const targetId = link.getAttribute('data-target');
-        if (targetId) {
-          e.preventDefault();
-          const targetElement = document.getElementById(targetId);
-          if (targetElement) {
-            targetElement.scrollIntoView({ behavior: 'smooth' });
-            closeMobileMenu(); // Cerrar el menú después de navegar
-          }
-        }
+        e.preventDefault();
+        document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
       });
+      li.appendChild(link);
+      tocList.appendChild(li);
     });
   }
 
-  // ========== ACTIVAR ENLACES DEL TOC MÓVIL CON SCROLL ==========
-  function setupMobileTOCScroll() {
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          document.querySelectorAll('.mobile-toc-link').forEach(link => {
-            link.classList.remove('active');
-            if (link.getAttribute('data-target') === entry.target.id) {
-              link.classList.add('active');
-            }
-          });
-        }
-      });
-    }, { threshold: 0.3, rootMargin: '-80px 0px -80px 0px' });
-
-    // Observar el abstract y todos los h2
-    const abstractEl = document.getElementById('abstract');
-    if (abstractEl) observer.observe(abstractEl);
-    
-    document.querySelectorAll('.article-container h2').forEach(h => {
-      if (h.id) observer.observe(h);
-    });
-  }
-
-  // ========== INICIALIZACIÓN PRINCIPAL ==========
-  document.addEventListener('DOMContentLoaded', () => {
-    // Generar tabla de contenidos móvil
-    generateMobileTOC();
-    
-    // Configurar observador de scroll para TOC móvil
-    setupMobileTOCScroll();
-    
-    // Cerrar menú al hacer clic en un enlace (por si acaso)
-    const mobileLinks = document.querySelectorAll('.sd-mobile-nav-link');
-    mobileLinks.forEach(link => {
-      link.addEventListener('click', (e) => {
-        // No cerrar si es un enlace externo que causa navegación
-        if (link.getAttribute('href') && !link.getAttribute('href').startsWith('#')) {
-          closeMobileMenu();
-        }
-      });
-    });
-    
-    // Cerrar con tecla Escape
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        closeMobileMenu();
+  // Smooth scroll for all internal links
+  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function (e) {
+      const href = this.getAttribute('href');
+      if (href === '#') return;
+      
+      const target = document.querySelector(href);
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth' });
       }
     });
   });
 
-  // ========== COPY RICH TEXT FUNCTION ==========
-  function copyRichText(id, event) {
-    const element = document.getElementById(id);
-    if (!element) return;
-    
-    const htmlContent = element.innerHTML;
-    const plainText = element.innerText || element.textContent;
-    
-    const clipboardItem = new ClipboardItem({
-      'text/plain': new Blob([plainText], { type: 'text/plain' }),
-      'text/html': new Blob([htmlContent], { type: 'text/html' })
+  // Active section highlighting for desktop TOC
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        document.querySelectorAll('.toc-item a').forEach(link => {
+          link.classList.remove('active');
+          if (link.getAttribute('href') === '#' + entry.target.id) {
+            link.classList.add('active');
+          }
+        });
+      }
     });
-    
-    navigator.clipboard.write([clipboardItem]).then(() => {
-      const btn = event.target;
-      const originalText = btn.innerText;
-      const originalBg = btn.style.background;
-      const originalColor = btn.style.color;
-      
-      btn.innerText = '${t.copied}';
-      btn.style.background = '#22c55e';
-      btn.style.color = 'white';
-      btn.style.borderColor = '#22c55e';
-      
-      setTimeout(() => {
-        btn.innerText = originalText;
-        btn.style.background = originalBg;
-        btn.style.color = originalColor;
-        btn.style.borderColor = '';
-      }, 2000);
-    }).catch(err => {
-      console.error('Error copying rich text: ', err);
-      fallbackCopy(plainText, event.target);
-    });
-  }
+  }, { threshold: 0.3, rootMargin: '-80px 0px -80px 0px' });
 
-  function fallbackCopy(text, btn) {
+  document.querySelectorAll('.article-container h2, #abstract').forEach(h => {
+    if (h.id) observer.observe(h);
+  });
+  
+  // Generar TOC móvil inicial
+  generateMobileTOC();
+});
+
+// ========== ACTIVE SECTION HIGHLIGHTING FOR MOBILE TOC ==========
+// Crear un observer separado para el TOC móvil
+document.addEventListener('DOMContentLoaded', () => {
+  const mobileObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        document.querySelectorAll('.mobile-toc-link').forEach(link => {
+          link.classList.remove('active');
+          if (link.getAttribute('data-target') === entry.target.id) {
+            link.classList.add('active');
+          }
+        });
+      }
+    });
+  }, { threshold: 0.3, rootMargin: '-80px 0px -80px 0px' });
+
+  document.querySelectorAll('.article-container h2, #abstract').forEach(el => {
+    if (el.id) mobileObserver.observe(el);
+  });
+});
+
+// ========== COPY RICH TEXT FUNCTION ==========
+function copyRichText(id, event) {
+  const element = document.getElementById(id);
+  if (!element) return;
+  
+  const htmlContent = element.innerHTML;
+  const plainText = element.innerText || element.textContent;
+  
+  const clipboardItem = new ClipboardItem({
+    'text/plain': new Blob([plainText], { type: 'text/plain' }),
+    'text/html': new Blob([htmlContent], { type: 'text/html' })
+  });
+  
+  navigator.clipboard.write([clipboardItem]).then(() => {
+    const btn = event.target;
     const originalText = btn.innerText;
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    document.body.appendChild(textarea);
-    textarea.select();
+    const originalBg = btn.style.background;
+    const originalColor = btn.style.color;
     
-    try {
-      document.execCommand('copy');
-      btn.innerText = '${t.copied}';
-      btn.style.background = '#22c55e';
-      btn.style.color = 'white';
-      setTimeout(() => {
-        btn.innerText = originalText;
-        btn.style.background = 'white';
-        btn.style.color = '';
-      }, 2000);
-    } catch (err) {
-      console.error('Fallback copy failed:', err);
-      alert('No se pudo copiar. Por favor, selecciona el texto manualmente.');
-    }
+    btn.innerText = document.documentElement.lang === 'es' ? '✓ Copiado' : '✓ Copied';
+    btn.style.background = '#22c55e';
+    btn.style.color = 'white';
+    btn.style.borderColor = '#22c55e';
     
-    document.body.removeChild(textarea);
-  }
+    setTimeout(() => {
+      btn.innerText = originalText;
+      btn.style.background = originalBg;
+      btn.style.color = originalColor;
+      btn.style.borderColor = '';
+    }, 2000);
+  }).catch(err => {
+    console.error('Error copying rich text: ', err);
+    fallbackCopy(plainText, event.target);
+  });
+}
 
-  // ========== MATHJAX ==========
-  if (window.MathJax) {
-    MathJax.typesetPromise();
+function fallbackCopy(text, btn) {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  
+  const originalText = btn.innerText;
+  
+  try {
+    document.execCommand('copy');
+    btn.innerText = document.documentElement.lang === 'es' ? '✓ Copiado' : '✓ Copied';
+    btn.style.background = '#22c55e';
+    btn.style.color = 'white';
+    setTimeout(() => {
+      btn.innerText = originalText;
+      btn.style.background = 'white';
+      btn.style.color = '';
+    }, 2000);
+  } catch (err) {
+    console.error('Fallback copy failed:', err);
+    alert('No se pudo copiar. Por favor, selecciona el texto manualmente.');
   }
+  
+  document.body.removeChild(textarea);
+}
+
+// ========== CERRAR MENÚ CON TECLA ESCAPE ==========
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeMobileMenu();
+  }
+});
+
+// ========== MATHJAX ==========
+if (window.MathJax) {
+  MathJax.typesetPromise();
+}
+
+// ========== INICIALIZACIÓN ADICIONAL ==========
+document.addEventListener('DOMContentLoaded', () => {
+  // Cerrar menú al hacer clic en un enlace (por si acaso)
+  const mobileLinks = document.querySelectorAll('.sd-mobile-nav-link');
+  mobileLinks.forEach(link => {
+    link.addEventListener('click', () => {
+      // No cerrar si es un enlace externo o tiene target _blank
+      if (!link.hasAttribute('target') || link.getAttribute('target') !== '_blank') {
+        setTimeout(closeMobileMenu, 150); // Pequeño retraso para permitir la navegación
+      }
+    });
+  });
+});
 </script>
 </body>
 </html>`;
@@ -4081,8 +4081,5 @@ function generateIndexes(articles) {
   console.log(`✅ Índice inglés: ${indexPathEn}`);
 }
 
-  // ========== EJECUCIÓN ==========
-`;
-}
-
+// ========== EJECUCIÓN ==========
 generateAll();
