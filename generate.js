@@ -676,7 +676,7 @@ async function generateArticleHtml(article) {
   }
   const authorMetaTags = authorsList.map(author => `<meta name="citation_author" content="${author}">`).join('\n');
   
-  const articleSlug = `${generateSlug(article.titulo)}-${article.numeroArticulo}`;
+  const articleSlug = article.permalink || `${generateSlug(article.titulo)}-${article.numeroArticulo}`;
 
   // Construir autores con iconos - AHORA PASAMOS EL ARTÍCULO COMPLETO
   const authorsDisplayEs = processAuthorsWithIcons(article.autores, article, 'es');
@@ -3091,7 +3091,7 @@ function generateIndexes(articles) {
         <h2>Año ${year}</h2>
         <ul class="articles-list">
           ${articlesByYear[year].map(article => {
-            const articleSlug = `${generateSlug(article.titulo)}-${article.numeroArticulo}`;
+            const articleSlug = article.permalink || `${generateSlug(article.titulo)}-${article.numeroArticulo}`;
             const authorsDisplay = formatAuthorsDisplay(article.autores, 'es');
             return `
             <li class="article-item">
@@ -3254,7 +3254,7 @@ function generateIndexes(articles) {
         <h2>Year ${year}</h2>
         <ul class="articles-list">
           ${articlesByYear[year].map(article => {
-            const articleSlug = `${generateSlug(article.titulo)}-${article.numeroArticulo}`;
+            const articleSlug = article.permalink || `${generateSlug(article.titulo)}-${article.numeroArticulo}`;
             const authorsDisplay = formatAuthorsDisplay(article.autores, 'en');
             return `
             <li class="article-item">
