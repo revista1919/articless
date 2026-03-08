@@ -4370,80 +4370,79 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function wrapWithToolbar(element, type, title) {
-    if (element.parentElement && element.parentElement.classList.contains('special-element-container')) {
-      return;
-    }
-    
-    var container = document.createElement('div');
-    container.className = 'special-element-container';
-    container.setAttribute('data-element-type', type);
-    
-    element.parentNode.insertBefore(container, element);
-    container.appendChild(element);
-    
-    var toolbar = document.createElement('div');
-    toolbar.className = 'special-element-toolbar';
-    
-    var buttons = [];
-    
-    // Botón pantalla completa
-    buttons.push('<button class="toolbar-btn" onclick="openInModal(\'' + element.id + '\')" data-tooltip="Ver en pantalla completa">' +
-        '<svg viewBox="0 0 24 24" width="14" height="14">' +
-          '<path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>' +
-        '</svg>' +
-        '<span class="toolbar-label">Pantalla completa</span>' +
-      '</button>');
-    
-    // Botón nueva pestaña
-    buttons.push('<button class="toolbar-btn" onclick="openInNewTab(\'' + element.id + '\')" data-tooltip="Abrir en nueva pestaña">' +
-        '<svg viewBox="0 0 24 24" width="14" height="14">' +
-          '<path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>' +
-        '</svg>' +
-        '<span class="toolbar-label">Nueva pestaña</span>' +
-      '</button>');
-    
-    // Botones específicos para tablas
-    if (type === 'table') {
-      buttons.push('<div style="position: relative;">' +
-          '<button class="toolbar-btn" onclick="toggleDownloadMenu(this, \'' + element.id + '\')" data-tooltip="Descargar tabla">' +
-            '<svg viewBox="0 0 24 24" width="14" height="14">' +
-              '<path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>' +
-            '</svg>' +
-            '<span class="toolbar-label">Descargar</span>' +
-          '</button>' +
-          '<div class="download-format-menu">' +
-            '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'csv\')">CSV</button>' +
-            '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'excel\')">Excel</button>' +
-            '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'json\')">JSON</button>' +
-            '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'markdown\')">Markdown</button>' +
-            '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'latex\')">LaTeX</button>' +
-            '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'html\')">HTML</button>' +
-          '</div>' +
-        '</div>');
-    }
-    
-    // Botón copiar para código
-    if (type === 'code') {
-      buttons.push('<button class="toolbar-btn" onclick="copyElementContent(\'' + element.id + '\')" data-tooltip="Copiar contenido">' +
-          '<svg viewBox="0 0 24 24" width="14" height="14">' +
-            '<rect x="9" y="9" width="13" height="13" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/>' +
-            '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" fill="none" stroke="currentColor" stroke-width="2"/>' +
-          '</svg>' +
-          '<span class="toolbar-label">Copiar</span>' +
-        '</button>');
-    }
-    
-    toolbar.innerHTML = buttons.join('');
-    container.appendChild(toolbar);
-    
-    var badge = document.createElement('span');
-    badge.className = 'special-badge';
-    badge.textContent = type === 'figure' ? 'Figura' : 
-                        type === 'table' ? 'Tabla' : 
-                        type === 'code' ? 'Código' : 'Ecuación';
-    element.parentNode.insertBefore(badge, element);
+  if (element.parentElement && element.parentElement.classList.contains('special-element-container')) {
+    return;
   }
-
+  
+  var container = document.createElement('div');
+  container.className = 'special-element-container';
+  container.setAttribute('data-element-type', type);
+  
+  element.parentNode.insertBefore(container, element);
+  container.appendChild(element);
+  
+  var toolbar = document.createElement('div');
+  toolbar.className = 'special-element-toolbar';
+  
+  var buttons = [];
+  
+  // Botón pantalla completa - CORREGIDO
+  buttons.push('<button class="toolbar-btn" onclick="openInModal(\'' + element.id + '\')" data-tooltip="Ver en pantalla completa">' +
+      '<svg viewBox="0 0 24 24" width="14" height="14">' +
+        '<path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>' +
+      '</svg>' +
+      '<span class="toolbar-label">Pantalla completa</span>' +
+    '</button>');
+  
+  // Botón nueva pestaña - CORREGIDO
+  buttons.push('<button class="toolbar-btn" onclick="openInNewTab(\'' + element.id + '\')" data-tooltip="Abrir en nueva pestaña">' +
+      '<svg viewBox="0 0 24 24" width="14" height="14">' +
+        '<path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>' +
+      '</svg>' +
+      '<span class="toolbar-label">Nueva pestaña</span>' +
+    '</button>');
+  
+  // Botones específicos para tablas - CORREGIDO
+  if (type === 'table') {
+    buttons.push('<div style="position: relative;">' +
+        '<button class="toolbar-btn" onclick="toggleDownloadMenu(this, \'' + element.id + '\')" data-tooltip="Descargar tabla">' +
+          '<svg viewBox="0 0 24 24" width="14" height="14">' +
+            '<path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>' +
+          '</svg>' +
+          '<span class="toolbar-label">Descargar</span>' +
+        '</button>' +
+        '<div class="download-format-menu">' +
+          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'csv\')">CSV</button>' +
+          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'excel\')">Excel</button>' +
+          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'json\')">JSON</button>' +
+          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'markdown\')">Markdown</button>' +
+          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'latex\')">LaTeX</button>' +
+          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'html\')">HTML</button>' +
+        '</div>' +
+      '</div>');
+  }
+  
+  // Botón copiar para código - CORREGIDO
+  if (type === 'code') {
+    buttons.push('<button class="toolbar-btn" onclick="copyElementContent(\'' + element.id + '\')" data-tooltip="Copiar contenido">' +
+        '<svg viewBox="0 0 24 24" width="14" height="14">' +
+          '<rect x="9" y="9" width="13" height="13" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/>' +
+          '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" fill="none" stroke="currentColor" stroke-width="2"/>' +
+        '</svg>' +
+        '<span class="toolbar-label">Copiar</span>' +
+      '</button>');
+  }
+  
+  toolbar.innerHTML = buttons.join('');
+  container.appendChild(toolbar);
+  
+  var badge = document.createElement('span');
+  badge.className = 'special-badge';
+  badge.textContent = type === 'figure' ? 'Figura' : 
+                      type === 'table' ? 'Tabla' : 
+                      type === 'code' ? 'Código' : 'Ecuación';
+  element.parentNode.insertBefore(badge, element);
+}
   // Funciones globales para elementos especiales
   window.openInModal = function(elementId) {
     var element = document.getElementById(elementId);
