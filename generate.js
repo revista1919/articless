@@ -4165,9 +4165,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el.id) mobileObserver.observe(el);
   });
 });
-// ========== DETECCIÓN DE ELEMENTOS ESPECIALES ==========
+// ========== DETECCIÓN DE ELEMENTOS ESPECIALES Y TOOLBAR ==========
 (function() {
-  function updateSpecialElements() {
+  // Variables globales
+  window.currentModalElement = null;
+  
+  // Función para actualizar la lista de elementos especiales
+  function updateSpecialElementsList() {
     var elements = [];
     
     // Detectar figuras
@@ -4218,6 +4222,110 @@ document.addEventListener('DOMContentLoaded', () => {
     
     window.__SPECIAL_ELEMENTS__ = elements;
     console.log('Elementos especiales detectados:', elements.length);
+    
+    // Refrescar el TOC después de detectar elementos
+    refreshTOC();
+  }
+
+  // Función para refrescar el TOC
+  function refreshTOC() {
+    var tocList = document.getElementById('toc-list');
+    if (!tocList) return;
+
+    // Limpiar TOC existente
+    tocList.innerHTML = '';
+
+    // Añadir encabezados H2
+    var headings = document.querySelectorAll('.article-container h2');
+    for (var j = 0; j < headings.length; j++) {
+      var heading = headings[j];
+      if (heading.id === 'citations' || heading.closest('.citation-box')) continue;
+      
+      var id = heading.id || 'section-' + j;
+      heading.id = id;
+      
+      var li = document.createElement('li');
+      li.className = 'toc-item';
+      var link = document.createElement('a');
+      link.href = '#' + id;
+      link.textContent = heading.textContent;
+      
+      link.addEventListener('click', (function(sectionId) {
+        return function(e) {
+          e.preventDefault();
+          document.getElementById(sectionId).scrollIntoView({ behavior: 'smooth' });
+        };
+      })(id));
+      
+      li.appendChild(link);
+      tocList.appendChild(li);
+    }
+
+    // Añadir elementos especiales
+    var specialElements = window.__SPECIAL_ELEMENTS__ || [];
+    
+    var iconMap = {
+      figure: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15L16 10 5 21"/></svg>',
+      table: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5zm0 5h18M10 3v18"/></svg>',
+      code: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m18 16 4-4-4-4M6 8l-4 4 4 4M14.5 4l-5 16"/></svg>',
+      equation: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 7h3a2 2 0 0 1 2 2v6a2 2 0 0 0 2 2h3"/><path d="M7 11h4"/><path d="M17 7h.01"/><circle cx="18.5" cy="15.5" r="2.5"/></svg>'
+    };
+
+    if (specialElements.length > 0) {
+      var separator = document.createElement('li');
+      separator.className = 'toc-separator';
+      separator.innerHTML = '<span style="display:block; font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); margin:1rem 0 0.5rem 0; padding-left:1rem;">FIGURAS Y TABLAS</span>';
+      tocList.appendChild(separator);
+
+      for (var i = 0; i < specialElements.length; i++) {
+        var element = specialElements[i];
+        var li = document.createElement('li');
+        li.className = 'toc-item toc-special';
+        var link = document.createElement('a');
+        link.href = '#' + element.id;
+        
+        var icon = iconMap[element.type] || '•';
+        link.innerHTML = icon + ' <span style="margin-left: 6px;">' + element.title + '</span>';
+        
+        link.addEventListener('click', (function(id) {
+          return function(e) {
+            e.preventDefault();
+            document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+          };
+        })(element.id));
+        
+        li.appendChild(link);
+        tocList.appendChild(li);
+      }
+    }
+
+    // Reactivar observer para highlighting
+    setupIntersectionObserver();
+  }
+
+  // Configurar observer para highlighting
+  function setupIntersectionObserver() {
+    var observer = new IntersectionObserver(function(entries) {
+      for (var l = 0; l < entries.length; l++) {
+        var entry = entries[l];
+        if (entry.isIntersecting) {
+          var links = document.querySelectorAll('.toc-item a');
+          for (var m = 0; m < links.length; m++) {
+            var link = links[m];
+            link.classList.remove('active');
+            if (link.getAttribute('href') === '#' + entry.target.id) {
+              link.classList.add('active');
+            }
+          }
+        }
+      }
+    }, { threshold: 0.3, rootMargin: '-80px 0px -80px 0px' });
+
+    var elementsToObserve = document.querySelectorAll('.article-container h2, #abstract, [id^="figure-"], [id^="table-"], [id^="code-"], [id^="equation-"]');
+    for (var n = 0; n < elementsToObserve.length; n++) {
+      var el = elementsToObserve[n];
+      if (el.id) observer.observe(el);
+    }
   }
 
   // Función para envolver elementos con toolbar
@@ -4246,7 +4354,8 @@ document.addEventListener('DOMContentLoaded', () => {
       wrapWithToolbar(equations[i], 'equation', 'Ecuación');
     }
     
-    updateSpecialElements();
+    // Actualizar lista después de envolver
+    updateSpecialElementsList();
   }
 
   function getElementTitle(element, type) {
@@ -4335,639 +4444,364 @@ document.addEventListener('DOMContentLoaded', () => {
     element.parentNode.insertBefore(badge, element);
   }
 
+  // Funciones globales para elementos especiales
+  window.openInModal = function(elementId) {
+    var element = document.getElementById(elementId);
+    if (!element) return;
+    
+    var modal = document.getElementById('special-modal') || createModal();
+    var modalContent = modal.querySelector('.special-modal-content');
+    
+    var clone = element.cloneNode(true);
+    clone.classList.add('in-modal');
+    
+    modalContent.innerHTML = '';
+    modalContent.appendChild(clone);
+    
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    window.currentModalElement = elementId;
+  }
+
+  window.createModal = function() {
+    var modal = document.createElement('div');
+    modal.id = 'special-modal';
+    modal.className = 'special-modal';
+    modal.innerHTML = '<div class="special-modal-content">' +
+      '<button class="special-modal-close" onclick="closeModal()">&times;</button>' +
+      '</div>';
+    document.body.appendChild(modal);
+    
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && modal.classList.contains('active')) {
+        closeModal();
+      }
+    });
+    
+    modal.addEventListener('click', function(e) {
+      if (e.target === modal) {
+        closeModal();
+      }
+    });
+    
+    return modal;
+  }
+
+  window.closeModal = function() {
+    var modal = document.getElementById('special-modal');
+    if (modal) {
+      modal.classList.remove('active');
+      document.body.style.overflow = '';
+    }
+    window.currentModalElement = null;
+  }
+
+  window.openInNewTab = function(elementId) {
+    var element = document.getElementById(elementId);
+    if (!element) return;
+    
+    var title = element.getAttribute('data-title') || 'Elemento especial';
+    var content = element.outerHTML;
+    
+    var newWindow = window.open('', '_blank');
+    newWindow.document.write('<!DOCTYPE html>' +
+      '<html><head><title>' + title + ' - Revista Nacional</title>' +
+      '<meta charset="UTF-8">' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+      '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono&display=swap" rel="stylesheet">' +
+      '<style>body{font-family:"Inter",sans-serif;padding:2rem;max-width:1200px;margin:0 auto;background:#f8f9fa;}' +
+      '.container{background:white;padding:2rem;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);}' +
+      'h1{font-size:1.5rem;color:#005a7d;margin-bottom:1.5rem;}' +
+      'pre{background:#1e1e1e;padding:1rem;border-radius:4px;overflow-x:auto;}' +
+      'code{font-family:"JetBrains Mono",monospace;}' +
+      'img{max-width:100%;height:auto;}' +
+      'table{width:100%;border-collapse:collapse;margin:1rem 0;}' +
+      'th,td{border:1px solid #ddd;padding:8px;text-align:left;}' +
+      'th{background:#f0f0f0;}' +
+      '.close-btn{position:fixed;top:1rem;right:1rem;padding:0.5rem 1rem;background:#005a7d;color:white;border:none;border-radius:4px;cursor:pointer;}' +
+      '</style></head><body>' +
+      '<div class="container"><h1>' + title + '</h1>' +
+      '<div id="element-container">' + content + '</div></div>' +
+      '<button class="close-btn" onclick="window.close()">Cerrar ventana</button>' +
+      '</body></html>');
+    newWindow.document.close();
+  }
+
+  // Funciones para descarga de tablas
+  window.downloadTable = function(tableId, format) {
+    var table = document.getElementById(tableId);
+    if (!table) return;
+    
+    var content = '';
+    var filename = 'table-' + tableId;
+    var mimeType = '';
+    
+    switch(format) {
+      case 'csv':
+        content = tableToCSV(table);
+        mimeType = 'text/csv';
+        filename += '.csv';
+        break;
+      case 'excel':
+        content = tableToExcel(table);
+        mimeType = 'application/vnd.ms-excel';
+        filename += '.xls';
+        break;
+      case 'json':
+        content = tableToJSON(table);
+        mimeType = 'application/json';
+        filename += '.json';
+        break;
+      case 'markdown':
+        content = tableToMarkdown(table);
+        mimeType = 'text/markdown';
+        filename += '.md';
+        break;
+      case 'latex':
+        content = tableToLaTeX(table);
+        mimeType = 'text/plain';
+        filename += '.tex';
+        break;
+      case 'html':
+        content = table.outerHTML;
+        mimeType = 'text/html';
+        filename += '.html';
+        break;
+      default:
+        return;
+    }
+    
+    var blob = new Blob([content], { type: mimeType });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showToast('Tabla descargada como ' + format.toUpperCase());
+  }
+
+  function tableToCSV(table) {
+    var rows = table.querySelectorAll('tr');
+    var csv = [];
+    
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var cells = row.querySelectorAll('th, td');
+      var rowData = [];
+      
+      for (var j = 0; j < cells.length; j++) {
+        var cell = cells[j];
+        var text = cell.textContent.trim();
+        if (text.includes(',') || text.includes('"') || text.includes('\n')) {
+          text = '"' + text.replace(/"/g, '""') + '"';
+        }
+        rowData.push(text);
+      }
+      
+      csv.push(rowData.join(','));
+    }
+    
+    return csv.join('\n');
+  }
+
+  function tableToExcel(table) {
+    return '<html><head><meta charset="UTF-8"><title>Tabla exportada</title></head><body>' +
+      table.outerHTML + '</body></html>';
+  }
+
+  function tableToJSON(table) {
+    var headers = [];
+    var data = [];
+    
+    var headerRow = table.querySelector('tr');
+    if (headerRow) {
+      var headerCells = headerRow.querySelectorAll('th, td');
+      for (var i = 0; i < headerCells.length; i++) {
+        headers.push(headerCells[i].textContent.trim());
+      }
+    }
+    
+    var rows = table.querySelectorAll('tr');
+    for (var i = 1; i < rows.length; i++) {
+      var row = rows[i];
+      var cells = row.querySelectorAll('td');
+      var rowData = {};
+      
+      for (var j = 0; j < cells.length; j++) {
+        if (headers[j]) {
+          rowData[headers[j]] = cells[j].textContent.trim();
+        } else {
+          rowData['columna_' + j] = cells[j].textContent.trim();
+        }
+      }
+      
+      data.push(rowData);
+    }
+    
+    return JSON.stringify(data, null, 2);
+  }
+
+  function tableToMarkdown(table) {
+    var rows = table.querySelectorAll('tr');
+    var markdown = [];
+    
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var cells = row.querySelectorAll('th, td');
+      var rowData = [];
+      
+      for (var j = 0; j < cells.length; j++) {
+        rowData.push(cells[j].textContent.trim());
+      }
+      
+      if (i === 0) {
+        markdown.push('| ' + rowData.join(' | ') + ' |');
+        var separators = [];
+        for (var j = 0; j < rowData.length; j++) {
+          separators.push(' --- ');
+        }
+        markdown.push('|' + separators.join('|') + '|');
+      } else {
+        markdown.push('| ' + rowData.join(' | ') + ' |');
+      }
+    }
+    
+    return markdown.join('\n');
+  }
+
+  function tableToLaTeX(table) {
+    var rows = table.querySelectorAll('tr');
+    var latex = ['\\begin{table}[h]', '\\centering', '\\begin{tabular}{'];
+    
+    var firstRow = rows[0];
+    var colCount = firstRow ? firstRow.querySelectorAll('th, td').length : 0;
+    
+    var colFormat = '';
+    for (var i = 0; i < colCount; i++) {
+      colFormat += 'c';
+    }
+    latex.push('{|' + colFormat + '|}');
+    latex.push('}');
+    latex.push('\\hline');
+    
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var cells = row.querySelectorAll('th, td');
+      var rowData = [];
+      
+      for (var j = 0; j < cells.length; j++) {
+        var text = cells[j].textContent.trim();
+        text = text.replace(/_/g, '\\_')
+                   .replace(/&/g, '\\&')
+                   .replace(/%/g, '\\%')
+                   .replace(/\$/g, '\\$')
+                   .replace(/#/g, '\\#')
+                   .replace(/{/g, '\\{')
+                   .replace(/}/g, '\\}');
+        rowData.push(text);
+      }
+      
+      latex.push(rowData.join(' & ') + ' \\\\');
+      latex.push('\\hline');
+    }
+    
+    latex.push('\\end{tabular}');
+    latex.push('\\caption{Título de la tabla}');
+    latex.push('\\label{tab:' + table.id + '}');
+    latex.push('\\end{table}');
+    
+    return latex.join('\n');
+  }
+
+  window.showToast = function(message, duration) {
+    if (duration === undefined) duration = 2000;
+    
+    var toast = document.createElement('div');
+    toast.textContent = message;
+    toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#005a7d;color:white;' +
+      'padding:12px 24px;border-radius:8px;font-family:"Inter",sans-serif;font-size:0.9rem;' +
+      'box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:10001;animation:slideIn 0.3s ease;';
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(function() {
+      toast.style.animation = 'slideIn 0.3s ease reverse';
+      setTimeout(function() { toast.remove(); }, 300);
+    }, duration);
+  }
+
+  window.toggleDownloadMenu = function(btn, tableId) {
+    event.stopPropagation();
+    
+    var menus = document.querySelectorAll('.download-format-menu.active');
+    for (var i = 0; i < menus.length; i++) {
+      if (menus[i] !== btn.nextElementSibling) {
+        menus[i].classList.remove('active');
+      }
+    }
+    
+    var menu = btn.nextElementSibling;
+    if (menu) {
+      menu.classList.toggle('active');
+      
+      if (menu.classList.contains('active')) {
+        var closeMenu = function(e) {
+          if (!menu.contains(e.target) && e.target !== btn) {
+            menu.classList.remove('active');
+            document.removeEventListener('click', closeMenu);
+          }
+        };
+        setTimeout(function() {
+          document.addEventListener('click', closeMenu);
+        }, 100);
+      }
+    }
+  }
+
+  window.copyElementContent = function(elementId) {
+    var element = document.getElementById(elementId);
+    if (!element) return;
+    
+    var text = '';
+    
+    if (element.classList.contains('code-block-wrapper')) {
+      var codeElement = element.querySelector('code');
+      text = codeElement ? codeElement.textContent : element.textContent;
+    } else {
+      text = element.textContent;
+    }
+    
+    navigator.clipboard.writeText(text).then(function() {
+      showToast('Contenido copiado al portapapeles');
+    }).catch(function(err) {
+      console.error('Error copying:', err);
+      showToast('Error al copiar', 3000);
+    });
+  }
+
   // Ejecutar cuando el DOM esté listo
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
       setTimeout(wrapSpecialElements, 100);
+      setTimeout(function() {
+        if (typeof generateMobileTOC === 'function') {
+          generateMobileTOC();
+        }
+      }, 200);
     });
   } else {
     setTimeout(wrapSpecialElements, 100);
+    setTimeout(function() {
+      if (typeof generateMobileTOC === 'function') {
+        generateMobileTOC();
+      }
+    }, 200);
   }
 })();
-
-// ========== FUNCIONES GLOBALES PARA ELEMENTOS ESPECIALES ==========
-var currentModalElement = null;
-
-function openInModal(elementId) {
-  var element = document.getElementById(elementId);
-  if (!element) return;
-  
-  var modal = document.getElementById('special-modal') || createModal();
-  var modalContent = modal.querySelector('.special-modal-content');
-  
-  var clone = element.cloneNode(true);
-  clone.classList.add('in-modal');
-  
-  modalContent.innerHTML = '';
-  modalContent.appendChild(clone);
-  
-  modal.classList.add('active');
-  document.body.style.overflow = 'hidden';
-  currentModalElement = elementId;
-}
-
-function createModal() {
-  var modal = document.createElement('div');
-  modal.id = 'special-modal';
-  modal.className = 'special-modal';
-  modal.innerHTML = '<div class="special-modal-content">' +
-    '<button class="special-modal-close" onclick="closeModal()">&times;</button>' +
-    '</div>';
-  document.body.appendChild(modal);
-  
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && modal.classList.contains('active')) {
-      closeModal();
-    }
-  });
-  
-  modal.addEventListener('click', function(e) {
-    if (e.target === modal) {
-      closeModal();
-    }
-  });
-  
-  return modal;
-}
-
-function closeModal() {
-  var modal = document.getElementById('special-modal');
-  if (modal) {
-    modal.classList.remove('active');
-    document.body.style.overflow = '';
-  }
-  currentModalElement = null;
-}
-
-function openInNewTab(elementId) {
-  var element = document.getElementById(elementId);
-  if (!element) return;
-  
-  var title = element.getAttribute('data-title') || 'Elemento especial';
-  var content = element.outerHTML;
-  
-  var newWindow = window.open('', '_blank');
-  newWindow.document.write('<!DOCTYPE html>' +
-    '<html><head><title>' + title + ' - Revista Nacional</title>' +
-    '<meta charset="UTF-8">' +
-    '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
-    '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono&display=swap" rel="stylesheet">' +
-    '<style>body{font-family:"Inter",sans-serif;padding:2rem;max-width:1200px;margin:0 auto;background:#f8f9fa;}' +
-    '.container{background:white;padding:2rem;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);}' +
-    'h1{font-size:1.5rem;color:#005a7d;margin-bottom:1.5rem;}' +
-    'pre{background:#1e1e1e;padding:1rem;border-radius:4px;overflow-x:auto;}' +
-    'code{font-family:"JetBrains Mono",monospace;}' +
-    'img{max-width:100%;height:auto;}' +
-    'table{width:100%;border-collapse:collapse;margin:1rem 0;}' +
-    'th,td{border:1px solid #ddd;padding:8px;text-align:left;}' +
-    'th{background:#f0f0f0;}' +
-    '.close-btn{position:fixed;top:1rem;right:1rem;padding:0.5rem 1rem;background:#005a7d;color:white;border:none;border-radius:4px;cursor:pointer;}' +
-    '</style></head><body>' +
-    '<div class="container"><h1>' + title + '</h1>' +
-    '<div id="element-container">' + content + '</div></div>' +
-    '<button class="close-btn" onclick="window.close()">Cerrar ventana</button>' +
-    '</body></html>');
-  newWindow.document.close();
-}
-
-// Funciones para descarga de tablas
-function downloadTable(tableId, format) {
-  var table = document.getElementById(tableId);
-  if (!table) return;
-  
-  var content = '';
-  var filename = 'table-' + tableId;
-  var mimeType = '';
-  
-  switch(format) {
-    case 'csv':
-      content = tableToCSV(table);
-      mimeType = 'text/csv';
-      filename += '.csv';
-      break;
-    case 'excel':
-      content = tableToExcel(table);
-      mimeType = 'application/vnd.ms-excel';
-      filename += '.xls';
-      break;
-    case 'json':
-      content = tableToJSON(table);
-      mimeType = 'application/json';
-      filename += '.json';
-      break;
-    case 'markdown':
-      content = tableToMarkdown(table);
-      mimeType = 'text/markdown';
-      filename += '.md';
-      break;
-    case 'latex':
-      content = tableToLaTeX(table);
-      mimeType = 'text/plain';
-      filename += '.tex';
-      break;
-    case 'html':
-      content = table.outerHTML;
-      mimeType = 'text/html';
-      filename += '.html';
-      break;
-    default:
-      return;
-  }
-  
-  var blob = new Blob([content], { type: mimeType });
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  
-  showToast('Tabla descargada como ' + format.toUpperCase());
-}
-
-function tableToCSV(table) {
-  var rows = table.querySelectorAll('tr');
-  var csv = [];
-  
-  for (var i = 0; i < rows.length; i++) {
-    var row = rows[i];
-    var cells = row.querySelectorAll('th, td');
-    var rowData = [];
-    
-    for (var j = 0; j < cells.length; j++) {
-      var cell = cells[j];
-      var text = cell.textContent.trim();
-      if (text.includes(',') || text.includes('"') || text.includes('\n')) {
-        text = '"' + text.replace(/"/g, '""') + '"';
-      }
-      rowData.push(text);
-    }
-    
-    csv.push(rowData.join(','));
-  }
-  
-  return csv.join('\n');
-}
-
-function tableToExcel(table) {
-  return '<html><head><meta charset="UTF-8"><title>Tabla exportada</title></head><body>' +
-    table.outerHTML + '</body></html>';
-}
-
-function tableToJSON(table) {
-  var headers = [];
-  var data = [];
-  
-  var headerRow = table.querySelector('tr');
-  if (headerRow) {
-    var headerCells = headerRow.querySelectorAll('th, td');
-    for (var i = 0; i < headerCells.length; i++) {
-      headers.push(headerCells[i].textContent.trim());
-    }
-  }
-  
-  var rows = table.querySelectorAll('tr');
-  for (var i = 1; i < rows.length; i++) {
-    var row = rows[i];
-    var cells = row.querySelectorAll('td');
-    var rowData = {};
-    
-    for (var j = 0; j < cells.length; j++) {
-      if (headers[j]) {
-        rowData[headers[j]] = cells[j].textContent.trim();
-      } else {
-        rowData['columna_' + j] = cells[j].textContent.trim();
-      }
-    }
-    
-    data.push(rowData);
-  }
-  
-  return JSON.stringify(data, null, 2);
-}
-
-function tableToMarkdown(table) {
-  var rows = table.querySelectorAll('tr');
-  var markdown = [];
-  
-  for (var i = 0; i < rows.length; i++) {
-    var row = rows[i];
-    var cells = row.querySelectorAll('th, td');
-    var rowData = [];
-    
-    for (var j = 0; j < cells.length; j++) {
-      rowData.push(cells[j].textContent.trim());
-    }
-    
-    if (i === 0) {
-      markdown.push('| ' + rowData.join(' | ') + ' |');
-      var separators = [];
-      for (var j = 0; j < rowData.length; j++) {
-        separators.push(' --- ');
-      }
-      markdown.push('|' + separators.join('|') + '|');
-    } else {
-      markdown.push('| ' + rowData.join(' | ') + ' |');
-    }
-  }
-  
-  return markdown.join('\n');
-}
-
-function tableToLaTeX(table) {
-  var rows = table.querySelectorAll('tr');
-  var latex = ['\\begin{table}[h]', '\\centering', '\\begin{tabular}{'];
-  
-  var firstRow = rows[0];
-  var colCount = firstRow ? firstRow.querySelectorAll('th, td').length : 0;
-  
-  var colFormat = '';
-  for (var i = 0; i < colCount; i++) {
-    colFormat += 'c';
-  }
-  latex.push('{|' + colFormat + '|}');
-  latex.push('}');
-  latex.push('\\hline');
-  
-  for (var i = 0; i < rows.length; i++) {
-    var row = rows[i];
-    var cells = row.querySelectorAll('th, td');
-    var rowData = [];
-    
-    for (var j = 0; j < cells.length; j++) {
-      var text = cells[j].textContent.trim();
-      text = text.replace(/_/g, '\\_')
-                 .replace(/&/g, '\\&')
-                 .replace(/%/g, '\\%')
-                 .replace(/\$/g, '\\$')
-                 .replace(/#/g, '\\#')
-                 .replace(/{/g, '\\{')
-                 .replace(/}/g, '\\}');
-      rowData.push(text);
-    }
-    
-    latex.push(rowData.join(' & ') + ' \\\\');
-    latex.push('\\hline');
-  }
-  
-  latex.push('\\end{tabular}');
-  latex.push('\\caption{Título de la tabla}');
-  latex.push('\\label{tab:' + table.id + '}');
-  latex.push('\\end{table}');
-  
-  return latex.join('\n');
-}
-
-function showToast(message, duration) {
-  if (duration === undefined) duration = 2000;
-  
-  var toast = document.createElement('div');
-  toast.textContent = message;
-  toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#005a7d;color:white;' +
-    'padding:12px 24px;border-radius:8px;font-family:"Inter",sans-serif;font-size:0.9rem;' +
-    'box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:10001;animation:slideIn 0.3s ease;';
-  
-  document.body.appendChild(toast);
-  
-  setTimeout(function() {
-    toast.style.animation = 'slideIn 0.3s ease reverse';
-    setTimeout(function() { toast.remove(); }, 300);
-  }, duration);
-}
-
-function toggleDownloadMenu(btn, tableId) {
-  event.stopPropagation();
-  
-  var menus = document.querySelectorAll('.download-format-menu.active');
-  for (var i = 0; i < menus.length; i++) {
-    if (menus[i] !== btn.nextElementSibling) {
-      menus[i].classList.remove('active');
-    }
-  }
-  
-  var menu = btn.nextElementSibling;
-  if (menu) {
-    menu.classList.toggle('active');
-    
-    if (menu.classList.contains('active')) {
-      var closeMenu = function(e) {
-        if (!menu.contains(e.target) && e.target !== btn) {
-          menu.classList.remove('active');
-          document.removeEventListener('click', closeMenu);
-        }
-      };
-      setTimeout(function() {
-        document.addEventListener('click', closeMenu);
-      }, 100);
-    }
-  }
-}
-
-function copyElementContent(elementId) {
-  var element = document.getElementById(elementId);
-  if (!element) return;
-  
-  var text = '';
-  
-  if (element.classList.contains('code-block-wrapper')) {
-    var codeElement = element.querySelector('code');
-    text = codeElement ? codeElement.textContent : element.textContent;
-  } else {
-    text = element.textContent;
-  }
-  
-  navigator.clipboard.writeText(text).then(function() {
-    showToast('Contenido copiado al portapapeles');
-  }).catch(function(err) {
-    console.error('Error copying:', err);
-    showToast('Error al copiar', 3000);
-  });
-}
-
-// ========== ACTUALIZAR ELEMENTOS ESPECIALES DESPUÉS DE CARGAR ==========
-document.addEventListener('DOMContentLoaded', function() {
-  // Envolver elementos especiales con contenedor y toolbar
-  wrapSpecialElements();
-  
-  // Actualizar la lista de elementos especiales para el TOC
-  updateSpecialElementsList();
-});
-
-function wrapSpecialElements() {
-  // Envolver figuras
-  var figures = document.querySelectorAll('figure.image-figure[id^="figure-"]');
-  for (var i = 0; i < figures.length; i++) {
-    wrapWithToolbar(figures[i], 'figure', getFigureTitle(figures[i]));
-  }
-  
-  // Envolver tablas
-  var tables = document.querySelectorAll('table.article-table[id^="table-"]');
-  for (var i = 0; i < tables.length; i++) {
-    wrapWithToolbar(tables[i], 'table', getTableTitle(tables[i]));
-  }
-  
-  // Envolver bloques de código
-  var codes = document.querySelectorAll('.code-block-wrapper[id^="code-"]');
-  for (var i = 0; i < codes.length; i++) {
-    wrapWithToolbar(codes[i], 'code', getCodeTitle(codes[i]));
-  }
-  
-  // Envolver ecuaciones
-  var equations = document.querySelectorAll('[id^="equation-"]');
-  for (var i = 0; i < equations.length; i++) {
-    wrapWithToolbar(equations[i], 'equation', 'Ecuación');
-  }
-}
-
-function wrapWithToolbar(element, type, title) {
-  // Evitar envolver múltiples veces
-  if (element.parentElement && element.parentElement.classList.contains('special-element-container')) {
-    return;
-  }
-  
-  var container = document.createElement('div');
-  container.className = 'special-element-container';
-  container.setAttribute('data-element-type', type);
-  
-  // Insertar antes de mover el elemento
-  element.parentNode.insertBefore(container, element);
-  container.appendChild(element);
-  
-  // Crear toolbar
-  var toolbar = document.createElement('div');
-  toolbar.className = 'special-element-toolbar';
-  
-  // Botones según tipo
-  var buttons = [];
-  
-  // Botón abrir en modal (pantalla completa)
-  buttons.push('<button class="toolbar-btn" onclick="openInModal(\'' + element.id + '\')" data-tooltip="Ver en pantalla completa">' +
-      '<svg viewBox="0 0 24 24" width="14" height="14">' +
-        '<path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>' +
-      '</svg>' +
-      '<span class="toolbar-label">Pantalla completa</span>' +
-    '</button>');
-  
-  // Botón abrir en nueva pestaña
-  buttons.push('<button class="toolbar-btn" onclick="openInNewTab(\'' + element.id + '\')" data-tooltip="Abrir en nueva pestaña">' +
-      '<svg viewBox="0 0 24 24" width="14" height="14">' +
-        '<path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>' +
-      '</svg>' +
-      '<span class="toolbar-label">Nueva pestaña</span>' +
-    '</button>');
-  
-  // Botones específicos para tablas
-  if (type === 'table') {
-    buttons.push('<div style="position: relative;">' +
-        '<button class="toolbar-btn" onclick="toggleDownloadMenu(this, \'' + element.id + '\')" data-tooltip="Descargar tabla">' +
-          '<svg viewBox="0 0 24 24" width="14" height="14">' +
-            '<path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>' +
-          '</svg>' +
-          '<span class="toolbar-label">Descargar</span>' +
-        '</button>' +
-        '<div class="download-format-menu">' +
-          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'csv\')">CSV</button>' +
-          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'excel\')">Excel</button>' +
-          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'json\')">JSON</button>' +
-          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'markdown\')">Markdown</button>' +
-          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'latex\')">LaTeX</button>' +
-          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'html\')">HTML</button>' +
-        '</div>' +
-      '</div>');
-  }
-  
-  // Botón copiar para código
-  if (type === 'code') {
-    buttons.push('<button class="toolbar-btn" onclick="copyElementContent(\'' + element.id + '\')" data-tooltip="Copiar contenido">' +
-        '<svg viewBox="0 0 24 24" width="14" height="14">' +
-          '<rect x="9" y="9" width="13" height="13" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/>' +
-          '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" fill="none" stroke="currentColor" stroke-width="2"/>' +
-        '</svg>' +
-        '<span class="toolbar-label">Copiar</span>' +
-      '</button>');
-  }
-  
-  toolbar.innerHTML = buttons.join('');
-  container.appendChild(toolbar);
-  
-  // Añadir badge con el tipo
-  var badge = document.createElement('span');
-  badge.className = 'special-badge';
-  badge.textContent = type === 'figure' ? 'Figura' : 
-                      type === 'table' ? 'Tabla' : 
-                      type === 'code' ? 'Código' : 'Ecuación';
-  element.parentNode.insertBefore(badge, element);
-}
-
-// Funciones auxiliares para obtener títulos
-function getFigureTitle(figure) {
-  var caption = figure.querySelector('.image-caption');
-  return caption ? caption.textContent.trim() : 'Figura';
-}
-
-function getTableTitle(table) {
-  return 'Tabla';
-}
-
-function getCodeTitle(code) {
-  var language = code.querySelector('.code-language');
-  return language ? 'Código (' + language.textContent.trim() + ')' : 'Código';
-}
-
-// Copiar contenido de un elemento
-function copyElementContent(elementId) {
-  var element = document.getElementById(elementId);
-  if (!element) return;
-  
-  var text = '';
-  
-  if (element.classList.contains('code-block-wrapper')) {
-    // Para bloques de código, obtener el texto del código
-    var codeElement = element.querySelector('code');
-    text = codeElement ? codeElement.textContent : element.textContent;
-  } else {
-    text = element.textContent;
-  }
-  
-  navigator.clipboard.writeText(text).then(function() {
-    showToast('Contenido copiado al portapapeles');
-  }).catch(function(err) {
-    console.error('Error copying:', err);
-    showToast('Error al copiar', 3000);
-  });
-}
-
-// Actualizar lista de elementos especiales para el TOC
-function updateSpecialElementsList() {
-  var elements = [];
-  
-  var containers = document.querySelectorAll('.special-element-container');
-  for (var i = 0; i < containers.length; i++) {
-    var container = containers[i];
-    var element = container.querySelector('[id^="figure-"], [id^="table-"], [id^="code-"], [id^="equation-"]');
-    if (!element) continue;
-    
-    var type = container.getAttribute('data-element-type');
-    var title = '';
-    
-    if (type === 'figure') {
-      var caption = element.querySelector('.image-caption');
-      title = caption ? caption.textContent.trim() : 'Figura';
-    } else if (type === 'table') {
-      title = 'Tabla';
-    } else if (type === 'code') {
-      var language = element.querySelector('.code-language');
-      title = language ? 'Código (' + language.textContent.trim() + ')' : 'Código';
-    } else {
-      title = 'Ecuación';
-    }
-    
-    elements.push({
-      type: type,
-      id: element.id,
-      title: title
-    });
-  }
-  
-  window.__SPECIAL_ELEMENTS__ = elements;
-}
-
-// ========== INICIALIZACIÓN ADICIONAL ==========
-document.addEventListener('DOMContentLoaded', function() {
-  // Si ya existen elementos, envolverlos después de un pequeño retraso
-  setTimeout(wrapSpecialElements, 500);
-});
-// ========== COPY RICH TEXT FUNCTION ==========
-function copyRichText(id, event) {
-  const element = document.getElementById(id);
-  if (!element) return;
-  
-  const htmlContent = element.innerHTML;
-  const plainText = element.innerText || element.textContent;
-  
-  const clipboardItem = new ClipboardItem({
-    'text/plain': new Blob([plainText], { type: 'text/plain' }),
-    'text/html': new Blob([htmlContent], { type: 'text/html' })
-  });
-  
-  navigator.clipboard.write([clipboardItem]).then(() => {
-    const btn = event.target;
-    const originalText = btn.innerText;
-    const originalBg = btn.style.background;
-    const originalColor = btn.style.color;
-    
-    btn.innerText = document.documentElement.lang === 'es' ? '✓ Copiado' : '✓ Copied';
-    btn.style.background = '#22c55e';
-    btn.style.color = 'white';
-    btn.style.borderColor = '#22c55e';
-    
-    setTimeout(() => {
-      btn.innerText = originalText;
-      btn.style.background = originalBg;
-      btn.style.color = originalColor;
-      btn.style.borderColor = '';
-    }, 2000);
-  }).catch(err => {
-    console.error('Error copying rich text: ', err);
-    fallbackCopy(plainText, event.target);
-  });
-}
-
-function fallbackCopy(text, btn) {
-  const textarea = document.createElement('textarea');
-  textarea.value = text;
-  textarea.style.position = 'fixed';
-  textarea.style.opacity = '0';
-  document.body.appendChild(textarea);
-  textarea.select();
-  
-  const originalText = btn.innerText;
-  
-  try {
-    document.execCommand('copy');
-    btn.innerText = document.documentElement.lang === 'es' ? '✓ Copiado' : '✓ Copied';
-    btn.style.background = '#22c55e';
-    btn.style.color = 'white';
-    setTimeout(() => {
-      btn.innerText = originalText;
-      btn.style.background = 'white';
-      btn.style.color = '';
-    }, 2000);
-  } catch (err) {
-    console.error('Fallback copy failed:', err);
-    alert('No se pudo copiar. Por favor, selecciona el texto manualmente.');
-  }
-  
-  document.body.removeChild(textarea);
-}
-
-// ========== CERRAR MENÚ CON TECLA ESCAPE ==========
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    closeMobileMenu();
-  }
-});
-
-// ========== MATHJAX ==========
-if (window.MathJax) {
-  MathJax.typesetPromise();
-}
-
-// ========== INICIALIZACIÓN ADICIONAL ==========
-document.addEventListener('DOMContentLoaded', () => {
-  // Cerrar menú al hacer clic en un enlace (por si acaso)
-  const mobileLinks = document.querySelectorAll('.sd-mobile-nav-link');
-  mobileLinks.forEach(link => {
-    link.addEventListener('click', () => {
-      // No cerrar si es un enlace externo o tiene target _blank
-      if (!link.hasAttribute('target') || link.getAttribute('target') !== '_blank') {
-        setTimeout(closeMobileMenu, 150); // Pequeño retraso para permitir la navegación
-      }
-    });
-  });
-});
 </script>
 
 </html>`;
