@@ -4165,10 +4165,189 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el.id) mobileObserver.observe(el);
   });
 });
-// ========== MANEJO DE ELEMENTOS ESPECIALES ==========
+// ========== DETECCIÓN DE ELEMENTOS ESPECIALES ==========
+(function() {
+  function updateSpecialElements() {
+    var elements = [];
+    
+    // Detectar figuras
+    var figures = document.querySelectorAll('figure.image-figure[id^="figure-"]');
+    for (var i = 0; i < figures.length; i++) {
+      var fig = figures[i];
+      var caption = fig.querySelector('.image-caption');
+      elements.push({
+        type: 'figure',
+        id: fig.id,
+        title: caption ? caption.textContent.trim() : 'Figura ' + (i + 1)
+      });
+    }
+    
+    // Detectar tablas
+    var tables = document.querySelectorAll('table.article-table[id^="table-"]');
+    for (var i = 0; i < tables.length; i++) {
+      var table = tables[i];
+      elements.push({
+        type: 'table',
+        id: table.id,
+        title: 'Tabla ' + (i + 1)
+      });
+    }
+    
+    // Detectar código
+    var codeBlocks = document.querySelectorAll('.code-block-wrapper[id^="code-"]');
+    for (var i = 0; i < codeBlocks.length; i++) {
+      var code = codeBlocks[i];
+      var language = code.querySelector('.code-language');
+      elements.push({
+        type: 'code',
+        id: code.id,
+        title: language ? 'Código (' + language.textContent.trim() + ')' : 'Código ' + (i + 1)
+      });
+    }
+    
+    // Detectar ecuaciones
+    var equations = document.querySelectorAll('[id^="equation-"]');
+    for (var i = 0; i < equations.length; i++) {
+      var eq = equations[i];
+      elements.push({
+        type: 'equation',
+        id: eq.id,
+        title: 'Ecuación ' + (i + 1)
+      });
+    }
+    
+    window.__SPECIAL_ELEMENTS__ = elements;
+    console.log('Elementos especiales detectados:', elements.length);
+  }
+
+  // Función para envolver elementos con toolbar
+  function wrapSpecialElements() {
+    // Envolver figuras
+    var figures = document.querySelectorAll('figure.image-figure[id^="figure-"]');
+    for (var i = 0; i < figures.length; i++) {
+      wrapWithToolbar(figures[i], 'figure', getElementTitle(figures[i], 'figure'));
+    }
+    
+    // Envolver tablas
+    var tables = document.querySelectorAll('table.article-table[id^="table-"]');
+    for (var i = 0; i < tables.length; i++) {
+      wrapWithToolbar(tables[i], 'table', getElementTitle(tables[i], 'table'));
+    }
+    
+    // Envolver bloques de código
+    var codes = document.querySelectorAll('.code-block-wrapper[id^="code-"]');
+    for (var i = 0; i < codes.length; i++) {
+      wrapWithToolbar(codes[i], 'code', getElementTitle(codes[i], 'code'));
+    }
+    
+    // Envolver ecuaciones
+    var equations = document.querySelectorAll('[id^="equation-"]');
+    for (var i = 0; i < equations.length; i++) {
+      wrapWithToolbar(equations[i], 'equation', 'Ecuación');
+    }
+    
+    updateSpecialElements();
+  }
+
+  function getElementTitle(element, type) {
+    if (type === 'figure') {
+      var caption = element.querySelector('.image-caption');
+      return caption ? caption.textContent.trim() : 'Figura';
+    } else if (type === 'code') {
+      var language = element.querySelector('.code-language');
+      return language ? 'Código (' + language.textContent.trim() + ')' : 'Código';
+    }
+    return type === 'table' ? 'Tabla' : 'Ecuación';
+  }
+
+  function wrapWithToolbar(element, type, title) {
+    if (element.parentElement && element.parentElement.classList.contains('special-element-container')) {
+      return;
+    }
+    
+    var container = document.createElement('div');
+    container.className = 'special-element-container';
+    container.setAttribute('data-element-type', type);
+    
+    element.parentNode.insertBefore(container, element);
+    container.appendChild(element);
+    
+    var toolbar = document.createElement('div');
+    toolbar.className = 'special-element-toolbar';
+    
+    var buttons = [];
+    
+    // Botón pantalla completa
+    buttons.push('<button class="toolbar-btn" onclick="openInModal(\'' + element.id + '\')" data-tooltip="Ver en pantalla completa">' +
+        '<svg viewBox="0 0 24 24" width="14" height="14">' +
+          '<path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>' +
+        '</svg>' +
+        '<span class="toolbar-label">Pantalla completa</span>' +
+      '</button>');
+    
+    // Botón nueva pestaña
+    buttons.push('<button class="toolbar-btn" onclick="openInNewTab(\'' + element.id + '\')" data-tooltip="Abrir en nueva pestaña">' +
+        '<svg viewBox="0 0 24 24" width="14" height="14">' +
+          '<path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>' +
+        '</svg>' +
+        '<span class="toolbar-label">Nueva pestaña</span>' +
+      '</button>');
+    
+    // Botones específicos para tablas
+    if (type === 'table') {
+      buttons.push('<div style="position: relative;">' +
+          '<button class="toolbar-btn" onclick="toggleDownloadMenu(this, \'' + element.id + '\')" data-tooltip="Descargar tabla">' +
+            '<svg viewBox="0 0 24 24" width="14" height="14">' +
+              '<path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>' +
+            '</svg>' +
+            '<span class="toolbar-label">Descargar</span>' +
+          '</button>' +
+          '<div class="download-format-menu">' +
+            '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'csv\')">CSV</button>' +
+            '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'excel\')">Excel</button>' +
+            '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'json\')">JSON</button>' +
+            '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'markdown\')">Markdown</button>' +
+            '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'latex\')">LaTeX</button>' +
+            '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'html\')">HTML</button>' +
+          '</div>' +
+        '</div>');
+    }
+    
+    // Botón copiar para código
+    if (type === 'code') {
+      buttons.push('<button class="toolbar-btn" onclick="copyElementContent(\'' + element.id + '\')" data-tooltip="Copiar contenido">' +
+          '<svg viewBox="0 0 24 24" width="14" height="14">' +
+            '<rect x="9" y="9" width="13" height="13" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/>' +
+            '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" fill="none" stroke="currentColor" stroke-width="2"/>' +
+          '</svg>' +
+          '<span class="toolbar-label">Copiar</span>' +
+        '</button>');
+    }
+    
+    toolbar.innerHTML = buttons.join('');
+    container.appendChild(toolbar);
+    
+    var badge = document.createElement('span');
+    badge.className = 'special-badge';
+    badge.textContent = type === 'figure' ? 'Figura' : 
+                        type === 'table' ? 'Tabla' : 
+                        type === 'code' ? 'Código' : 'Ecuación';
+    element.parentNode.insertBefore(badge, element);
+  }
+
+  // Ejecutar cuando el DOM esté listo
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(wrapSpecialElements, 100);
+    });
+  } else {
+    setTimeout(wrapSpecialElements, 100);
+  }
+})();
+
+// ========== FUNCIONES GLOBALES PARA ELEMENTOS ESPECIALES ==========
 var currentModalElement = null;
 
-// Abrir elemento en modal (pantalla completa)
 function openInModal(elementId) {
   var element = document.getElementById(elementId);
   if (!element) return;
@@ -4176,22 +4355,17 @@ function openInModal(elementId) {
   var modal = document.getElementById('special-modal') || createModal();
   var modalContent = modal.querySelector('.special-modal-content');
   
-  // Clonar el elemento para no modificar el original
   var clone = element.cloneNode(true);
   clone.classList.add('in-modal');
   
-  // Limpiar contenido anterior
   modalContent.innerHTML = '';
   modalContent.appendChild(clone);
   
-  // Mostrar modal
   modal.classList.add('active');
   document.body.style.overflow = 'hidden';
-  
   currentModalElement = elementId;
 }
 
-// Crear modal si no existe
 function createModal() {
   var modal = document.createElement('div');
   modal.id = 'special-modal';
@@ -4201,14 +4375,12 @@ function createModal() {
     '</div>';
   document.body.appendChild(modal);
   
-  // Cerrar con ESC
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape' && modal.classList.contains('active')) {
       closeModal();
     }
   });
   
-  // Cerrar al hacer clic fuera
   modal.addEventListener('click', function(e) {
     if (e.target === modal) {
       closeModal();
@@ -4218,7 +4390,6 @@ function createModal() {
   return modal;
 }
 
-// Cerrar modal
 function closeModal() {
   var modal = document.getElementById('special-modal');
   if (modal) {
@@ -4228,86 +4399,38 @@ function closeModal() {
   currentModalElement = null;
 }
 
-// Abrir elemento en nueva pestaña
 function openInNewTab(elementId) {
   var element = document.getElementById(elementId);
   if (!element) return;
   
-  // Crear un HTML completo para la nueva pestaña
   var title = element.getAttribute('data-title') || 'Elemento especial';
   var content = element.outerHTML;
   
   var newWindow = window.open('', '_blank');
   newWindow.document.write('<!DOCTYPE html>' +
-    '<html>' +
-    '<head>' +
-      '<title>' + title + ' - Revista Nacional</title>' +
-      '<meta charset="UTF-8">' +
-      '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
-      '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono&display=swap" rel="stylesheet">' +
-      '<style>' +
-        'body { ' + 
-          'font-family: \'Inter\', sans-serif; ' + 
-          'padding: 2rem; ' + 
-          'max-width: 1200px; ' + 
-          'margin: 0 auto;' +
-          'background: #f8f9fa;' +
-        '}' +
-        '.container {' +
-          'background: white;' +
-          'padding: 2rem;' +
-          'border-radius: 8px;' +
-          'box-shadow: 0 4px 6px rgba(0,0,0,0.1);' +
-        '}' +
-        'h1 { ' + 
-          'font-size: 1.5rem; ' + 
-          'color: #005a7d;' +
-          'margin-bottom: 1.5rem;' +
-        '}' +
-        'pre { ' + 
-          'background: #1e1e1e; ' + 
-          'padding: 1rem; ' + 
-          'border-radius: 4px;' +
-          'overflow-x: auto;' +
-        '}' +
-        'code { font-family: \'JetBrains Mono\', monospace; }' +
-        'img { max-width: 100%; height: auto; }' +
-        'table { ' + 
-          'width: 100%; ' + 
-          'border-collapse: collapse; ' + 
-          'margin: 1rem 0;' +
-        '}' +
-        'th, td { ' + 
-          'border: 1px solid #ddd; ' + 
-          'padding: 8px; ' + 
-          'text-align: left;' +
-        '}' +
-        'th { background: #f0f0f0; }' +
-        '.close-btn {' +
-          'position: fixed;' +
-          'top: 1rem;' +
-          'right: 1rem;' +
-          'padding: 0.5rem 1rem;' +
-          'background: #005a7d;' +
-          'color: white;' +
-          'border: none;' +
-          'border-radius: 4px;' +
-          'cursor: pointer;' +
-        '}' +
-      '</style>' +
-    '</head>' +
-    '<body>' +
-      '<div class="container">' +
-        '<h1>' + title + '</h1>' +
-        '<div id="element-container">' + content + '</div>' +
-      '</div>' +
-      '<button class="close-btn" onclick="window.close()">Cerrar ventana</button>' +
-    '</body>' +
-    '</html>');
+    '<html><head><title>' + title + ' - Revista Nacional</title>' +
+    '<meta charset="UTF-8">' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+    '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono&display=swap" rel="stylesheet">' +
+    '<style>body{font-family:"Inter",sans-serif;padding:2rem;max-width:1200px;margin:0 auto;background:#f8f9fa;}' +
+    '.container{background:white;padding:2rem;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);}' +
+    'h1{font-size:1.5rem;color:#005a7d;margin-bottom:1.5rem;}' +
+    'pre{background:#1e1e1e;padding:1rem;border-radius:4px;overflow-x:auto;}' +
+    'code{font-family:"JetBrains Mono",monospace;}' +
+    'img{max-width:100%;height:auto;}' +
+    'table{width:100%;border-collapse:collapse;margin:1rem 0;}' +
+    'th,td{border:1px solid #ddd;padding:8px;text-align:left;}' +
+    'th{background:#f0f0f0;}' +
+    '.close-btn{position:fixed;top:1rem;right:1rem;padding:0.5rem 1rem;background:#005a7d;color:white;border:none;border-radius:4px;cursor:pointer;}' +
+    '</style></head><body>' +
+    '<div class="container"><h1>' + title + '</h1>' +
+    '<div id="element-container">' + content + '</div></div>' +
+    '<button class="close-btn" onclick="window.close()">Cerrar ventana</button>' +
+    '</body></html>');
   newWindow.document.close();
 }
 
-// ========== DESCARGA DE TABLAS EN MÚLTIPLES FORMATOS ==========
+// Funciones para descarga de tablas
 function downloadTable(tableId, format) {
   var table = document.getElementById(tableId);
   if (!table) return;
@@ -4351,7 +4474,6 @@ function downloadTable(tableId, format) {
       return;
   }
   
-  // Descargar archivo
   var blob = new Blob([content], { type: mimeType });
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
@@ -4362,11 +4484,9 @@ function downloadTable(tableId, format) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
   
-  // Feedback visual
   showToast('Tabla descargada como ' + format.toUpperCase());
 }
 
-// Convertir tabla a CSV
 function tableToCSV(table) {
   var rows = table.querySelectorAll('tr');
   var csv = [];
@@ -4379,7 +4499,6 @@ function tableToCSV(table) {
     for (var j = 0; j < cells.length; j++) {
       var cell = cells[j];
       var text = cell.textContent.trim();
-      // Escapar comillas y comas
       if (text.includes(',') || text.includes('"') || text.includes('\n')) {
         text = '"' + text.replace(/"/g, '""') + '"';
       }
@@ -4392,25 +4511,15 @@ function tableToCSV(table) {
   return csv.join('\n');
 }
 
-// Convertir tabla a Excel (HTML)
 function tableToExcel(table) {
-  return '<html>' +
-    '<head>' +
-      '<meta charset="UTF-8">' +
-      '<title>Tabla exportada</title>' +
-    '</head>' +
-    '<body>' +
-      table.outerHTML +
-    '</body>' +
-    '</html>';
+  return '<html><head><meta charset="UTF-8"><title>Tabla exportada</title></head><body>' +
+    table.outerHTML + '</body></html>';
 }
 
-// Convertir tabla a JSON
 function tableToJSON(table) {
   var headers = [];
   var data = [];
   
-  // Obtener headers
   var headerRow = table.querySelector('tr');
   if (headerRow) {
     var headerCells = headerRow.querySelectorAll('th, td');
@@ -4419,9 +4528,8 @@ function tableToJSON(table) {
     }
   }
   
-  // Obtener datos
   var rows = table.querySelectorAll('tr');
-  for (var i = 1; i < rows.length; i++) { // Saltar header row
+  for (var i = 1; i < rows.length; i++) {
     var row = rows[i];
     var cells = row.querySelectorAll('td');
     var rowData = {};
@@ -4440,11 +4548,9 @@ function tableToJSON(table) {
   return JSON.stringify(data, null, 2);
 }
 
-// Convertir tabla a Markdown
 function tableToMarkdown(table) {
   var rows = table.querySelectorAll('tr');
   var markdown = [];
-  var headerSeparator = '';
   
   for (var i = 0; i < rows.length; i++) {
     var row = rows[i];
@@ -4456,18 +4562,13 @@ function tableToMarkdown(table) {
     }
     
     if (i === 0) {
-      // Header row
       markdown.push('| ' + rowData.join(' | ') + ' |');
-      
-      // Separator row
       var separators = [];
       for (var j = 0; j < rowData.length; j++) {
         separators.push(' --- ');
       }
-      headerSeparator = '|' + separators.join('|') + '|';
-      markdown.push(headerSeparator);
+      markdown.push('|' + separators.join('|') + '|');
     } else {
-      // Data rows
       markdown.push('| ' + rowData.join(' | ') + ' |');
     }
   }
@@ -4475,16 +4576,13 @@ function tableToMarkdown(table) {
   return markdown.join('\n');
 }
 
-// Convertir tabla a LaTeX
 function tableToLaTeX(table) {
   var rows = table.querySelectorAll('tr');
   var latex = ['\\begin{table}[h]', '\\centering', '\\begin{tabular}{'];
   
-  // Determinar número de columnas
   var firstRow = rows[0];
   var colCount = firstRow ? firstRow.querySelectorAll('th, td').length : 0;
   
-  // Formato de columnas (centradas)
   var colFormat = '';
   for (var i = 0; i < colCount; i++) {
     colFormat += 'c';
@@ -4500,7 +4598,6 @@ function tableToLaTeX(table) {
     
     for (var j = 0; j < cells.length; j++) {
       var text = cells[j].textContent.trim();
-      // Escapar caracteres especiales de LaTeX
       text = text.replace(/_/g, '\\_')
                  .replace(/&/g, '\\&')
                  .replace(/%/g, '\\%')
@@ -4523,32 +4620,14 @@ function tableToLaTeX(table) {
   return latex.join('\n');
 }
 
-// ========== SHOW TOAST NOTIFICATION ==========
 function showToast(message, duration) {
   if (duration === undefined) duration = 2000;
   
   var toast = document.createElement('div');
   toast.textContent = message;
-  toast.style.cssText = 'position: fixed;' +
-    'bottom: 20px;' +
-    'right: 20px;' +
-    'background: #005a7d;' +
-    'color: white;' +
-    'padding: 12px 24px;' +
-    'border-radius: 8px;' +
-    'font-family: \'Inter\', sans-serif;' +
-    'font-size: 0.9rem;' +
-    'box-shadow: 0 4px 12px rgba(0,0,0,0.15);' +
-    'z-index: 10001;' +
-    'animation: slideIn 0.3s ease;';
-  
-  // Añadir animación
-  var style = document.createElement('style');
-  style.textContent = '@keyframes slideIn {' +
-    'from { transform: translateX(100%); opacity: 0; }' +
-    'to { transform: translateX(0); opacity: 1; }' +
-    '}';
-  document.head.appendChild(style);
+  toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#005a7d;color:white;' +
+    'padding:12px 24px;border-radius:8px;font-family:"Inter",sans-serif;font-size:0.9rem;' +
+    'box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:10001;animation:slideIn 0.3s ease;';
   
   document.body.appendChild(toast);
   
@@ -4558,11 +4637,9 @@ function showToast(message, duration) {
   }, duration);
 }
 
-// ========== TOGGLE DOWNLOAD MENU ==========
 function toggleDownloadMenu(btn, tableId) {
   event.stopPropagation();
   
-  // Cerrar otros menús
   var menus = document.querySelectorAll('.download-format-menu.active');
   for (var i = 0; i < menus.length; i++) {
     if (menus[i] !== btn.nextElementSibling) {
@@ -4574,7 +4651,6 @@ function toggleDownloadMenu(btn, tableId) {
   if (menu) {
     menu.classList.toggle('active');
     
-    // Cerrar al hacer clic fuera
     if (menu.classList.contains('active')) {
       var closeMenu = function(e) {
         if (!menu.contains(e.target) && e.target !== btn) {
@@ -4587,6 +4663,27 @@ function toggleDownloadMenu(btn, tableId) {
       }, 100);
     }
   }
+}
+
+function copyElementContent(elementId) {
+  var element = document.getElementById(elementId);
+  if (!element) return;
+  
+  var text = '';
+  
+  if (element.classList.contains('code-block-wrapper')) {
+    var codeElement = element.querySelector('code');
+    text = codeElement ? codeElement.textContent : element.textContent;
+  } else {
+    text = element.textContent;
+  }
+  
+  navigator.clipboard.writeText(text).then(function() {
+    showToast('Contenido copiado al portapapeles');
+  }).catch(function(err) {
+    console.error('Error copying:', err);
+    showToast('Error al copiar', 3000);
+  });
 }
 
 // ========== ACTUALIZAR ELEMENTOS ESPECIALES DESPUÉS DE CARGAR ==========
@@ -4872,627 +4969,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 </script>
-<script>
 
-
-// ========== MANEJO DE ELEMENTOS ESPECIALES ==========
-var currentModalElement = null;
-
-// Abrir elemento en modal (pantalla completa)
-function openInModal(elementId) {
-  var element = document.getElementById(elementId);
-  if (!element) return;
-  
-  var modal = document.getElementById('special-modal') || createModal();
-  var modalContent = modal.querySelector('.special-modal-content');
-  
-  // Clonar el elemento para no modificar el original
-  var clone = element.cloneNode(true);
-  clone.classList.add('in-modal');
-  
-  // Limpiar contenido anterior
-  modalContent.innerHTML = '';
-  modalContent.appendChild(clone);
-  
-  // Mostrar modal
-  modal.classList.add('active');
-  document.body.style.overflow = 'hidden';
-  
-  currentModalElement = elementId;
-}
-
-// Crear modal si no existe
-function createModal() {
-  var modal = document.createElement('div');
-  modal.id = 'special-modal';
-  modal.className = 'special-modal';
-  modal.innerHTML = '<div class="special-modal-content">' +
-    '<button class="special-modal-close" onclick="closeModal()">&times;</button>' +
-    '</div>';
-  document.body.appendChild(modal);
-  
-  // Cerrar con ESC
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && modal.classList.contains('active')) {
-      closeModal();
-    }
-  });
-  
-  // Cerrar al hacer clic fuera
-  modal.addEventListener('click', function(e) {
-    if (e.target === modal) {
-      closeModal();
-    }
-  });
-  
-  return modal;
-}
-
-// Cerrar modal
-function closeModal() {
-  var modal = document.getElementById('special-modal');
-  if (modal) {
-    modal.classList.remove('active');
-    document.body.style.overflow = '';
-  }
-  currentModalElement = null;
-}
-
-// Abrir elemento en nueva pestaña
-function openInNewTab(elementId) {
-  var element = document.getElementById(elementId);
-  if (!element) return;
-  
-  // Crear un HTML completo para la nueva pestaña
-  var title = element.getAttribute('data-title') || 'Elemento especial';
-  var content = element.outerHTML;
-  
-  var newWindow = window.open('', '_blank');
-  newWindow.document.write('<!DOCTYPE html>' +
-    '<html>' +
-    '<head>' +
-      '<title>' + title + ' - Revista Nacional</title>' +
-      '<meta charset="UTF-8">' +
-      '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
-      '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono&display=swap" rel="stylesheet">' +
-      '<style>' +
-        'body { ' + 
-          'font-family: \'Inter\', sans-serif; ' + 
-          'padding: 2rem; ' + 
-          'max-width: 1200px; ' + 
-          'margin: 0 auto;' +
-          'background: #f8f9fa;' +
-        '}' +
-        '.container {' +
-          'background: white;' +
-          'padding: 2rem;' +
-          'border-radius: 8px;' +
-          'box-shadow: 0 4px 6px rgba(0,0,0,0.1);' +
-        '}' +
-        'h1 { ' + 
-          'font-size: 1.5rem; ' + 
-          'color: #005a7d;' +
-          'margin-bottom: 1.5rem;' +
-        '}' +
-        'pre { ' + 
-          'background: #1e1e1e; ' + 
-          'padding: 1rem; ' + 
-          'border-radius: 4px;' +
-          'overflow-x: auto;' +
-        '}' +
-        'code { font-family: \'JetBrains Mono\', monospace; }' +
-        'img { max-width: 100%; height: auto; }' +
-        'table { ' + 
-          'width: 100%; ' + 
-          'border-collapse: collapse; ' + 
-          'margin: 1rem 0;' +
-        '}' +
-        'th, td { ' + 
-          'border: 1px solid #ddd; ' + 
-          'padding: 8px; ' + 
-          'text-align: left;' +
-        '}' +
-        'th { background: #f0f0f0; }' +
-        '.close-btn {' +
-          'position: fixed;' +
-          'top: 1rem;' +
-          'right: 1rem;' +
-          'padding: 0.5rem 1rem;' +
-          'background: #005a7d;' +
-          'color: white;' +
-          'border: none;' +
-          'border-radius: 4px;' +
-          'cursor: pointer;' +
-        '}' +
-      '</style>' +
-    '</head>' +
-    '<body>' +
-      '<div class="container">' +
-        '<h1>' + title + '</h1>' +
-        '<div id="element-container">' + content + '</div>' +
-      '</div>' +
-      '<button class="close-btn" onclick="window.close()">Cerrar ventana</button>' +
-    '</body>' +
-    '</html>');
-  newWindow.document.close();
-}
-
-// ========== DESCARGA DE TABLAS EN MÚLTIPLES FORMATOS ==========
-function downloadTable(tableId, format) {
-  var table = document.getElementById(tableId);
-  if (!table) return;
-  
-  var content = '';
-  var filename = 'table-' + tableId;
-  var mimeType = '';
-  
-  switch(format) {
-    case 'csv':
-      content = tableToCSV(table);
-      mimeType = 'text/csv';
-      filename += '.csv';
-      break;
-    case 'excel':
-      content = tableToExcel(table);
-      mimeType = 'application/vnd.ms-excel';
-      filename += '.xls';
-      break;
-    case 'json':
-      content = tableToJSON(table);
-      mimeType = 'application/json';
-      filename += '.json';
-      break;
-    case 'markdown':
-      content = tableToMarkdown(table);
-      mimeType = 'text/markdown';
-      filename += '.md';
-      break;
-    case 'latex':
-      content = tableToLaTeX(table);
-      mimeType = 'text/plain';
-      filename += '.tex';
-      break;
-    case 'html':
-      content = table.outerHTML;
-      mimeType = 'text/html';
-      filename += '.html';
-      break;
-    default:
-      return;
-  }
-  
-  // Descargar archivo
-  var blob = new Blob([content], { type: mimeType });
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  
-  // Feedback visual
-  showToast('Tabla descargada como ' + format.toUpperCase());
-}
-
-// Convertir tabla a CSV
-function tableToCSV(table) {
-  var rows = table.querySelectorAll('tr');
-  var csv = [];
-  
-  for (var i = 0; i < rows.length; i++) {
-    var row = rows[i];
-    var cells = row.querySelectorAll('th, td');
-    var rowData = [];
-    
-    for (var j = 0; j < cells.length; j++) {
-      var cell = cells[j];
-      var text = cell.textContent.trim();
-      // Escapar comillas y comas
-      if (text.includes(',') || text.includes('"') || text.includes('\n')) {
-        text = '"' + text.replace(/"/g, '""') + '"';
-      }
-      rowData.push(text);
-    }
-    
-    csv.push(rowData.join(','));
-  }
-  
-  return csv.join('\n');
-}
-
-// Convertir tabla a Excel (HTML)
-function tableToExcel(table) {
-  return '<html>' +
-    '<head>' +
-      '<meta charset="UTF-8">' +
-      '<title>Tabla exportada</title>' +
-    '</head>' +
-    '<body>' +
-      table.outerHTML +
-    '</body>' +
-    '</html>';
-}
-
-// Convertir tabla a JSON
-function tableToJSON(table) {
-  var headers = [];
-  var data = [];
-  
-  // Obtener headers
-  var headerRow = table.querySelector('tr');
-  if (headerRow) {
-    var headerCells = headerRow.querySelectorAll('th, td');
-    for (var i = 0; i < headerCells.length; i++) {
-      headers.push(headerCells[i].textContent.trim());
-    }
-  }
-  
-  // Obtener datos
-  var rows = table.querySelectorAll('tr');
-  for (var i = 1; i < rows.length; i++) { // Saltar header row
-    var row = rows[i];
-    var cells = row.querySelectorAll('td');
-    var rowData = {};
-    
-    for (var j = 0; j < cells.length; j++) {
-      if (headers[j]) {
-        rowData[headers[j]] = cells[j].textContent.trim();
-      } else {
-        rowData['columna_' + j] = cells[j].textContent.trim();
-      }
-    }
-    
-    data.push(rowData);
-  }
-  
-  return JSON.stringify(data, null, 2);
-}
-
-// Convertir tabla a Markdown
-function tableToMarkdown(table) {
-  var rows = table.querySelectorAll('tr');
-  var markdown = [];
-  var headerSeparator = '';
-  
-  for (var i = 0; i < rows.length; i++) {
-    var row = rows[i];
-    var cells = row.querySelectorAll('th, td');
-    var rowData = [];
-    
-    for (var j = 0; j < cells.length; j++) {
-      rowData.push(cells[j].textContent.trim());
-    }
-    
-    if (i === 0) {
-      // Header row
-      markdown.push('| ' + rowData.join(' | ') + ' |');
-      
-      // Separator row
-      var separators = [];
-      for (var j = 0; j < rowData.length; j++) {
-        separators.push(' --- ');
-      }
-      headerSeparator = '|' + separators.join('|') + '|';
-      markdown.push(headerSeparator);
-    } else {
-      // Data rows
-      markdown.push('| ' + rowData.join(' | ') + ' |');
-    }
-  }
-  
-  return markdown.join('\n');
-}
-
-// Convertir tabla a LaTeX
-function tableToLaTeX(table) {
-  var rows = table.querySelectorAll('tr');
-  var latex = ['\\begin{table}[h]', '\\centering', '\\begin{tabular}{'];
-  
-  // Determinar número de columnas
-  var firstRow = rows[0];
-  var colCount = firstRow ? firstRow.querySelectorAll('th, td').length : 0;
-  
-  // Formato de columnas (centradas)
-  var colFormat = '';
-  for (var i = 0; i < colCount; i++) {
-    colFormat += 'c';
-  }
-  latex.push('{|' + colFormat + '|}');
-  latex.push('}');
-  latex.push('\\hline');
-  
-  for (var i = 0; i < rows.length; i++) {
-    var row = rows[i];
-    var cells = row.querySelectorAll('th, td');
-    var rowData = [];
-    
-    for (var j = 0; j < cells.length; j++) {
-      var text = cells[j].textContent.trim();
-      // Escapar caracteres especiales de LaTeX
-      text = text.replace(/_/g, '\\_')
-                 .replace(/&/g, '\\&')
-                 .replace(/%/g, '\\%')
-                 .replace(/\$/g, '\\$')
-                 .replace(/#/g, '\\#')
-                 .replace(/{/g, '\\{')
-                 .replace(/}/g, '\\}');
-      rowData.push(text);
-    }
-    
-    latex.push(rowData.join(' & ') + ' \\\\');
-    latex.push('\\hline');
-  }
-  
-  latex.push('\\end{tabular}');
-  latex.push('\\caption{Título de la tabla}');
-  latex.push('\\label{tab:' + table.id + '}');
-  latex.push('\\end{table}');
-  
-  return latex.join('\n');
-}
-
-// ========== SHOW TOAST NOTIFICATION ==========
-function showToast(message, duration) {
-  if (duration === undefined) duration = 2000;
-  
-  var toast = document.createElement('div');
-  toast.textContent = message;
-  toast.style.cssText = 'position: fixed;' +
-    'bottom: 20px;' +
-    'right: 20px;' +
-    'background: #005a7d;' +
-    'color: white;' +
-    'padding: 12px 24px;' +
-    'border-radius: 8px;' +
-    'font-family: \'Inter\', sans-serif;' +
-    'font-size: 0.9rem;' +
-    'box-shadow: 0 4px 12px rgba(0,0,0,0.15);' +
-    'z-index: 10001;' +
-    'animation: slideIn 0.3s ease;';
-  
-  // Añadir animación
-  var style = document.createElement('style');
-  style.textContent = '@keyframes slideIn {' +
-    'from { transform: translateX(100%); opacity: 0; }' +
-    'to { transform: translateX(0); opacity: 1; }' +
-    '}';
-  document.head.appendChild(style);
-  
-  document.body.appendChild(toast);
-  
-  setTimeout(function() {
-    toast.style.animation = 'slideIn 0.3s ease reverse';
-    setTimeout(function() { toast.remove(); }, 300);
-  }, duration);
-}
-
-// ========== TOGGLE DOWNLOAD MENU ==========
-function toggleDownloadMenu(btn, tableId) {
-  event.stopPropagation();
-  
-  // Cerrar otros menús
-  var menus = document.querySelectorAll('.download-format-menu.active');
-  for (var i = 0; i < menus.length; i++) {
-    if (menus[i] !== btn.nextElementSibling) {
-      menus[i].classList.remove('active');
-    }
-  }
-  
-  var menu = btn.nextElementSibling;
-  if (menu) {
-    menu.classList.toggle('active');
-    
-    // Cerrar al hacer clic fuera
-    if (menu.classList.contains('active')) {
-      var closeMenu = function(e) {
-        if (!menu.contains(e.target) && e.target !== btn) {
-          menu.classList.remove('active');
-          document.removeEventListener('click', closeMenu);
-        }
-      };
-      setTimeout(function() {
-        document.addEventListener('click', closeMenu);
-      }, 100);
-    }
-  }
-}
-
-// ========== ACTUALIZAR ELEMENTOS ESPECIALES DESPUÉS DE CARGAR ==========
-document.addEventListener('DOMContentLoaded', function() {
-  // Envolver elementos especiales con contenedor y toolbar
-  wrapSpecialElements();
-  
-  // Actualizar la lista de elementos especiales para el TOC
-  updateSpecialElementsList();
-});
-
-function wrapSpecialElements() {
-  // Envolver figuras
-  var figures = document.querySelectorAll('figure.image-figure[id^="figure-"]');
-  for (var i = 0; i < figures.length; i++) {
-    wrapWithToolbar(figures[i], 'figure', getFigureTitle(figures[i]));
-  }
-  
-  // Envolver tablas
-  var tables = document.querySelectorAll('table.article-table[id^="table-"]');
-  for (var i = 0; i < tables.length; i++) {
-    wrapWithToolbar(tables[i], 'table', getTableTitle(tables[i]));
-  }
-  
-  // Envolver bloques de código
-  var codes = document.querySelectorAll('.code-block-wrapper[id^="code-"]');
-  for (var i = 0; i < codes.length; i++) {
-    wrapWithToolbar(codes[i], 'code', getCodeTitle(codes[i]));
-  }
-  
-  // Envolver ecuaciones
-  var equations = document.querySelectorAll('[id^="equation-"]');
-  for (var i = 0; i < equations.length; i++) {
-    wrapWithToolbar(equations[i], 'equation', 'Ecuación');
-  }
-}
-
-function wrapWithToolbar(element, type, title) {
-  // Evitar envolver múltiples veces
-  if (element.parentElement && element.parentElement.classList.contains('special-element-container')) {
-    return;
-  }
-  
-  var container = document.createElement('div');
-  container.className = 'special-element-container';
-  container.setAttribute('data-element-type', type);
-  
-  // Insertar antes de mover el elemento
-  element.parentNode.insertBefore(container, element);
-  container.appendChild(element);
-  
-  // Crear toolbar
-  var toolbar = document.createElement('div');
-  toolbar.className = 'special-element-toolbar';
-  
-  // Botones según tipo
-  var buttons = [];
-  
-  // Botón abrir en modal (pantalla completa)
-  buttons.push('<button class="toolbar-btn" onclick="openInModal(\'' + element.id + '\')" data-tooltip="Ver en pantalla completa">' +
-      '<svg viewBox="0 0 24 24" width="14" height="14">' +
-        '<path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>' +
-      '</svg>' +
-      '<span class="toolbar-label">Pantalla completa</span>' +
-    '</button>');
-  
-  // Botón abrir en nueva pestaña
-  buttons.push('<button class="toolbar-btn" onclick="openInNewTab(\'' + element.id + '\')" data-tooltip="Abrir en nueva pestaña">' +
-      '<svg viewBox="0 0 24 24" width="14" height="14">' +
-        '<path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>' +
-      '</svg>' +
-      '<span class="toolbar-label">Nueva pestaña</span>' +
-    '</button>');
-  
-  // Botones específicos para tablas
-  if (type === 'table') {
-    buttons.push('<div style="position: relative;">' +
-        '<button class="toolbar-btn" onclick="toggleDownloadMenu(this, \'' + element.id + '\')" data-tooltip="Descargar tabla">' +
-          '<svg viewBox="0 0 24 24" width="14" height="14">' +
-            '<path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>' +
-          '</svg>' +
-          '<span class="toolbar-label">Descargar</span>' +
-        '</button>' +
-        '<div class="download-format-menu">' +
-          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'csv\')">CSV</button>' +
-          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'excel\')">Excel</button>' +
-          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'json\')">JSON</button>' +
-          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'markdown\')">Markdown</button>' +
-          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'latex\')">LaTeX</button>' +
-          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'html\')">HTML</button>' +
-        '</div>' +
-      '</div>');
-  }
-  
-  // Botón copiar para código
-  if (type === 'code') {
-    buttons.push('<button class="toolbar-btn" onclick="copyElementContent(\'' + element.id + '\')" data-tooltip="Copiar contenido">' +
-        '<svg viewBox="0 0 24 24" width="14" height="14">' +
-          '<rect x="9" y="9" width="13" height="13" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/>' +
-          '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" fill="none" stroke="currentColor" stroke-width="2"/>' +
-        '</svg>' +
-        '<span class="toolbar-label">Copiar</span>' +
-      '</button>');
-  }
-  
-  toolbar.innerHTML = buttons.join('');
-  container.appendChild(toolbar);
-  
-  // Añadir badge con el tipo
-  var badge = document.createElement('span');
-  badge.className = 'special-badge';
-  badge.textContent = type === 'figure' ? 'Figura' : 
-                      type === 'table' ? 'Tabla' : 
-                      type === 'code' ? 'Código' : 'Ecuación';
-  element.parentNode.insertBefore(badge, element);
-}
-
-// Funciones auxiliares para obtener títulos
-function getFigureTitle(figure) {
-  var caption = figure.querySelector('.image-caption');
-  return caption ? caption.textContent.trim() : 'Figura';
-}
-
-function getTableTitle(table) {
-  return 'Tabla';
-}
-
-function getCodeTitle(code) {
-  var language = code.querySelector('.code-language');
-  return language ? 'Código (' + language.textContent.trim() + ')' : 'Código';
-}
-
-// Copiar contenido de un elemento
-function copyElementContent(elementId) {
-  var element = document.getElementById(elementId);
-  if (!element) return;
-  
-  var text = '';
-  
-  if (element.classList.contains('code-block-wrapper')) {
-    // Para bloques de código, obtener el texto del código
-    var codeElement = element.querySelector('code');
-    text = codeElement ? codeElement.textContent : element.textContent;
-  } else {
-    text = element.textContent;
-  }
-  
-  navigator.clipboard.writeText(text).then(function() {
-    showToast('Contenido copiado al portapapeles');
-  }).catch(function(err) {
-    console.error('Error copying:', err);
-    showToast('Error al copiar', 3000);
-  });
-}
-
-// Actualizar lista de elementos especiales para el TOC
-function updateSpecialElementsList() {
-  var elements = [];
-  
-  var containers = document.querySelectorAll('.special-element-container');
-  for (var i = 0; i < containers.length; i++) {
-    var container = containers[i];
-    var element = container.querySelector('[id^="figure-"], [id^="table-"], [id^="code-"], [id^="equation-"]');
-    if (!element) continue;
-    
-    var type = container.getAttribute('data-element-type');
-    var title = '';
-    
-    if (type === 'figure') {
-      var caption = element.querySelector('.image-caption');
-      title = caption ? caption.textContent.trim() : 'Figura';
-    } else if (type === 'table') {
-      title = 'Tabla';
-    } else if (type === 'code') {
-      var language = element.querySelector('.code-language');
-      title = language ? 'Código (' + language.textContent.trim() + ')' : 'Código';
-    } else {
-      title = 'Ecuación';
-    }
-    
-    elements.push({
-      type: type,
-      id: element.id,
-      title: title
-    });
-  }
-  
-  window.__SPECIAL_ELEMENTS__ = elements;
-}
-
-// ========== INICIALIZACIÓN ADICIONAL ==========
-document.addEventListener('DOMContentLoaded', function() {
-  // Si ya existen elementos, envolverlos después de un pequeño retraso
-  setTimeout(wrapSpecialElements, 500);
-});
-</script>
 </html>`;
 }
 
