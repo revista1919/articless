@@ -968,6 +968,7 @@ function generateHtmlTemplate({
   abstractParagraphs,
   referencesHtml,
   htmlContent,
+  allTocItems = [],
   domain,
   oaSvg,
   orcidSvg,
