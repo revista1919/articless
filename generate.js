@@ -831,65 +831,67 @@ async function generateArticleHtml(article) {
   // Procesar HTML del artículo (con bloques de código, tablas, etc.)
   const processedHtmlEs = processCodeBlocks(article.html_es || '');
   const processedHtmlEn = processCodeBlocks(article.html_en || '');
-  // Después de obtener processedHtmlEs y processedHtmlEn
-const $ = cheerio.load(processedHtmlEs);
-const headings = [];
-$('.article-container h2').each((index, el) => {
-  const $el = $(el);
-  // Si no tiene id, se lo asignamos
-  let id = $el.attr('id');
-  if (!id) {
-    id = `section-${index + 1}`;
-    $el.attr('id', id);
-  }
-  headings.push({
-    type: 'heading',
-    id: id,
-    title: $el.text().trim(),
-    level: 2,
-    order: index,
-    icon: null  // los encabezados no llevan icono en tu diseño
+  
+  // ===== CORRECCIÓN AQUÍ =====
+  // Procesar headings y elementos especiales para español
+  const $es = cheerio.load(processedHtmlEs);
+  const headingsEs = [];
+  $es('.article-container h2').each((index, el) => {
+    const $el = $es(el);
+    // Si no tiene id, se lo asignamos
+    let id = $el.attr('id');
+    if (!id) {
+      id = `section-${index + 1}`;
+      $el.attr('id', id);
+    }
+    headingsEs.push({
+      type: 'heading',
+      id: id,
+      title: $el.text().trim(),
+      level: 2,
+      order: index,
+      icon: null
+    });
   });
-  // PROCESAR VERSIÓN EN INGLÉS
-const $en = cheerio.load(processedHtmlEn);
-const headingsEn = [];
-$en('.article-container h2').each((index, el) => {
-  const $el = $en(el);
-  let id = $el.attr('id');
-  if (!id) {
-    id = `section-${index + 1}`;
-    $el.attr('id', id);
-  }
-  headingsEn.push({
-    type: 'heading',
-    id: id,
-    title: $el.text().trim(),
-    level: 2,
-    order: index,
-    icon: null
+  
+  // Obtener elementos especiales de la versión en español
+  const specialElementsEs = extractSpecialElements(processedHtmlEs);
+  
+  // Combinar headings y elementos especiales para español
+  const allTocItemsEs = [
+    ...headingsEs.map(h => ({ ...h, type: 'heading' })),
+    ...specialElementsEs
+  ];
+  
+  // Procesar headings y elementos especiales para inglés
+  const $en = cheerio.load(processedHtmlEn);
+  const headingsEn = [];
+  $en('.article-container h2').each((index, el) => {
+    const $el = $en(el);
+    let id = $el.attr('id');
+    if (!id) {
+      id = `section-${index + 1}`;
+      $el.attr('id', id);
+    }
+    headingsEn.push({
+      type: 'heading',
+      id: id,
+      title: $el.text().trim(),
+      level: 2,
+      order: index,
+      icon: null
+    });
   });
-});
 
-// Extraer elementos especiales de la versión en inglés
-const specialElementsEn = extractSpecialElements(processedHtmlEn);
+  // Extraer elementos especiales de la versión en inglés
+  const specialElementsEn = extractSpecialElements(processedHtmlEn);
 
-const allTocItems = [
-  ...headings.map(h => ({ ...h, type: 'heading' })),
-  ...specialElementsEs
-];
+  const allTocItemsEn = [
+    ...headingsEn.map(h => ({ ...h, type: 'heading' })),
+    ...specialElementsEn
+  ];
+  // ===== FIN DE LA CORRECCIÓN =====
 
-const allTocItemsEn = [
-  ...headingsEn.map(h => ({ ...h, type: 'heading' })),
-  ...specialElementsEn
-];
-});
-
-// Obtener elementos especiales (ya existente)
-const specialElementsEs = extractSpecialElements(processedHtmlEs);
-  const allTocItems = [
-  ...headings.map(h => ({ ...h, type: 'heading' })),
-  ...specialElementsEs
-];
   // Procesar referencias
   const referencesHtml = (() => {
     if (!article.referencias) return '<p>No hay referencias disponibles.</p>';
@@ -933,7 +935,7 @@ const specialElementsEs = extractSpecialElements(processedHtmlEs);
     referencesHtml,
     htmlContent: processedHtmlEs,
     specialElements: specialElementsEs, 
-    allTocItems: allTocItems, 
+    allTocItems: allTocItemsEs, 
     domain: DOMAIN,
     oaSvg,
     orcidSvg,
@@ -979,7 +981,6 @@ const specialElementsEs = extractSpecialElements(processedHtmlEs);
   fs.writeFileSync(filePathEn, htmlContentEn, 'utf8');
   console.log(`✅ Generado: ${filePathEn}`);
 }
-
 function generateHtmlTemplate({
   lang,
   article,
