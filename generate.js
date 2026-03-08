@@ -3801,11 +3801,11 @@ body {
 
 <script>
 // ========== FUNCIONES PARA MENÚ MÓVIL ==========
-let mobileSearchVisible = false;
+var mobileSearchVisible = false;
 
 function toggleMobileMenu() {
-  const menu = document.getElementById('mobileMenu');
-  const overlay = document.getElementById('mobileOverlay');
+  var menu = document.getElementById('mobileMenu');
+  var overlay = document.getElementById('mobileOverlay');
   
   if (menu && overlay) {
     menu.classList.toggle('active');
@@ -3821,8 +3821,8 @@ function toggleMobileMenu() {
 }
 
 function closeMobileMenu() {
-  const menu = document.getElementById('mobileMenu');
-  const overlay = document.getElementById('mobileOverlay');
+  var menu = document.getElementById('mobileMenu');
+  var overlay = document.getElementById('mobileOverlay');
   
   if (menu) menu.classList.remove('active');
   if (overlay) overlay.classList.remove('active');
@@ -3830,8 +3830,8 @@ function closeMobileMenu() {
 }
 
 function toggleMobileSearch() {
-  const menu = document.getElementById('mobileMenu');
-  const overlay = document.getElementById('mobileOverlay');
+  var menu = document.getElementById('mobileMenu');
+  var overlay = document.getElementById('mobileOverlay');
   
   if (menu && overlay) {
     menu.classList.add('active');
@@ -3840,8 +3840,8 @@ function toggleMobileSearch() {
     
     generateMobileTOC();
     
-    setTimeout(() => {
-      const mobileSearchInput = document.getElementById('mobile-search-input');
+    setTimeout(function() {
+      var mobileSearchInput = document.getElementById('mobile-search-input');
       if (mobileSearchInput) {
         mobileSearchInput.focus();
         mobileSearchInput.select();
@@ -3852,22 +3852,24 @@ function toggleMobileSearch() {
 
 function handleMobileSearch(e) {
   e.preventDefault();
-  const query = document.getElementById('mobile-search-input')?.value.trim();
+  var queryInput = document.getElementById('mobile-search-input');
+  var query = queryInput ? queryInput.value.trim() : '';
   if (query) {
-    const encodedQuery = encodeURIComponent(query).replace(/%20/g, '+');
+    var encodedQuery = encodeURIComponent(query).replace(/%20/g, '+');
     window.location.href = '/article?article_search=' + encodedQuery;
   }
 }
 
 // ========== FUNCIÓN DE BÚSQUEDA PRINCIPAL ==========
-document.addEventListener('DOMContentLoaded', () => {
-  const searchForm = document.getElementById('search-form');
+document.addEventListener('DOMContentLoaded', function() {
+  var searchForm = document.getElementById('search-form');
   if (searchForm) {
-    searchForm.addEventListener('submit', (e) => {
+    searchForm.addEventListener('submit', function(e) {
       e.preventDefault();
-      const query = document.getElementById('search-input')?.value.trim();
+      var queryInput = document.getElementById('search-input');
+      var query = queryInput ? queryInput.value.trim() : '';
       if (query) {
-        const encodedQuery = encodeURIComponent(query).replace(/%20/g, '+');
+        var encodedQuery = encodeURIComponent(query).replace(/%20/g, '+');
         window.location.href = '/article?article_search=' + encodedQuery;
       }
     });
@@ -3883,39 +3885,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ========== FUNCIÓN PRINCIPAL PARA INICIALIZAR LA TOC ==========
 function initializeTableOfContents() {
-  const tocList = document.getElementById('toc-list');
+  var tocList = document.getElementById('toc-list');
   if (!tocList) return;
 
   // Limpiar TOC existente
   tocList.innerHTML = '';
 
   // Obtener todos los encabezados H2 del artículo
-  const headings = document.querySelectorAll('.article-container h2');
+  var headings = document.querySelectorAll('.article-container h2');
   
-  headings.forEach((heading, index) => {
+  for (var i = 0; i < headings.length; i++) {
+    var heading = headings[i];
+    
     // Ignorar ciertos encabezados si es necesario
-    if (heading.id === 'citations' || heading.closest('.citation-box')) return;
+    if (heading.id === 'citations' || heading.closest('.citation-box')) continue;
     
     // Asegurar que el encabezado tenga un ID
-    const id = heading.id || `section-${index}`;
+    var id = heading.id || 'section-' + i;
     heading.id = id;
     
     // Crear elemento de la TOC
-    const li = document.createElement('li');
+    var li = document.createElement('li');
     li.className = 'toc-item';
     
-    const link = document.createElement('a');
-    link.href = `#${id}`;
+    var link = document.createElement('a');
+    link.href = '#' + id;
     link.textContent = heading.textContent;
     
-    link.addEventListener('click', (e) => {
-      e.preventDefault();
-      document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
-    });
+    link.addEventListener('click', (function(sectionId) {
+      return function(e) {
+        e.preventDefault();
+        document.getElementById(sectionId).scrollIntoView({ behavior: 'smooth' });
+      };
+    })(id));
     
     li.appendChild(link);
     tocList.appendChild(li);
-  });
+  }
 
   // Añadir elementos especiales (figuras, tablas, código, ecuaciones)
   addSpecialElementsToTOC();
@@ -3923,89 +3929,100 @@ function initializeTableOfContents() {
 
 // ========== AÑADIR ELEMENTOS ESPECIALES A LA TOC ==========
 function addSpecialElementsToTOC() {
-  const tocList = document.getElementById('toc-list');
+  var tocList = document.getElementById('toc-list');
   if (!tocList) return;
 
-  const specialElements = [];
+  var specialElements = [];
   
   // Detectar figuras
-  document.querySelectorAll('figure.image-figure[id^="figure-"]').forEach((fig, i) => {
-    const caption = fig.querySelector('.image-caption');
+  var figures = document.querySelectorAll('figure.image-figure[id^="figure-"]');
+  for (var i = 0; i < figures.length; i++) {
+    var fig = figures[i];
+    var caption = fig.querySelector('.image-caption');
     specialElements.push({
       type: 'figure',
       id: fig.id,
-      title: caption ? caption.textContent.trim() : `Figura ${i + 1}`,
+      title: caption ? caption.textContent.trim() : 'Figura ' + (i + 1),
       icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15L16 10 5 21"/></svg>'
     });
-  });
+  }
   
   // Detectar tablas
-  document.querySelectorAll('table.article-table[id^="table-"]').forEach((table, i) => {
+  var tables = document.querySelectorAll('table.article-table[id^="table-"]');
+  for (var i = 0; i < tables.length; i++) {
+    var table = tables[i];
     specialElements.push({
       type: 'table',
       id: table.id,
-      title: `Tabla ${i + 1}`,
+      title: 'Tabla ' + (i + 1),
       icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5zm0 5h18M10 3v18"/></svg>'
     });
-  });
+  }
   
   // Detectar código
-  document.querySelectorAll('.code-block-wrapper[id^="code-"]').forEach((code, i) => {
-    const language = code.querySelector('.code-language');
+  var codes = document.querySelectorAll('.code-block-wrapper[id^="code-"]');
+  for (var i = 0; i < codes.length; i++) {
+    var code = codes[i];
+    var language = code.querySelector('.code-language');
     specialElements.push({
       type: 'code',
       id: code.id,
-      title: language ? `Código (${language.textContent.trim()})` : `Código ${i + 1}`,
+      title: language ? 'Código (' + language.textContent.trim() + ')' : 'Código ' + (i + 1),
       icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m18 16 4-4-4-4M6 8l-4 4 4 4M14.5 4l-5 16"/></svg>'
     });
-  });
+  }
   
   // Detectar ecuaciones
-  document.querySelectorAll('[id^="equation-"]').forEach((eq, i) => {
+  var equations = document.querySelectorAll('[id^="equation-"]');
+  for (var i = 0; i < equations.length; i++) {
+    var eq = equations[i];
     specialElements.push({
       type: 'equation',
       id: eq.id,
-      title: `Ecuación ${i + 1}`,
+      title: 'Ecuación ' + (i + 1),
       icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 7h3a2 2 0 0 1 2 2v6a2 2 0 0 0 2 2h3"/><path d="M7 11h4"/><path d="M17 7h.01"/><circle cx="18.5" cy="15.5" r="2.5"/></svg>'
     });
-  });
+  }
 
   // Añadir separador y elementos especiales si existen
   if (specialElements.length > 0) {
-    const separator = document.createElement('li');
+    var separator = document.createElement('li');
     separator.className = 'toc-separator';
     separator.innerHTML = '<span style="display:block; font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); margin:1rem 0 0.5rem 0; padding-left:1rem;">FIGURAS Y TABLAS</span>';
     tocList.appendChild(separator);
 
-    specialElements.forEach(element => {
-      const li = document.createElement('li');
+    for (var j = 0; j < specialElements.length; j++) {
+      var element = specialElements[j];
+      var li = document.createElement('li');
       li.className = 'toc-item toc-special';
       
-      const link = document.createElement('a');
-      link.href = `#${element.id}`;
+      var link = document.createElement('a');
+      link.href = '#' + element.id;
       link.innerHTML = element.icon + ' <span style="margin-left: 6px;">' + element.title + '</span>';
       
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        document.getElementById(element.id).scrollIntoView({ behavior: 'smooth' });
-      });
+      link.addEventListener('click', (function(elId) {
+        return function(e) {
+          e.preventDefault();
+          document.getElementById(elId).scrollIntoView({ behavior: 'smooth' });
+        };
+      })(element.id));
       
       li.appendChild(link);
       tocList.appendChild(li);
-    });
+    }
   }
 }
 
 // ========== GENERAR TABLA DE CONTENIDOS PARA MÓVIL ==========
 function generateMobileTOC() {
-  const mobileTocList = document.getElementById('mobile-toc-list');
+  var mobileTocList = document.getElementById('mobile-toc-list');
   if (!mobileTocList) return;
   
-  const isSpanish = document.documentElement.lang === 'es';
+  var isSpanish = document.documentElement.lang === 'es';
   mobileTocList.innerHTML = '';
   
   // Añadir Resumen/Abstract
-  const abstractItem = document.createElement('li');
+  var abstractItem = document.createElement('li');
   abstractItem.className = 'sd-mobile-nav-item';
   abstractItem.innerHTML = '<a href="#abstract" class="sd-mobile-nav-link mobile-toc-link" data-target="abstract">' +
     '<svg viewBox="0 0 24 24" width="20" height="20">' +
@@ -4016,18 +4033,19 @@ function generateMobileTOC() {
   mobileTocList.appendChild(abstractItem);
   
   // Añadir encabezados H2
-  const headings = document.querySelectorAll('.article-container h2');
-  headings.forEach((heading, index) => {
-    if (heading.id === 'citations' || heading.closest('.citation-box')) return;
+  var headings = document.querySelectorAll('.article-container h2');
+  for (var i = 0; i < headings.length; i++) {
+    var heading = headings[i];
+    if (heading.id === 'citations' || heading.closest('.citation-box')) continue;
     
-    const id = heading.id || `section-${index}`;
+    var id = heading.id || 'section-' + i;
     heading.id = id;
     
-    const li = document.createElement('li');
+    var li = document.createElement('li');
     li.className = 'sd-mobile-nav-item';
     
-    let iconPath = '<path d="M4 6H20v2H4zM4 12H20v2H4zM4 18H20v2H4z"/>';
-    const headingText = heading.textContent.toLowerCase();
+    var iconPath = '<path d="M4 6H20v2H4zM4 12H20v2H4zM4 18H20v2H4z"/>';
+    var headingText = heading.textContent.toLowerCase();
     
     if (headingText.includes('referencia') || headingText.includes('reference')) {
       iconPath = '<path d="M4 6H20v2H4zM4 12H20v2H4zM4 18H20v2H4z"/>';
@@ -4047,105 +4065,116 @@ function generateMobileTOC() {
     '</a>';
     
     mobileTocList.appendChild(li);
-  });
+  }
   
   // Añadir eventos a los enlaces móviles
-  document.querySelectorAll('.mobile-toc-link').forEach(link => {
-    link.addEventListener('click', (e) => {
-      const targetId = link.getAttribute('data-target');
+  var mobileLinks = document.querySelectorAll('.mobile-toc-link');
+  for (var i = 0; i < mobileLinks.length; i++) {
+    var link = mobileLinks[i];
+    link.addEventListener('click', function(e) {
+      var targetId = this.getAttribute('data-target');
       if (targetId) {
         e.preventDefault();
-        const targetElement = document.getElementById(targetId);
+        var targetElement = document.getElementById(targetId);
         if (targetElement) {
           targetElement.scrollIntoView({ behavior: 'smooth' });
           closeMobileMenu();
         }
       }
     });
-  });
+  }
 }
 
 // ========== CONFIGURAR INTERSECTION OBSERVER PARA HIGHLIGHTING ==========
 function setupIntersectionObserver() {
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
+  var observer = new IntersectionObserver(function(entries) {
+    for (var i = 0; i < entries.length; i++) {
+      var entry = entries[i];
       if (entry.isIntersecting) {
         // Actualizar TOC desktop
-        document.querySelectorAll('.toc-item a').forEach(link => {
+        var desktopLinks = document.querySelectorAll('.toc-item a');
+        for (var j = 0; j < desktopLinks.length; j++) {
+          var link = desktopLinks[j];
           link.classList.remove('active');
           if (link.getAttribute('href') === '#' + entry.target.id) {
             link.classList.add('active');
           }
-        });
+        }
         
         // Actualizar TOC móvil
-        document.querySelectorAll('.mobile-toc-link').forEach(link => {
-          link.classList.remove('active');
-          if (link.getAttribute('data-target') === entry.target.id) {
-            link.classList.add('active');
+        var mobileLinks = document.querySelectorAll('.mobile-toc-link');
+        for (var k = 0; k < mobileLinks.length; k++) {
+          var mlink = mobileLinks[k];
+          mlink.classList.remove('active');
+          if (mlink.getAttribute('data-target') === entry.target.id) {
+            mlink.classList.add('active');
           }
-        });
+        }
       }
-    });
+    }
   }, { threshold: 0.3, rootMargin: '-80px 0px -80px 0px' });
 
   // Observar todos los elementos relevantes
-  const elementsToObserve = document.querySelectorAll(
+  var elementsToObserve = document.querySelectorAll(
     '.article-container h2, #abstract, [id^="figure-"], [id^="table-"], [id^="code-"], [id^="equation-"]'
   );
   
-  elementsToObserve.forEach(el => {
+  for (var i = 0; i < elementsToObserve.length; i++) {
+    var el = elementsToObserve[i];
     if (el.id) observer.observe(el);
-  });
+  }
 }
 
 // ========== CONFIGURAR SCROLL SUAVE ==========
 function setupSmoothScrolling() {
-  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+  var anchors = document.querySelectorAll('a[href^="#"]');
+  for (var i = 0; i < anchors.length; i++) {
+    var anchor = anchors[i];
     anchor.addEventListener('click', function(e) {
-      const href = this.getAttribute('href');
+      var href = this.getAttribute('href');
       if (href === '#') return;
       
-      const target = document.querySelector(href);
+      var target = document.querySelector(href);
       if (target) {
         e.preventDefault();
         target.scrollIntoView({ behavior: 'smooth' });
       }
     });
-  });
+  }
 }
 
 // ========== HIGHLIGHT JS ==========
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
   if (window.hljs) {
-    document.querySelectorAll('pre code').forEach((block) => {
-      hljs.highlightElement(block);
-    });
+    var codeBlocks = document.querySelectorAll('pre code');
+    for (var i = 0; i < codeBlocks.length; i++) {
+      hljs.highlightElement(codeBlocks[i]);
+    }
   }
 });
 
 // ========== FUNCIÓN PARA COPIAR CÓDIGO ==========
 function copyCode(codeId, btn) {
-  const codeElement = document.getElementById(codeId);
+  var codeElement = document.getElementById(codeId);
   if (!codeElement) return;
   
-  const code = codeElement.textContent || codeElement.innerText;
+  var code = codeElement.textContent || codeElement.innerText;
   
-  navigator.clipboard.writeText(code).then(() => {
-    const originalHtml = btn.innerHTML;
+  navigator.clipboard.writeText(code).then(function() {
+    var originalHtml = btn.innerHTML;
     
     btn.innerHTML = '✓ Copiado';
     btn.style.background = '#22c55e';
     btn.style.color = 'white';
     btn.style.borderColor = '#22c55e';
     
-    setTimeout(() => {
+    setTimeout(function() {
       btn.innerHTML = originalHtml;
       btn.style.background = '';
       btn.style.color = '';
       btn.style.borderColor = '';
     }, 2000);
-  }).catch(err => {
+  }).catch(function(err) {
     console.error('Error copying code:', err);
     alert('No se pudo copiar el código');
   });
@@ -4154,23 +4183,27 @@ function copyCode(codeId, btn) {
 // ========== TAB SWITCHING ==========
 function switchTab(device, tabName) {
   if (device === 'desktop') {
-    document.querySelectorAll('#desktop-citations, #desktop-metadata').forEach(panel => {
-      panel.classList.remove('active');
-    });
-    document.querySelectorAll('.right-sidebar .tab-button').forEach(btn => {
-      btn.classList.remove('active');
-    });
-    const panel = document.getElementById('desktop-' + tabName);
+    var desktopPanels = document.querySelectorAll('#desktop-citations, #desktop-metadata');
+    for (var i = 0; i < desktopPanels.length; i++) {
+      desktopPanels[i].classList.remove('active');
+    }
+    var desktopBtns = document.querySelectorAll('.right-sidebar .tab-button');
+    for (var i = 0; i < desktopBtns.length; i++) {
+      desktopBtns[i].classList.remove('active');
+    }
+    var panel = document.getElementById('desktop-' + tabName);
     if (panel) panel.classList.add('active');
     if (event && event.target) event.target.classList.add('active');
   } else {
-    document.querySelectorAll('#mobile-citations, #mobile-metadata').forEach(panel => {
-      panel.classList.remove('active');
-    });
-    document.querySelectorAll('.mobile-info .tab-button').forEach(btn => {
-      btn.classList.remove('active');
-    });
-    const panel = document.getElementById('mobile-' + tabName);
+    var mobilePanels = document.querySelectorAll('#mobile-citations, #mobile-metadata');
+    for (var i = 0; i < mobilePanels.length; i++) {
+      mobilePanels[i].classList.remove('active');
+    }
+    var mobileBtns = document.querySelectorAll('.mobile-info .tab-button');
+    for (var i = 0; i < mobileBtns.length; i++) {
+      mobileBtns[i].classList.remove('active');
+    }
+    var panel = document.getElementById('mobile-' + tabName);
     if (panel) panel.classList.add('active');
     if (event && event.target) event.target.classList.add('active');
   }
@@ -4179,32 +4212,36 @@ function switchTab(device, tabName) {
 // ========== FUNCIONES PARA ELEMENTOS ESPECIALES ==========
 function wrapSpecialElements() {
   // Envolver figuras
-  document.querySelectorAll('figure.image-figure[id^="figure-"]').forEach(fig => {
-    wrapWithToolbar(fig, 'figure', getElementTitle(fig, 'figure'));
-  });
+  var figures = document.querySelectorAll('figure.image-figure[id^="figure-"]');
+  for (var i = 0; i < figures.length; i++) {
+    wrapWithToolbar(figures[i], 'figure', getElementTitle(figures[i], 'figure'));
+  }
   
   // Envolver tablas
-  document.querySelectorAll('table.article-table[id^="table-"]').forEach(table => {
-    wrapWithToolbar(table, 'table', getElementTitle(table, 'table'));
-  });
+  var tables = document.querySelectorAll('table.article-table[id^="table-"]');
+  for (var i = 0; i < tables.length; i++) {
+    wrapWithToolbar(tables[i], 'table', getElementTitle(tables[i], 'table'));
+  }
   
   // Envolver bloques de código
-  document.querySelectorAll('.code-block-wrapper[id^="code-"]').forEach(code => {
-    wrapWithToolbar(code, 'code', getElementTitle(code, 'code'));
-  });
+  var codes = document.querySelectorAll('.code-block-wrapper[id^="code-"]');
+  for (var i = 0; i < codes.length; i++) {
+    wrapWithToolbar(codes[i], 'code', getElementTitle(codes[i], 'code'));
+  }
   
   // Envolver ecuaciones
-  document.querySelectorAll('[id^="equation-"]').forEach(eq => {
-    wrapWithToolbar(eq, 'equation', 'Ecuación');
-  });
+  var equations = document.querySelectorAll('[id^="equation-"]');
+  for (var i = 0; i < equations.length; i++) {
+    wrapWithToolbar(equations[i], 'equation', 'Ecuación');
+  }
 }
 
 function getElementTitle(element, type) {
   if (type === 'figure') {
-    const caption = element.querySelector('.image-caption');
+    var caption = element.querySelector('.image-caption');
     return caption ? caption.textContent.trim() : 'Figura';
   } else if (type === 'code') {
-    const language = element.querySelector('.code-language');
+    var language = element.querySelector('.code-language');
     return language ? 'Código (' + language.textContent.trim() + ')' : 'Código';
   }
   return type === 'table' ? 'Tabla' : 'Ecuación';
@@ -4215,17 +4252,17 @@ function wrapWithToolbar(element, type, title) {
     return;
   }
   
-  const container = document.createElement('div');
+  var container = document.createElement('div');
   container.className = 'special-element-container';
   container.setAttribute('data-element-type', type);
   
   element.parentNode.insertBefore(container, element);
   container.appendChild(element);
   
-  const toolbar = document.createElement('div');
+  var toolbar = document.createElement('div');
   toolbar.className = 'special-element-toolbar';
   
-  const buttons = [];
+  var buttons = [];
   
   // Botón pantalla completa
   buttons.push('<button class="toolbar-btn" onclick="openInModal(\'' + element.id + '\')" data-tooltip="Ver en pantalla completa">' +
@@ -4277,7 +4314,7 @@ function wrapWithToolbar(element, type, title) {
   toolbar.innerHTML = buttons.join('');
   container.appendChild(toolbar);
   
-  const badge = document.createElement('span');
+  var badge = document.createElement('span');
   badge.className = 'special-badge';
   badge.textContent = type === 'figure' ? 'Figura' : 
                       type === 'table' ? 'Tabla' : 
@@ -4287,10 +4324,10 @@ function wrapWithToolbar(element, type, title) {
 
 // Funciones para modal
 window.openInModal = function(elementId) {
-  const element = document.getElementById(elementId);
+  var element = document.getElementById(elementId);
   if (!element) return;
   
-  let modal = document.getElementById('special-modal');
+  var modal = document.getElementById('special-modal');
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'special-modal';
@@ -4313,8 +4350,8 @@ window.openInModal = function(elementId) {
     });
   }
   
-  const modalContent = modal.querySelector('.special-modal-content');
-  const clone = element.cloneNode(true);
+  var modalContent = modal.querySelector('.special-modal-content');
+  var clone = element.cloneNode(true);
   clone.classList.add('in-modal');
   
   // Limpiar contenido existente (excepto el botón de cerrar)
@@ -4328,7 +4365,7 @@ window.openInModal = function(elementId) {
 }
 
 window.closeModal = function() {
-  const modal = document.getElementById('special-modal');
+  var modal = document.getElementById('special-modal');
   if (modal) {
     modal.classList.remove('active');
     document.body.style.overflow = '';
@@ -4336,13 +4373,13 @@ window.closeModal = function() {
 }
 
 window.openInNewTab = function(elementId) {
-  const element = document.getElementById(elementId);
+  var element = document.getElementById(elementId);
   if (!element) return;
   
-  const title = element.getAttribute('data-title') || 'Elemento especial';
-  const content = element.outerHTML;
+  var title = element.getAttribute('data-title') || 'Elemento especial';
+  var content = element.outerHTML;
   
-  const newWindow = window.open('', '_blank');
+  var newWindow = window.open('', '_blank');
   newWindow.document.write('<!DOCTYPE html>' +
     '<html><head><title>' + title + ' - Revista Nacional</title>' +
     '<meta charset="UTF-8">' +
@@ -4368,12 +4405,12 @@ window.openInNewTab = function(elementId) {
 
 // Funciones para descarga de tablas
 window.downloadTable = function(tableId, format) {
-  const table = document.getElementById(tableId);
+  var table = document.getElementById(tableId);
   if (!table) return;
   
-  let content = '';
-  let filename = 'table-' + tableId;
-  let mimeType = '';
+  var content = '';
+  var filename = 'table-' + tableId;
+  var mimeType = '';
   
   switch(format) {
     case 'csv':
@@ -4410,9 +4447,9 @@ window.downloadTable = function(tableId, format) {
       return;
   }
   
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  var blob = new Blob([content], { type: mimeType });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
   a.href = url;
   a.download = filename;
   document.body.appendChild(a);
@@ -4424,23 +4461,25 @@ window.downloadTable = function(tableId, format) {
 }
 
 function tableToCSV(table) {
-  const rows = table.querySelectorAll('tr');
-  const csv = [];
+  var rows = table.querySelectorAll('tr');
+  var csv = [];
   
-  rows.forEach(row => {
-    const cells = row.querySelectorAll('th, td');
-    const rowData = [];
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var cells = row.querySelectorAll('th, td');
+    var rowData = [];
     
-    cells.forEach(cell => {
-      let text = cell.textContent.trim();
+    for (var j = 0; j < cells.length; j++) {
+      var cell = cells[j];
+      var text = cell.textContent.trim();
       if (text.includes(',') || text.includes('"') || text.includes('\n')) {
         text = '"' + text.replace(/"/g, '""') + '"';
       }
       rowData.push(text);
-    });
+    }
     
     csv.push(rowData.join(','));
-  });
+  }
   
   return csv.join('\n');
 }
@@ -4451,28 +4490,30 @@ function tableToExcel(table) {
 }
 
 function tableToJSON(table) {
-  const headers = [];
-  const data = [];
+  var headers = [];
+  var data = [];
   
-  const headerRow = table.querySelector('tr');
+  var headerRow = table.querySelector('tr');
   if (headerRow) {
-    const headerCells = headerRow.querySelectorAll('th, td');
-    headerCells.forEach(cell => headers.push(cell.textContent.trim()));
+    var headerCells = headerRow.querySelectorAll('th, td');
+    for (var i = 0; i < headerCells.length; i++) {
+      headers.push(headerCells[i].textContent.trim());
+    }
   }
   
-  const rows = table.querySelectorAll('tr');
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
-    const cells = row.querySelectorAll('td');
-    const rowData = {};
+  var rows = table.querySelectorAll('tr');
+  for (var i = 1; i < rows.length; i++) {
+    var row = rows[i];
+    var cells = row.querySelectorAll('td');
+    var rowData = {};
     
-    cells.forEach((cell, j) => {
+    for (var j = 0; j < cells.length; j++) {
       if (headers[j]) {
-        rowData[headers[j]] = cell.textContent.trim();
+        rowData[headers[j]] = cells[j].textContent.trim();
       } else {
-        rowData['columna_' + j] = cell.textContent.trim();
+        rowData['columna_' + j] = cells[j].textContent.trim();
       }
-    });
+    }
     
     data.push(rowData);
   }
@@ -4481,44 +4522,51 @@ function tableToJSON(table) {
 }
 
 function tableToMarkdown(table) {
-  const rows = table.querySelectorAll('tr');
-  const markdown = [];
+  var rows = table.querySelectorAll('tr');
+  var markdown = [];
   
-  rows.forEach((row, i) => {
-    const cells = row.querySelectorAll('th, td');
-    const rowData = [];
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var cells = row.querySelectorAll('th, td');
+    var rowData = [];
     
-    cells.forEach(cell => rowData.push(cell.textContent.trim()));
+    for (var j = 0; j < cells.length; j++) {
+      rowData.push(cells[j].textContent.trim());
+    }
     
     if (i === 0) {
       markdown.push('| ' + rowData.join(' | ') + ' |');
-      const separators = Array(rowData.length).fill(' --- ');
+      var separators = [];
+      for (var j = 0; j < rowData.length; j++) {
+        separators.push(' --- ');
+      }
       markdown.push('|' + separators.join('|') + '|');
     } else {
       markdown.push('| ' + rowData.join(' | ') + ' |');
     }
-  });
+  }
   
   return markdown.join('\n');
 }
 
 function tableToLaTeX(table) {
-  const rows = table.querySelectorAll('tr');
-  const latex = ['\\begin{table}[h]', '\\centering', '\\begin{tabular}{'];
+  var rows = table.querySelectorAll('tr');
+  var latex = ['\\begin{table}[h]', '\\centering', '\\begin{tabular}{'];
   
-  const firstRow = rows[0];
-  const colCount = firstRow ? firstRow.querySelectorAll('th, td').length : 0;
+  var firstRow = rows[0];
+  var colCount = firstRow ? firstRow.querySelectorAll('th, td').length : 0;
   
   latex.push('{|' + 'c'.repeat(colCount) + '|}');
   latex.push('}');
   latex.push('\\hline');
   
-  rows.forEach(row => {
-    const cells = row.querySelectorAll('th, td');
-    const rowData = [];
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var cells = row.querySelectorAll('th, td');
+    var rowData = [];
     
-    cells.forEach(cell => {
-      let text = cell.textContent.trim();
+    for (var j = 0; j < cells.length; j++) {
+      var text = cells[j].textContent.trim();
       text = text.replace(/_/g, '\\_')
                  .replace(/&/g, '\\&')
                  .replace(/%/g, '\\%')
@@ -4527,11 +4575,11 @@ function tableToLaTeX(table) {
                  .replace(/{/g, '\\{')
                  .replace(/}/g, '\\}');
       rowData.push(text);
-    });
+    }
     
     latex.push(rowData.join(' & ') + ' \\\\');
     latex.push('\\hline');
-  });
+  }
   
   latex.push('\\end{tabular}');
   latex.push('\\caption{Título de la tabla}');
@@ -4541,8 +4589,10 @@ function tableToLaTeX(table) {
   return latex.join('\n');
 }
 
-window.showToast = function(message, duration = 2000) {
-  const toast = document.createElement('div');
+window.showToast = function(message, duration) {
+  if (duration === undefined) duration = 2000;
+  
+  var toast = document.createElement('div');
   toast.textContent = message;
   toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#005a7d;color:white;' +
     'padding:12px 24px;border-radius:8px;font-family:"Inter",sans-serif;font-size:0.9rem;' +
@@ -4553,53 +4603,54 @@ window.showToast = function(message, duration = 2000) {
   
   document.body.appendChild(toast);
   
-  setTimeout(() => {
+  setTimeout(function() {
     toast.style.animation = 'slideIn 0.3s ease reverse';
-    setTimeout(() => toast.remove(), 300);
+    setTimeout(function() { toast.remove(); }, 300);
   }, duration);
 }
 
 window.toggleDownloadMenu = function(btn, tableId) {
   event.stopPropagation();
   
-  document.querySelectorAll('.download-format-menu.active').forEach(menu => {
-    if (menu !== btn.nextElementSibling) {
-      menu.classList.remove('active');
+  var activeMenus = document.querySelectorAll('.download-format-menu.active');
+  for (var i = 0; i < activeMenus.length; i++) {
+    if (activeMenus[i] !== btn.nextElementSibling) {
+      activeMenus[i].classList.remove('active');
     }
-  });
+  }
   
-  const menu = btn.nextElementSibling;
+  var menu = btn.nextElementSibling;
   if (menu) {
     menu.classList.toggle('active');
     
     if (menu.classList.contains('active')) {
-      const closeMenu = (e) => {
+      var closeMenu = function(e) {
         if (!menu.contains(e.target) && e.target !== btn) {
           menu.classList.remove('active');
           document.removeEventListener('click', closeMenu);
         }
       };
-      setTimeout(() => document.addEventListener('click', closeMenu), 100);
+      setTimeout(function() { document.addEventListener('click', closeMenu); }, 100);
     }
   }
 }
 
 window.copyElementContent = function(elementId) {
-  const element = document.getElementById(elementId);
+  var element = document.getElementById(elementId);
   if (!element) return;
   
-  let text = '';
+  var text = '';
   
   if (element.classList.contains('code-block-wrapper')) {
-    const codeElement = element.querySelector('code');
+    var codeElement = element.querySelector('code');
     text = codeElement ? codeElement.textContent : element.textContent;
   } else {
     text = element.textContent;
   }
   
-  navigator.clipboard.writeText(text).then(() => {
+  navigator.clipboard.writeText(text).then(function() {
     showToast('Contenido copiado al portapapeles');
-  }).catch(err => {
+  }).catch(function(err) {
     console.error('Error copying:', err);
     showToast('Error al copiar', 3000);
   });
