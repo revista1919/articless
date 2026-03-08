@@ -3886,6 +3886,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // ========== FUNCIÓN PRINCIPAL PARA INICIALIZAR LA TOC ==========
 // ========== FUNCIÓN PRINCIPAL PARA INICIALIZAR LA TOC ==========
 function initializeTableOfContents() {
+console.log('TOC inicializada')
   var tocList = document.getElementById('toc-list');
   if (!tocList) return;
 
