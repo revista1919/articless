@@ -3334,9 +3334,23 @@ body {
   <div class="main-wrapper">
     <!-- Left Sidebar - Table of Contents -->
     <nav class="toc-sidebar">
-      <div class="toc-title">${t.contents}</div>
-      <ul class="toc-list" id="toc-list"></ul>
-    </nav>
+  <div class="toc-title">${t.contents}</div>
+  <ul class="toc-list" id="toc-list">
+    ${allTocItems.map(item => {
+      if (item.type === 'heading') {
+        return `<li class="toc-item"><a href="#${item.id}">${item.title}</a></li>`;
+      } else {
+        // Elemento especial (figure, table, code, equation)
+        return `<li class="toc-item toc-special toc-${item.type}">
+          <a href="#${item.id}" class="special-link" data-type="${item.type}">
+            <span class="toc-icon">${tocIcons[item.icon] || ''}</span>
+            <span class="toc-title-text">${item.title}</span>
+          </a>
+        </li>`;
+      }
+    }).join('')}
+  </ul>
+</nav>
 
     <!-- Main Content -->
     <main class="article-container">
@@ -3916,30 +3930,6 @@ function switchTab(device, tabName) {
 
 // ========== GENERATE DESKTOP TABLE OF CONTENTS ==========
 document.addEventListener('DOMContentLoaded', () => {
-  const tocList = document.getElementById('toc-list');
-  if (tocList) {
-    const headings = document.querySelectorAll('.article-container h2');
-    
-    headings.forEach((heading, index) => {
-      if (heading.id === 'citations' || heading.closest('.citation-box')) return;
-      
-      const id = heading.id || 'section-' + index;
-      heading.id = id;
-      
-      const li = document.createElement('li');
-      li.className = 'toc-item';
-      const link = document.createElement('a');
-      link.href = '#' + id;
-      link.textContent = heading.textContent;
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
-      });
-      li.appendChild(link);
-      tocList.appendChild(li);
-    });
-  }
-
   // Smooth scroll for all internal links
   document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     anchor.addEventListener('click', function (e) {
@@ -3968,13 +3958,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }, { threshold: 0.3, rootMargin: '-80px 0px -80px 0px' });
 
-  document.querySelectorAll('.article-container h2, #abstract').forEach(h => {
-    if (h.id) observer.observe(h);
+  // Observar headings y elementos especiales
+  document.querySelectorAll('.article-container h2, #abstract, .image-figure, .table-wrapper, .code-block-wrapper, .MathJax_Display, .math-container').forEach(el => {
+    if (el.id) observer.observe(el);
   });
   
   // Generar TOC móvil inicial
   generateMobileTOC();
 });
+
 
 // ========== ACTIVE SECTION HIGHLIGHTING FOR MOBILE TOC ==========
 // Crear un observer separado para el TOC móvil
