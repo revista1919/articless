@@ -11,6 +11,20 @@ const JOURNAL_NAME_ES = 'Revista Nacional de las Ciencias para Estudiantes';
 const JOURNAL_NAME_EN = 'The National Review of Sciences for Students';
 const LOGO_ES = 'https://www.revistacienciasestudiantes.com/assets/logo.png';
 const LOGO_EN = 'https://www.revistacienciasestudiantes.com/logoEN.png';
+// ========== SVG ICONS PARA TOC (Elegance Edition) ==========
+const tocIcons = {
+  // Un diseño de marco más sutil con un punto de enfoque artístico
+  figure: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>`,
+
+  // Una tabla abstracta que resalta la cabecera, evitando el exceso de líneas
+  table: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5zm0 5h18M10 3v18"/></svg>`,
+
+  // Brackets más estilizados y modernos
+  code: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 16 4-4-4-4M6 8l-4 4 4 4M14.5 4l-5 16"/></svg>`,
+
+  // Un símbolo de sumatoria (sigma) que representa "ecuación" de forma universal y académica
+  equation: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 21h10a1 1 0 0 0 1-1v-1a1 1 0 0 0-1-1h-2.17a2 2 0 0 1-1.41-.59l-4.42-4.41a2 2 0 0 1 0-2.82l4.42-4.41A2 2 0 0 1 14.83 5H17a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H7"/></svg>`
+};
 // Asegurar que existe el directorio de salida
 if (!fs.existsSync(OUTPUT_HTML_DIR)) {
   fs.mkdirSync(OUTPUT_HTML_DIR, { recursive: true });
@@ -546,7 +560,7 @@ function processAuthorsWithIcons(authors, article = null, lang = 'es') {
   return authorElements.join('<span class="author-separator">, </span>');
 }
 
-// ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML ==========
+
 // ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML ==========
 function processCodeBlocks(html) {
   if (!html) return html;
@@ -648,6 +662,7 @@ const codeHtml = `
   return $.html();
 }
 // ========== FUNCIÓN PARA EXTRAER ELEMENTOS ESPECIALES DEL ARTÍCULO ==========
+// ========== FUNCIÓN PARA EXTRAER ELEMENTOS ESPECIALES DEL ARTÍCULO ==========
 function extractSpecialElements(html) {
   if (!html) return [];
   
@@ -664,13 +679,16 @@ function extractSpecialElements(html) {
     const id = $fig.attr('id') || `figure-${index + 1}`;
     $fig.attr('id', id);
     
+    // Añadir un marcador visible para el enlace
+    $fig.prepend(`<span id="${id}-marker" style="display: block; height: 0; width: 0; visibility: hidden; position: relative; top: -100px;"></span>`);
+    
     elements.push({
       type: 'figure',
       id: id,
       title: $caption.text().trim() || `Figura ${index + 1}`,
       level: 0,
       order: index,
-      icon: '📷'
+      icon: 'figure' // Cambiamos a texto para luego usar SVG
     });
   });
   
@@ -678,7 +696,7 @@ function extractSpecialElements(html) {
   $('table.article-table').each((index, el) => {
     const $table = $(el);
     
-    // Intentar encontrar caption (si existe en tu HTML)
+    // Intentar encontrar caption
     const $caption = $table.find('caption').first();
     const captionText = $caption.text().trim();
     
@@ -686,13 +704,16 @@ function extractSpecialElements(html) {
     const id = $table.attr('id') || `table-${index + 1}`;
     $table.attr('id', id);
     
+    // Añadir marcador
+    $table.before(`<span id="${id}-marker" style="display: block; height: 0; width: 0; visibility: hidden; position: relative; top: -100px;"></span>`);
+    
     elements.push({
       type: 'table',
       id: id,
       title: captionText || `Tabla ${index + 1}`,
       level: 0,
-      order: index + 100, // Las tablas después de las figuras
-      icon: '📊'
+      order: index + 100,
+      icon: 'table'
     });
   });
   
@@ -705,13 +726,16 @@ function extractSpecialElements(html) {
     const id = $code.attr('id') || `code-${index + 1}`;
     $code.attr('id', id);
     
+    // Añadir marcador
+    $code.before(`<span id="${id}-marker" style="display: block; height: 0; width: 0; visibility: hidden; position: relative; top: -100px;"></span>`);
+    
     elements.push({
       type: 'code',
       id: id,
-      title: `Bloque de código (${language})`,
+      title: `Código (${language})`,
       level: 0,
       order: index + 200,
-      icon: '💻'
+      icon: 'code'
     });
   });
   
@@ -719,12 +743,13 @@ function extractSpecialElements(html) {
   $('.MathJax_Display, .math-container').each((index, el) => {
     const $math = $(el);
     
-    // Intentar encontrar etiqueta de ecuación (ej: (1), [eq:1])
-    const equationLabel = $math.find('.equation-label, .eq-number').text().trim() || 
-                         `Ecuación ${index + 1}`;
+    const equationLabel = `Ecuación ${index + 1}`;
     
     const id = $math.attr('id') || `equation-${index + 1}`;
     $math.attr('id', id);
+    
+    // Añadir marcador
+    $math.before(`<span id="${id}-marker" style="display: block; height: 0; width: 0; visibility: hidden; position: relative; top: -100px;"></span>`);
     
     elements.push({
       type: 'equation',
@@ -732,11 +757,11 @@ function extractSpecialElements(html) {
       title: equationLabel,
       level: 0,
       order: index + 300,
-      icon: '∫'
+      icon: 'equation'
     });
   });
   
-  // Ordenar elementos por su aparición en el documento
+  // Ordenar elementos por su aparición
   elements.sort((a, b) => a.order - b.order);
   
   return elements;
@@ -2740,9 +2765,10 @@ body {
       border-bottom: 1px solid #005a7d;
     }
 /* Estilos para elementos especiales en el TOC */
+/* Estilos para elementos especiales en el TOC */
 .toc-item.toc-special {
-  margin-left: 0.5rem;
-  border-left: 2px solid var(--border-color);
+  margin: 0;
+  border-left: 2px solid transparent;
 }
 
 .toc-item.toc-special a {
@@ -2751,24 +2777,58 @@ body {
   gap: 0.5rem;
   font-size: 0.8rem;
   padding: 0.3rem 0.5rem 0.3rem 1rem;
+  color: var(--text-light);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border-left: 2px solid transparent;
+  margin-left: -1px;
 }
 
 .toc-icon {
-  font-size: 1rem;
-  min-width: 1.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2rem;
+  height: 1.2rem;
   opacity: 0.7;
   transition: opacity 0.2s;
+  color: currentColor;
+}
+
+.toc-icon svg {
+  width: 100%;
+  height: 100%;
+  stroke: currentColor;
 }
 
 .toc-item.toc-special:hover .toc-icon {
   opacity: 1;
 }
 
-/* Colores específicos por tipo */
-.toc-figure a { border-left-color: #4ec9b0; }
-.toc-table a { border-left-color: #569cd6; }
-.toc-code a { border-left-color: #ce9178; }
-.toc-equation a { border-left-color: #c586c0; }
+/* Colores específicos por tipo al hacer hover/active */
+.toc-figure a:hover,
+.toc-figure a.active {
+  color: #4ec9b0;
+  border-left-color: #4ec9b0;
+}
+
+.toc-table a:hover,
+.toc-table a.active {
+  color: #569cd6;
+  border-left-color: #569cd6;
+}
+
+.toc-code a:hover,
+.toc-code a.active {
+  color: #ce9178;
+  border-left-color: #ce9178;
+}
+
+.toc-equation a:hover,
+.toc-equation a.active {
+  color: #c586c0;
+  border-left-color: #c586c0;
+}
 
 /* Tooltip para indicar que se puede abrir en nueva pestaña */
 .toc-item a[data-type]::after {
@@ -3380,23 +3440,25 @@ body {
 
   <div class="main-wrapper">
     <!-- Left Sidebar - Table of Contents -->
-    <nav class="toc-sidebar">
-      <div class="toc-title">${t.contents}</div>
-      <ul class="toc-list" id="toc-list"></ul>
-      <!-- NUEVO: Elementos especiales -->
-      ${specialElements.map(el => `
-        <li class="toc-item toc-special toc-${el.type}">
-          <a href="#${el.id}" 
-             class="special-link" 
-             data-type="${el.type}"
-             onclick="handleSpecialLinkClick(event, '${el.id}')">
-            <span class="toc-icon">${el.icon}</span>
-            <span class="toc-title-text">${el.title}</span>
-          </a>
-        </li>
-      `).join('')}
-    </ul>
-  </nav>
+<nav class="toc-sidebar">
+  <div class="toc-title">${t.contents}</div>
+  <ul class="toc-list" id="toc-list">
+    <!-- Resumen siempre primero -->
+    <li class="toc-item">
+      <a href="#abstract">${t.abstract}</a>
+    </li>
+    
+    <!-- Elementos especiales -->
+    ${specialElements.map(el => `
+    <li class="toc-item toc-special toc-${el.type}">
+      <a href="#${el.id}" class="special-link" data-type="${el.type}">
+        <span class="toc-icon">${tocIcons[el.icon] || ''}</span>
+        <span class="toc-title-text">${el.title}</span>
+      </a>
+    </li>
+    `).join('')}
+  </ul>
+</nav>
 
     <!-- Main Content -->
     <main class="article-container">
@@ -4176,57 +4238,64 @@ document.addEventListener('keydown', (e) => {
   }
 });
 // ========== FUNCIÓN PARA MANEJAR CLICKS EN ELEMENTOS ESPECIALES ==========
+// ========== FUNCIÓN PARA MANEJAR CLICKS EN ELEMENTOS ESPECIALES ==========
 function handleSpecialLinkClick(event, elementId) {
-  // Si se hace clic con Ctrl/Cmd o botón central, dejar comportamiento por defecto
-  if (event.ctrlKey || event.metaKey || event.button === 1) {
-    return true; // Permitir apertura en nueva pestaña
-  }
-  
-  // Click normal: desplazamiento suave
-  event.preventDefault();
-  const target = document.getElementById(elementId);
-  if (target) {
-    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    
-    // Efecto visual de resaltado
-    target.style.transition = 'box-shadow 0.3s, background 0.3s';
-    target.style.boxShadow = '0 0 0 3px rgba(0, 90, 125, 0.3)';
-    target.style.background = 'rgba(0, 90, 125, 0.05)';
-    
-    setTimeout(() => {
-      target.style.boxShadow = '';
-      target.style.background = '';
-    }, 2000);
-  }
+  // Esta función ya no es necesaria porque los enlaces funcionan naturalmente
+  // Pero la dejamos por compatibilidad
+  return true;
 }
 
-// También añadir al observer del TOC para resaltar elementos especiales
+// Actualizar el observer del TOC
 document.addEventListener('DOMContentLoaded', () => {
+  // Observer para elementos especiales
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
-        // Resaltar en TOC regular
+        // Remover active de todos
         document.querySelectorAll('.toc-item a').forEach(link => {
           link.classList.remove('active');
-          if (link.getAttribute('href') === '#' + entry.target.id) {
-            link.classList.add('active');
-          }
         });
         
-        // Resaltar en TOC especial
-        document.querySelectorAll('.toc-special a').forEach(link => {
-          link.classList.remove('active');
-          if (link.getAttribute('href') === '#' + entry.target.id) {
-            link.classList.add('active');
-          }
-        });
+        // Buscar el enlace que apunta a este elemento
+        const targetLink = document.querySelector('.toc-item a[href="#' + entry.target.id + '"]');
+        if (targetLink) {
+          targetLink.classList.add('active');
+        }
       }
     });
   }, { threshold: 0.3, rootMargin: '-80px 0px -80px 0px' });
 
-  // Observar todos los elementos especiales además de los h2
-  document.querySelectorAll('.article-container h2, #abstract, .image-figure, .table-wrapper, .code-block-wrapper, .MathJax_Display, .math-container').forEach(el => {
-    if (el.id) observer.observe(el);
+  // Observar todos los elementos especiales
+  setTimeout(() => {
+    document.querySelectorAll('.image-figure, .table-wrapper, .code-block-wrapper, .MathJax_Display, .math-container, #abstract').forEach(el => {
+      if (el.id) observer.observe(el);
+    });
+  }, 500); // Pequeño retraso para asegurar que el DOM esté listo
+
+  // Smooth scroll para todos los enlaces internos
+  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function(e) {
+      const href = this.getAttribute('href');
+      if (href === '#') return;
+      
+      const target = document.querySelector(href);
+      if (target) {
+        e.preventDefault();
+        
+        // Calcular posición considerando el header fijo
+        const headerOffset = 100;
+        const elementPosition = target.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+        
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
+        });
+        
+        // Actualizar URL sin recargar
+        history.pushState(null, null, href);
+      }
+    });
   });
 });
 // ========== MATHJAX ==========
