@@ -552,6 +552,7 @@ function processCodeBlocks(html) {
   if (!html) return html;
   
   const $ = cheerio.load(html, { decodeEntities: false });
+  let codeIndex = 0;
   
   // Procesar bloques de código
   $('pre code, pre').each((i, el) => {
@@ -575,18 +576,18 @@ function processCodeBlocks(html) {
       lineNumbersHtml += `<span class="code-line-number">${i}</span>`;
     }
     
-    // Escapar código y envolver cada línea para hover
+    // Escapar código y envolver cada línea
     const escapedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const wrappedLines = lines.map(line => 
       `<span class="line">${line || ' '}</span>`
     ).join('\n');
     
-    const codeId = `code-${Math.random().toString(36).substr(2, 9)}`;
+    // Generar ID consistente
+    codeIndex++;
+    const codeId = `code-${codeIndex}`;
     
-    // NUEVO HTML con numeración de líneas y estructura VS Code
-    // NUEVO HTML con numeración de líneas y estructura VS Code - MEJORADO PARA MÓVIL
-const codeHtml = `
-  <div class="code-block-wrapper">
+    const codeHtml = `
+  <div class="code-block-wrapper" id="${codeId}">
     <div class="code-header">
       <span class="code-language">${language || 'código'}</span>
       <button class="code-copy-btn" onclick="copyCode('${codeId}', this)" title="Copiar código (Ctrl+C)">
@@ -601,7 +602,7 @@ const codeHtml = `
       <div class="code-line-numbers" aria-hidden="true">
         ${lineNumbersHtml}
       </div>
-      <pre id="${codeId}" class="code-block ${language ? `language-${language}` : ''}"><code class="${language ? `language-${language}` : ''}">${wrappedLines}</code></pre>
+      <pre class="code-block ${language ? `language-${language}` : ''}"><code class="${language ? `language-${language}` : ''}">${wrappedLines}</code></pre>
     </div>
   </div>
 `;
@@ -609,14 +610,19 @@ const codeHtml = `
     $el.parent().replaceWith(codeHtml);
   });
   
-  // Procesar tablas
+  // Procesar tablas - AÑADIR IDs
+  let tableIndex = 0;
   $('table').each((i, el) => {
     const $el = $(el);
+    tableIndex++;
+    const tableId = `table-${tableIndex}`;
+    $el.attr('id', tableId);
     $el.addClass('article-table');
     $el.wrap('<div class="table-wrapper"></div>');
   });
   
-  // Procesar imágenes
+  // Procesar imágenes - AÑADIR IDs a los figures
+  let figureIndex = 0;
   $('img').each((i, el) => {
     const $el = $(el);
     const alt = $el.attr('alt') || '';
@@ -637,109 +643,27 @@ const codeHtml = `
       floatClass = ' float-right';
     }
     
+    figureIndex++;
+    const figureId = `figure-${figureIndex}`;
+    
     if (alt) {
-      $el.wrap(`<figure class="image-figure${floatClass}"></figure>`);
+      $el.wrap(`<figure class="image-figure${floatClass}" id="${figureId}"></figure>`);
       $el.after(`<figcaption class="image-caption">${alt}</figcaption>`);
     } else {
-      $el.wrap(`<figure class="image-figure${floatClass}"></figure>`);
+      $el.wrap(`<figure class="image-figure${floatClass}" id="${figureId}"></figure>`);
     }
   });
   
+  // Procesar ecuaciones - AÑADIR IDs
+  let equationIndex = 0;
+  $('.MathJax_Display, .math-container').each((i, el) => {
+    const $el = $(el);
+    equationIndex++;
+    const equationId = `equation-${equationIndex}`;
+    $el.attr('id', equationId);
+  });
+  
   return $.html();
-}
-// ========== FUNCIÓN PARA EXTRAER ELEMENTOS ESPECIALES DEL ARTÍCULO ==========
-function extractSpecialElements(html) {
-  if (!html) return [];
-  
-  const $ = cheerio.load(html, { decodeEntities: false });
-  const elements = [];
-  
-  // 1. Detectar Figuras (imágenes con caption)
-  $('figure.image-figure').each((index, el) => {
-    const $fig = $(el);
-    const $img = $fig.find('img');
-    const $caption = $fig.find('figcaption');
-    
-    // Generar un ID único si no existe
-    const id = $fig.attr('id') || `figure-${index + 1}`;
-    $fig.attr('id', id);
-    
-    elements.push({
-      type: 'figure',
-      id: id,
-      title: $caption.text().trim() || `Figura ${index + 1}`,
-      level: 0,
-      order: index,
-      icon: '📷'
-    });
-  });
-  
-  // 2. Detectar Tablas
-  $('table.article-table').each((index, el) => {
-    const $table = $(el);
-    
-    // Intentar encontrar caption (si existe en tu HTML)
-    const $caption = $table.find('caption').first();
-    const captionText = $caption.text().trim();
-    
-    // Generar ID
-    const id = $table.attr('id') || `table-${index + 1}`;
-    $table.attr('id', id);
-    
-    elements.push({
-      type: 'table',
-      id: id,
-      title: captionText || `Tabla ${index + 1}`,
-      level: 0,
-      order: index + 100, // Las tablas después de las figuras
-      icon: '📊'
-    });
-  });
-  
-  // 3. Detectar Bloques de Código
-  $('.code-block-wrapper').each((index, el) => {
-    const $code = $(el);
-    const $header = $code.find('.code-language');
-    const language = $header.text().trim() || 'código';
-    
-    const id = $code.attr('id') || `code-${index + 1}`;
-    $code.attr('id', id);
-    
-    elements.push({
-      type: 'code',
-      id: id,
-      title: `Bloque de código (${language})`,
-      level: 0,
-      order: index + 200,
-      icon: '💻'
-    });
-  });
-  
-  // 4. Detectar Ecuaciones (MathJax)
-  $('.MathJax_Display, .math-container').each((index, el) => {
-    const $math = $(el);
-    
-    // Intentar encontrar etiqueta de ecuación (ej: (1), [eq:1])
-    const equationLabel = $math.find('.equation-label, .eq-number').text().trim() || 
-                         `Ecuación ${index + 1}`;
-    
-    const id = $math.attr('id') || `equation-${index + 1}`;
-    $math.attr('id', id);
-    
-    elements.push({
-      type: 'equation',
-      id: id,
-      title: equationLabel,
-      level: 0,
-      order: index + 300,
-      icon: '∫'
-    });
-  });
-  
-  // Ordenar elementos por su aparición en el documento
-  elements.sort((a, b) => a.order - b.order);
-  
-  return elements;
 }
 // ========== FUNCIÓN PRINCIPAL ==========
 async function generateAll() {
@@ -3198,6 +3122,7 @@ body {
   }
     }
   </style>
+ 
 </head>
 <body>
   <header class="sd-header">
@@ -3915,67 +3840,123 @@ function switchTab(device, tabName) {
 }
 
 // ========== GENERATE DESKTOP TABLE OF CONTENTS ==========
-document.addEventListener('DOMContentLoaded', () => {
-  const tocList = document.getElementById('toc-list');
-  if (tocList) {
-    const headings = document.querySelectorAll('.article-container h2');
+document.addEventListener('DOMContentLoaded', function() {
+  var tocList = document.getElementById('toc-list');
+  if (!tocList) return;
+
+  // --- PRIMERO: AÑADIR ENCABEZADOS H2 ---
+  var headings = document.querySelectorAll('.article-container h2');
+  
+  for (var j = 0; j < headings.length; j++) {
+    var heading = headings[j];
+    if (heading.id === 'citations' || heading.closest('.citation-box')) continue;
     
-    headings.forEach((heading, index) => {
-      if (heading.id === 'citations' || heading.closest('.citation-box')) return;
-      
-      const id = heading.id || 'section-' + index;
-      heading.id = id;
-      
-      const li = document.createElement('li');
-      li.className = 'toc-item';
-      const link = document.createElement('a');
-      link.href = '#' + id;
-      link.textContent = heading.textContent;
-      link.addEventListener('click', (e) => {
+    var id = heading.id || 'section-' + j;
+    heading.id = id;
+    
+    var li = document.createElement('li');
+    li.className = 'toc-item';
+    var link = document.createElement('a');
+    link.href = '#' + id;
+    link.textContent = heading.textContent;
+    
+    link.addEventListener('click', (function(sectionId) {
+      return function(e) {
         e.preventDefault();
-        document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
-      });
+        document.getElementById(sectionId).scrollIntoView({ behavior: 'smooth' });
+      };
+    })(id));
+    
+    li.appendChild(link);
+    tocList.appendChild(li);
+  }
+
+  // --- DESPUÉS: AÑADIR ELEMENTOS ESPECIALES (FIGURAS, TABLAS, ETC.) ---
+  var specialElements = window.__SPECIAL_ELEMENTS__ || [];
+  
+  // Definir iconos para cada tipo
+  var iconMap = {
+    figure: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15L16 10 5 21"/></svg>',
+    table: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5zm0 5h18M10 3v18"/></svg>',
+    code: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m18 16 4-4-4-4M6 8l-4 4 4 4M14.5 4l-5 16"/></svg>',
+    equation: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 7h3a2 2 0 0 1 2 2v6a2 2 0 0 0 2 2h3"/><path d="M7 11h4"/><path d="M17 7h.01"/><circle cx="18.5" cy="15.5" r="2.5"/></svg>'
+  };
+
+  if (specialElements.length > 0) {
+    // Crear un separador visual
+    var separator = document.createElement('li');
+    separator.className = 'toc-separator';
+    separator.innerHTML = '<span style="display:block; font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); margin:1rem 0 0.5rem 0; padding-left:1rem;">FIGURAS Y TABLAS</span>';
+    tocList.appendChild(separator);
+
+    for (var i = 0; i < specialElements.length; i++) {
+      var element = specialElements[i];
+      var li = document.createElement('li');
+      li.className = 'toc-item toc-special';
+      var link = document.createElement('a');
+      link.href = '#' + element.id;
+      
+      // Usar el icono correspondiente
+      var icon = iconMap[element.type] || '•';
+      link.innerHTML = icon + ' <span style="margin-left: 6px;">' + element.title + '</span>';
+      
+      link.addEventListener('click', (function(id) {
+        return function(e) {
+          e.preventDefault();
+          document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+        };
+      })(element.id));
+      
       li.appendChild(link);
       tocList.appendChild(li);
-    });
+    }
   }
 
   // Smooth scroll for all internal links
-  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-    anchor.addEventListener('click', function (e) {
-      const href = this.getAttribute('href');
+  var anchors = document.querySelectorAll('a[href^="#"]');
+  for (var k = 0; k < anchors.length; k++) {
+    var anchor = anchors[k];
+    anchor.addEventListener('click', function(e) {
+      var href = this.getAttribute('href');
       if (href === '#') return;
       
-      const target = document.querySelector(href);
+      var target = document.querySelector(href);
       if (target) {
         e.preventDefault();
         target.scrollIntoView({ behavior: 'smooth' });
       }
     });
-  });
+  }
 
-  // Active section highlighting for desktop TOC
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
+  // Active section highlighting
+  var observer = new IntersectionObserver(function(entries) {
+    for (var l = 0; l < entries.length; l++) {
+      var entry = entries[l];
       if (entry.isIntersecting) {
-        document.querySelectorAll('.toc-item a').forEach(link => {
+        var links = document.querySelectorAll('.toc-item a');
+        for (var m = 0; m < links.length; m++) {
+          var link = links[m];
           link.classList.remove('active');
           if (link.getAttribute('href') === '#' + entry.target.id) {
             link.classList.add('active');
           }
-        });
+        }
       }
-    });
+    }
   }, { threshold: 0.3, rootMargin: '-80px 0px -80px 0px' });
 
-  document.querySelectorAll('.article-container h2, #abstract').forEach(h => {
-    if (h.id) observer.observe(h);
-  });
+  // Observar todos los elementos relevantes
+  var elementsToObserve = document.querySelectorAll('.article-container h2, #abstract, [id^="figure-"], [id^="table-"], [id^="code-"], [id^="equation-"]');
+  for (var n = 0; n < elementsToObserve.length; n++) {
+    var el = elementsToObserve[n];
+    if (el.id) observer.observe(el);
+  }
   
   // Generar TOC móvil inicial
-  generateMobileTOC();
+  if (typeof generateMobileTOC === 'function') {
+    generateMobileTOC();
+  }
 });
-
 // ========== ACTIVE SECTION HIGHLIGHTING FOR MOBILE TOC ==========
 // Crear un observer separado para el TOC móvil
 document.addEventListener('DOMContentLoaded', () => {
@@ -4086,6 +4067,63 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 });
+</script>
+<script>
+// ========== DETECCIÓN DE ELEMENTOS ESPECIALES (AHORA DESPUÉS DE QUE EL DOM EXISTE) ==========
+window.__SPECIAL_ELEMENTS__ = (function() {
+  var elements = [];
+  
+  // Detectar figuras
+  var figures = document.querySelectorAll('figure.image-figure[id^="figure-"]');
+  for (var i = 0; i < figures.length; i++) {
+    var fig = figures[i];
+    var caption = fig.querySelector('.image-caption');
+    elements.push({
+      type: 'figure',
+      id: fig.id,
+      title: caption ? caption.textContent.trim() : 'Figura ' + (i + 1)
+    });
+  }
+  
+  // Detectar tablas
+  var tables = document.querySelectorAll('table.article-table[id^="table-"]');
+  for (var i = 0; i < tables.length; i++) {
+    var table = tables[i];
+    // Intentar encontrar caption si existe
+    var caption = table.querySelector('caption');
+    elements.push({
+      type: 'table',
+      id: table.id,
+      title: caption ? caption.textContent.trim() : 'Tabla ' + (i + 1)
+    });
+  }
+  
+  // Detectar código
+  var codeBlocks = document.querySelectorAll('.code-block-wrapper[id^="code-"]');
+  for (var i = 0; i < codeBlocks.length; i++) {
+    var code = codeBlocks[i];
+    var language = code.querySelector('.code-language');
+    elements.push({
+      type: 'code',
+      id: code.id,
+      title: language ? 'Código (' + language.textContent.trim() + ')' : 'Código ' + (i + 1)
+    });
+  }
+  
+  // Detectar ecuaciones
+  var equations = document.querySelectorAll('[id^="equation-"]');
+  for (var i = 0; i < equations.length; i++) {
+    var eq = equations[i];
+    elements.push({
+      type: 'equation',
+      id: eq.id,
+      title: 'Ecuación ' + (i + 1)
+    });
+  }
+  
+  console.log('Elementos especiales detectados:', elements); // Para debug
+  return elements;
+})();
 </script>
 </body>
 </html>`;
