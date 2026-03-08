@@ -610,11 +610,15 @@ function processTablesWithDownload(html) {
 }
 
 // ========== FUNCIÓN PARA GENERAR CSV DESDE UNA TABLA ==========
+// ========== FUNCIÓN PARA GENERAR CSV DESDE UNA TABLA ==========
 function generateCSVFromTable($table) {
   let csv = [];
   
-  // Procesar filas
-  $table.find('tr').each((i, row) => {
+  // Necesitas crear una instancia de Cheerio para usar $
+  const $ = cheerio.load($table.html(), { decodeEntities: false });
+  
+  // Procesar filas - ahora $ está definido
+  $('tr').each((i, row) => {
     let rowData = [];
     
     // Procesar celdas (th o td)
