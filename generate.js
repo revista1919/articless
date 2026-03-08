@@ -870,14 +870,14 @@ function processTablesWithDownload($, html) {
   return $.html();
 }
 
-// ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML (CORREGIDA) ==========
+// ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML (CORREGIDA - PRESERVA LISTAS) ==========
 function processCodeBlocks(html) {
   if (!html) return html;
   
   const $ = cheerio.load(html, { decodeEntities: false });
   let codeIndex = 0;
   
-  // Procesar bloques de código
+  // Procesar bloques de código (esto no afecta listas)
   $('pre code, pre').each((i, el) => {
     const $el = $(el);
     const code = $el.text();
@@ -933,9 +933,10 @@ function processCodeBlocks(html) {
     $el.parent().replaceWith(codeHtml);
   });
   
-  // PROCESAR TABLAS CON BOTONES DE DESCARGA (AHORA CON MODELO INTERMEDIO)
+  // IMPORTANTE: Guardar el HTML después de procesar código
   let processedHtml = $.html();
-  // Resetear contador de tablas antes de procesar
+  
+  // PROCESAR TABLAS CON BOTONES DE DESCARGA
   resetTableCounter();
   
   // Volver a cargar el HTML para procesar tablas
@@ -994,7 +995,6 @@ function processCodeBlocks(html) {
   
   return $3.html();
 }
-
 // ========== FUNCIÓN PRINCIPAL ==========
 async function generateAll() {
   console.log('🚀 Iniciando generación de artículos estáticos...');
