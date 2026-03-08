@@ -4874,63 +4874,186 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 <script>
 
-// ========== DETECCIÓN DE ELEMENTOS ESPECIALES (AHORA DESPUÉS DE QUE EL DOM EXISTE) ==========
-window.__SPECIAL_ELEMENTS__ = (function() {
-  var elements = [];
-  
-  // Detectar figuras
-  var figures = document.querySelectorAll('figure.image-figure[id^="figure-"]');
-  for (var i = 0; i < figures.length; i++) {
-    var fig = figures[i];
-    var caption = fig.querySelector('.image-caption');
-    elements.push({
-      type: 'figure',
-      id: fig.id,
-      title: caption ? caption.textContent.trim() : 'Figura ' + (i + 1)
+
+// ========== DETECCIÓN DE ELEMENTOS ESPECIALES - VERSIÓN CORREGIDA ==========
+(function() {
+  // Función para actualizar elementos especiales
+  function updateSpecialElements() {
+    var elements = [];
+    
+    // Detectar figuras
+    var figures = document.querySelectorAll('figure.image-figure[id^="figure-"]');
+    for (var i = 0; i < figures.length; i++) {
+      var fig = figures[i];
+      var caption = fig.querySelector('.image-caption');
+      elements.push({
+        type: 'figure',
+        id: fig.id,
+        title: caption ? caption.textContent.trim() : 'Figura ' + (i + 1)
+      });
+    }
+    
+    // Detectar tablas
+    var tables = document.querySelectorAll('table.article-table[id^="table-"]');
+    for (var i = 0; i < tables.length; i++) {
+      var table = tables[i];
+      elements.push({
+        type: 'table',
+        id: table.id,
+        title: 'Tabla ' + (i + 1)
+      });
+    }
+    
+    // Detectar código
+    var codeBlocks = document.querySelectorAll('.code-block-wrapper[id^="code-"]');
+    for (var i = 0; i < codeBlocks.length; i++) {
+      var code = codeBlocks[i];
+      var language = code.querySelector('.code-language');
+      elements.push({
+        type: 'code',
+        id: code.id,
+        title: language ? 'Código (' + language.textContent.trim() + ')' : 'Código ' + (i + 1)
+      });
+    }
+    
+    // Detectar ecuaciones
+    var equations = document.querySelectorAll('[id^="equation-"]');
+    for (var i = 0; i < equations.length; i++) {
+      var eq = equations[i];
+      elements.push({
+        type: 'equation',
+        id: eq.id,
+        title: 'Ecuación ' + (i + 1)
+      });
+    }
+    
+    window.__SPECIAL_ELEMENTS__ = elements;
+    console.log('Elementos especiales detectados:', elements.length);
+    
+    // Forzar actualización del TOC si ya existe
+    if (typeof refreshTOC === 'function') {
+      refreshTOC();
+    }
+  }
+
+  // Función para refrescar el TOC
+  function refreshTOC() {
+    var tocList = document.getElementById('toc-list');
+    if (!tocList) return;
+
+    // Limpiar TOC existente
+    tocList.innerHTML = '';
+
+    // Añadir encabezados H2
+    var headings = document.querySelectorAll('.article-container h2');
+    for (var j = 0; j < headings.length; j++) {
+      var heading = headings[j];
+      if (heading.id === 'citations' || heading.closest('.citation-box')) continue;
+      
+      var id = heading.id || 'section-' + j;
+      heading.id = id;
+      
+      var li = document.createElement('li');
+      li.className = 'toc-item';
+      var link = document.createElement('a');
+      link.href = '#' + id;
+      link.textContent = heading.textContent;
+      
+      link.addEventListener('click', (function(sectionId) {
+        return function(e) {
+          e.preventDefault();
+          document.getElementById(sectionId).scrollIntoView({ behavior: 'smooth' });
+        };
+      })(id));
+      
+      li.appendChild(link);
+      tocList.appendChild(li);
+    }
+
+    // Añadir elementos especiales
+    var specialElements = window.__SPECIAL_ELEMENTS__ || [];
+    
+    var iconMap = {
+      figure: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15L16 10 5 21"/></svg>',
+      table: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5zm0 5h18M10 3v18"/></svg>',
+      code: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m18 16 4-4-4-4M6 8l-4 4 4 4M14.5 4l-5 16"/></svg>',
+      equation: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 7h3a2 2 0 0 1 2 2v6a2 2 0 0 0 2 2h3"/><path d="M7 11h4"/><path d="M17 7h.01"/><circle cx="18.5" cy="15.5" r="2.5"/></svg>'
+    };
+
+    if (specialElements.length > 0) {
+      var separator = document.createElement('li');
+      separator.className = 'toc-separator';
+      separator.innerHTML = '<span style="display:block; font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); margin:1rem 0 0.5rem 0; padding-left:1rem;">FIGURAS Y TABLAS</span>';
+      tocList.appendChild(separator);
+
+      for (var i = 0; i < specialElements.length; i++) {
+        var element = specialElements[i];
+        var li = document.createElement('li');
+        li.className = 'toc-item toc-special';
+        var link = document.createElement('a');
+        link.href = '#' + element.id;
+        
+        var icon = iconMap[element.type] || '•';
+        link.innerHTML = icon + ' <span style="margin-left: 6px;">' + element.title + '</span>';
+        
+        link.addEventListener('click', (function(id) {
+          return function(e) {
+            e.preventDefault();
+            document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+          };
+        })(element.id));
+        
+        li.appendChild(link);
+        tocList.appendChild(li);
+      }
+    }
+
+    // Reactivar observer
+    setupIntersectionObserver();
+  }
+
+  // Configurar observer para highlighting
+  function setupIntersectionObserver() {
+    var observer = new IntersectionObserver(function(entries) {
+      for (var l = 0; l < entries.length; l++) {
+        var entry = entries[l];
+        if (entry.isIntersecting) {
+          var links = document.querySelectorAll('.toc-item a');
+          for (var m = 0; m < links.length; m++) {
+            var link = links[m];
+            link.classList.remove('active');
+            if (link.getAttribute('href') === '#' + entry.target.id) {
+              link.classList.add('active');
+            }
+          }
+        }
+      }
+    }, { threshold: 0.3, rootMargin: '-80px 0px -80px 0px' });
+
+    var elementsToObserve = document.querySelectorAll('.article-container h2, #abstract, [id^="figure-"], [id^="table-"], [id^="code-"], [id^="equation-"]');
+    for (var n = 0; n < elementsToObserve.length; n++) {
+      var el = elementsToObserve[n];
+      if (el.id) observer.observe(el);
+    }
+  }
+
+  // Ejecutar cuando el DOM esté listo
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(updateSpecialElements, 100); // Pequeño delay para asegurar que todo está renderizado
+    });
+  } else {
+    setTimeout(updateSpecialElements, 100);
+  }
+
+  // También ejecutar después de que MathJax termine (por si hay ecuaciones)
+  if (window.MathJax) {
+    MathJax.startup.promise.then(function() {
+      setTimeout(updateSpecialElements, 200);
     });
   }
-  
-  // Detectar tablas
-  var tables = document.querySelectorAll('table.article-table[id^="table-"]');
-  for (var i = 0; i < tables.length; i++) {
-    var table = tables[i];
-    // Intentar encontrar caption si existe
-    var caption = table.querySelector('caption');
-    elements.push({
-      type: 'table',
-      id: table.id,
-      title: caption ? caption.textContent.trim() : 'Tabla ' + (i + 1)
-    });
-  }
-  
-  // Detectar código
-  var codeBlocks = document.querySelectorAll('.code-block-wrapper[id^="code-"]');
-  for (var i = 0; i < codeBlocks.length; i++) {
-    var code = codeBlocks[i];
-    var language = code.querySelector('.code-language');
-    elements.push({
-      type: 'code',
-      id: code.id,
-      title: language ? 'Código (' + language.textContent.trim() + ')' : 'Código ' + (i + 1)
-    });
-  }
-  
-  // Detectar ecuaciones
-  var equations = document.querySelectorAll('[id^="equation-"]');
-  for (var i = 0; i < equations.length; i++) {
-    var eq = equations[i];
-    elements.push({
-      type: 'equation',
-      id: eq.id,
-      title: 'Ecuación ' + (i + 1)
-    });
-  }
-  
-  console.log('Elementos especiales detectados:', elements); // Para debug
-  return elements;
 })();
 </script>
-</body>
 </html>`;
 }
 
