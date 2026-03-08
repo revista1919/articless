@@ -549,216 +549,275 @@ function processAuthorsWithIcons(authors, article = null, lang = 'es') {
 
 
 
-// ========== FUNCIONES PARA GENERAR DIFERENTES FORMATOS DE TABLA ==========
-function generateCSVFromTable($, $table) {
-  let csv = [];
-  
-  // Procesar filas
-  $table.find('tr').each((i, row) => {
-    let rowData = [];
-    
-    // Procesar celdas (th o td)
-    $(row).find('th, td').each((j, cell) => {
-      // Obtener texto de la celda y limpiarlo
-      let cellText = $(cell).text().trim();
-      
-      // Eliminar espacios extras y normalizar saltos de línea
-      cellText = cellText.replace(/\s+/g, ' ').replace(/\n/g, ' ');
-      
-      // Escapar comillas para CSV
-      cellText = cellText.replace(/"/g, '""');
-      
-      // Envolver en comillas dobles siempre
-      cellText = `"${cellText}"`;
-      
-      rowData.push(cellText);
-    });
-    
-    csv.push(rowData.join(','));
-  });
-  
-  return csv.join('\n');
-}
+// ==================================================
+// MODELO DE DATOS (AST) - Fuente de verdad única
+// ==================================================
 
-function generateJSONFromTable($, $table) {
-
-  const result = {
-    headers: [],
-    rows: [],
-    data: []
+/**
+ * Parsea una tabla de jQuery/Cheerio a un modelo de datos (AST) enriquecido.
+ * @param {Object} $ - Instancia de Cheerio o jQuery.
+ * @param {Object} $table - Elemento de la tabla seleccionado con Cheerio/jQuery.
+ * @returns {Object} Modelo de la tabla (AST).
+ */
+function parseTableToAST($, $table) {
+  // --- Metadatos de la tabla ---
+  const table = {
+    id: $table.attr('id') || null,
+    caption: $table.find('caption').text().trim() || null,
+    class: $table.attr('class') || null,
+    style: $table.attr('style') || null,
+    columns: 0,
+    headers: [],   // Array para la fila de encabezados (si existe)
+    rows: []       // Array para las filas de datos
   };
 
   const rows = $table.find('tr');
+  let headerProcessed = false;
 
   rows.each((i, row) => {
-
     const rowData = [];
+    const $cells = $(row).find('th, td');
+    const isHeaderRow = !headerProcessed && $(row).find('th').length > 0;
 
-    $(row).find('th, td').each((j, cell) => {
+    // Procesar cada celda de la fila
+    $cells.each((j, cell) => {
+      const $cell = $(cell);
+      const cellText = $cell.text().trim().replace(/\s+/g, ' ');
 
-      const cellText = $(cell)
-        .text()
-        .trim()
-        .replace(/\s+/g, ' ')
-        .replace(/\n/g, ' ');
-
-      rowData.push(cellText);
-
+      rowData.push({
+        text: cellText,
+        colspan: parseInt($cell.attr('colspan') || '1', 10),
+        rowspan: parseInt($cell.attr('rowspan') || '1', 10),
+        class: $cell.attr('class') || null,
+        style: $cell.attr('style') || null,
+        type: cell.tagName.toLowerCase(), // 'th' o 'td'
+        alignment: $cell.attr('align') || null // Un extra útil
+      });
     });
 
-    if (i === 0) {
-      result.headers = rowData;
+    // Asignar la fila procesada a headers o rows
+    if (isHeaderRow) {
+      table.headers = rowData;
+      headerProcessed = true;
     } else {
-      result.rows.push(rowData);
+      table.rows.push(rowData);
     }
-
   });
 
-  if (result.headers.length > 0) {
+  // Calcular el número máximo de columnas para tablas irregulares (con colspan)
+  table.columns = Math.max(
+    table.headers.reduce((sum, cell) => sum + cell.colspan, 0),
+    ...table.rows.map(r => r.reduce((sum, cell) => sum + cell.colspan, 0))
+  );
 
-    result.data = result.rows.map(row => {
-
-      const obj = {};
-
-      result.headers.forEach((header, index) => {
-
-        const key = header
-          .toLowerCase()
-          .replace(/\s+/g, '_')
-          .replace(/[^\w]/g, '');
-
-        obj[key] = row[index] || '';
-
-      });
-
-      return obj;
-
-    });
-
-  }
-
-  return JSON.stringify(result, null, 2);
-
+  return table;
 }
 
-function generateLaTeXFromTable($, $table) {
+// ==================================================
+// UTILIDADES DE POST-PROCESADO
+// ==================================================
 
-  let latex = [];
+/**
+ * Contador global para la numeración automática de tablas.
+ * En un sistema real, esto podría ser parte de un contexto de documento más grande.
+ */
+let tableCounter = 1;
 
-  const firstRow = $table.find('tr').first();
-  const colCount = firstRow.find('th, td').length;
+/**
+ * Añade un número de tabla al modelo.
+ * Reinicia el contador si es necesario.
+ * @param {Object} table - Modelo de tabla (AST).
+ * @returns {Object} El mismo modelo, con la propiedad 'number' añadida.
+ */
+function numberTable(table) {
+  table.number = tableCounter++;
+  return table;
+}
 
-  const alignment = 'l'.repeat(colCount);
+/**
+ * Reinicia el contador de tablas. Útil para empezar un nuevo documento.
+ */
+function resetTableCounter() {
+  tableCounter = 1;
+}
 
-  latex.push('\\begin{table}[h]');
-  latex.push('\\centering');
-  latex.push('\\caption{Tabla generada desde el artículo}');
-  latex.push('\\label{tab:generada}');
-  latex.push('\\begin{tabular}{|' + alignment.split('').join('|') + '|}');
-  latex.push('\\hline');
+// ==================================================
+// EXPORTADORES (usan el modelo, NO el HTML original)
+// ==================================================
 
-  $table.find('tr').each((i, row) => {
+/**
+ * Genera CSV desde el modelo de tabla.
+ * @param {Object} table - Modelo de tabla (AST).
+ * @returns {string} String en formato CSV.
+ */
+function generateCSVFromAST(table) {
+  const csvRows = [];
 
-    const rowData = [];
+  // Función para escapar y formatear una celda para CSV
+  const formatCellForCSV = (cell) => {
+    let text = cell.text || '';
+    text = text.replace(/"/g, '""'); // Escapar comillas dobles
+    return `"${text}"`; // Siempre entrecomillar
+  };
 
-    $(row).find('th, td').each((j, cell) => {
+  // Añadir headers si existen
+  if (table.headers.length > 0) {
+    csvRows.push(table.headers.map(formatCellForCSV).join(','));
+  }
 
-      let cellText = $(cell)
-        .text()
-        .trim()
-        .replace(/\s+/g, ' ')
-        .replace(/\n/g, ' ');
-
-      cellText = cellText
-        .replace(/\\/g, '\\textbackslash ')
-        .replace(/_/g, '\\_')
-        .replace(/&/g, '\\&')
-        .replace(/%/g, '\\%')
-        .replace(/\$/g, '\\$')
-        .replace(/#/g, '\\#')
-        .replace(/{/g, '\\{')
-        .replace(/}/g, '\\}')
-        .replace(/~/g, '\\textasciitilde ')
-        .replace(/\^/g, '\\textasciicircum ');
-
-      rowData.push(cellText);
-
-    });
-
-    latex.push(rowData.join(' & ') + ' \\\\');
-    latex.push('\\hline');
-
+  // Añadir filas de datos
+  table.rows.forEach(row => {
+    csvRows.push(row.map(formatCellForCSV).join(','));
   });
 
+  return csvRows.join('\n');
+}
+
+/**
+ * Genera JSON desde el modelo de tabla.
+ * @param {Object} table - Modelo de tabla (AST).
+ * @param {boolean} pretty - Si debe formatear el JSON con indentación.
+ * @returns {string} String en formato JSON.
+ */
+function generateJSONFromAST(table, pretty = true) {
+  // Podemos devolver el modelo directamente, o una versión simplificada si se prefiere.
+  // En este caso, devolvemos el modelo enriquecido.
+  if (pretty) {
+    return JSON.stringify(table, null, 2);
+  } else {
+    return JSON.stringify(table);
+  }
+}
+
+/**
+ * Genera LaTeX desde el modelo de tabla.
+ * @param {Object} table - Modelo de tabla (AST).
+ * @returns {string} Código LaTeX de la tabla.
+ */
+function generateLaTeXFromAST(table) {
+  if (!table || (!table.headers.length && !table.rows.length)) {
+    return '% LaTeX: Tabla vacía o inválida';
+  }
+
+  const latex = [];
+  const alignment = 'l'.repeat(table.columns); // Mejorable: extraer alineación de celdas
+
+  // --- Inicio de la tabla ---
+  latex.push('\\begin{table}[h]');
+  latex.push('\\centering');
+
+  // --- Caption y Label (usando la numeración) ---
+  if (table.caption) {
+    // Escapar caracteres especiales en el caption
+    const escapedCaption = escapeLatexText(table.caption);
+    latex.push(`\\caption{${escapedCaption}}`);
+  } else if (table.number) {
+    // Si no hay caption pero sí número, poner un caption genérico
+    latex.push(`\\caption{Tabla generada ${table.number}}`);
+  }
+  
+  if (table.number) {
+    latex.push(`\\label{tab:${table.number}}`);
+  }
+
+  // --- Estructura de la tabla (tabular) ---
+  latex.push(`\\begin{tabular}{|${alignment.split('').join('|')}|}`);
+  latex.push('\\hline');
+
+  // --- Fila de encabezados ---
+  if (table.headers.length > 0) {
+    const headerRow = table.headers.map(cell => escapeLatexText(cell.text)).join(' & ');
+    latex.push(headerRow + ' \\\\');
+    latex.push('\\hline');
+  }
+
+  // --- Filas de datos ---
+  table.rows.forEach(row => {
+    const dataRow = row.map(cell => escapeLatexText(cell.text)).join(' & ');
+    latex.push(dataRow + ' \\\\');
+    latex.push('\\hline');
+  });
+
+  // --- Cierre de la tabla ---
   latex.push('\\end{tabular}');
   latex.push('\\end{table}');
 
   return latex.join('\n');
+
+  // Función auxiliar para escapar caracteres especiales de LaTeX
+  function escapeLatexText(text) {
+    if (!text) return '';
+    return text
+      .replace(/\\/g, '\\textbackslash ')
+      .replace(/_/g, '\\_')
+      .replace(/&/g, '\\&')
+      .replace(/%/g, '\\%')
+      .replace(/\$/g, '\\$')
+      .replace(/#/g, '\\#')
+      .replace(/{/g, '\\{')
+      .replace(/}/g, '\\}')
+      .replace(/~/g, '\\textasciitilde ')
+      .replace(/\^/g, '\\textasciicircum ');
+  }
 }
 
-function generateXMLFromTable($, $table) {
+/**
+ * Genera XML (similar a XHTML) desde el modelo de tabla.
+ * @param {Object} table - Modelo de tabla (AST).
+ * @returns {string} String en formato XML.
+ */
+function generateXMLFromAST(table) {
   const xml = [];
-  const tableIndex = $table.attr('id')?.replace('table-', '') || '1';
 
   xml.push('<?xml version="1.0" encoding="UTF-8"?>');
-  xml.push(`<table id="${tableIndex}" xmlns="http://www.w3.org/1999/xhtml">`);
+  // Usar un namespace como en XHTML, y añadir el id si existe
+  const tableIdAttr = table.id ? ` id="${table.id}"` : '';
+  xml.push(`<table${tableIdAttr} xmlns="http://www.w3.org/1999/xhtml">`);
 
-  const rows = $table.find('tr');
+  // --- Caption ---
+  if (table.caption) {
+    xml.push(`  <caption>${escapeXML(table.caption)}</caption>`);
+  }
 
-  let headerDone = false;
-
-  rows.each((i, row) => {
-    const $cells = $(row).find('th, td');
-
-    // Detectar si es fila de encabezado
-    const isHeader = $(row).find('th').length > 0 && !headerDone;
-
-    if (isHeader) {
-      xml.push('  <thead>');
-      xml.push('    <tr>');
-    } else {
-      if (!headerDone) {
-        xml.push('  </thead>');
-        xml.push('  <tbody>');
-        headerDone = true;
-      }
-      xml.push('    <tr>');
-    }
-
-    $cells.each((j, cell) => {
-      const tagName = cell.tagName.toLowerCase();
-      const cellText = $(cell)
-        .text()
-        .trim()
-        .replace(/\s+/g, ' ')
-        .replace(/\n/g, ' ');
-
-      const escapedText = cellText
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&apos;');
-
-      xml.push(`      <${tagName}>${escapedText}</${tagName}>`);
+  // --- Thead (si hay headers) ---
+  if (table.headers.length > 0) {
+    xml.push('  <thead>');
+    xml.push('    <tr>');
+    table.headers.forEach(cell => {
+      // th en lugar de td para headers
+      xml.push(`      <th>${escapeXML(cell.text)}</th>`);
     });
-
     xml.push('    </tr>');
+    xml.push('  </thead>');
+  }
 
-    if (isHeader) {
-      xml.push('  </thead>');
-      xml.push('  <tbody>');
-      headerDone = true;
-    }
+  // --- Tbody (siempre, aunque esté vacío) ---
+  xml.push('  <tbody>');
+  table.rows.forEach(row => {
+    xml.push('    <tr>');
+    row.forEach(cell => {
+      xml.push(`      <td>${escapeXML(cell.text)}</td>`);
+    });
+    xml.push('    </tr>');
   });
-
   xml.push('  </tbody>');
-  xml.push('</table>');
 
+  xml.push('</table>');
   return xml.join('\n');
 
+  // Función auxiliar para escapar XML
+  function escapeXML(text) {
+    if (!text) return '';
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
 }
-// ========== FUNCIÓN PARA PROCESAR TABLAS CON BOTONES DE DESCARGA (CORREGIDA) ==========
+
+
 // ========== FUNCIÓN PARA PROCESAR TABLAS CON BOTONES DE DESCARGA (ACTUALIZADA) ==========
 function processTablesWithDownload($, html) {
   if (!html) return html;
