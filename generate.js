@@ -11,6 +11,201 @@ const JOURNAL_NAME_ES = 'Revista Nacional de las Ciencias para Estudiantes';
 const JOURNAL_NAME_EN = 'The National Review of Sciences for Students';
 const LOGO_ES = 'https://www.revistacienciasestudiantes.com/assets/logo.png';
 const LOGO_EN = 'https://www.revistacienciasestudiantes.com/logoEN.png';
+// ========== MODELO INTERMEDIO DE TABLA (AST) ==========
+let tableCounter = 1;
+
+function parseTable($, $table) {
+  const table = {
+    id: $table.attr('id') || `table-${tableCounter}`,
+    number: tableCounter++,
+    caption: $table.find('caption').text().trim() || null,
+    class: $table.attr('class') || null,
+    style: $table.attr('style') || null,
+    headers: [],
+    rows: [],
+    columns: 0,
+    footnotes: []
+  };
+
+  const rows = $table.find('tr');
+  let headerProcessed = false;
+
+  rows.each((i, row) => {
+    const rowData = [];
+    
+    $(row).find('th, td').each((j, cell) => {
+      const $cell = $(cell);
+      
+      rowData.push({
+        text: $cell.text().trim().replace(/\s+/g, ' '),
+        html: $cell.html(),
+        colspan: parseInt($cell.attr('colspan')) || 1,
+        rowspan: parseInt($cell.attr('rowspan')) || 1,
+        class: $cell.attr('class') || null,
+        style: $cell.attr('style') || null,
+        align: $cell.attr('align') || null,
+        type: cell.tagName.toLowerCase()
+      });
+    });
+
+    if (!headerProcessed && ($(row).find('th').length > 0 || i === 0)) {
+      table.headers = rowData;
+      headerProcessed = true;
+    } else {
+      table.rows.push(rowData);
+    }
+  });
+
+  table.columns = Math.max(
+    table.headers.length,
+    ...table.rows.map(r => r.reduce((sum, cell) => sum + (cell.colspan || 1), 0))
+  );
+
+  return table;
+}
+
+function formatCSVCell(text) {
+  let cleanText = text.replace(/"/g, '""');
+  return `"${cleanText}"`;
+}
+
+function tableToCSV(table) {
+  const rows = [];
+  if (table.headers.length) {
+    rows.push(table.headers.map(h => formatCSVCell(h.text)).join(','));
+  }
+  table.rows.forEach(row => {
+    rows.push(row.map(cell => formatCSVCell(cell.text)).join(','));
+  });
+  return rows.join('\n');
+}
+
+function tableToJSON(table) {
+  const simpleTable = {
+    number: table.number,
+    caption: table.caption,
+    headers: table.headers.map(h => h.text),
+    rows: table.rows.map(row => row.map(cell => cell.text)),
+    data: []
+  };
+
+  if (table.headers.length) {
+    simpleTable.data = table.rows.map(row => {
+      const obj = {};
+      table.headers.forEach((header, idx) => {
+        const key = header.text
+          .toLowerCase()
+          .replace(/\s+/g, '_')
+          .replace(/[^\w]/g, '');
+        obj[key] = row[idx]?.text || '';
+      });
+      return obj;
+    });
+  }
+
+  return JSON.stringify(simpleTable, null, 2);
+}
+
+function escapeLaTeX(text) {
+  return text
+    .replace(/\\/g, '\\textbackslash ')
+    .replace(/_/g, '\\_')
+    .replace(/&/g, '\\&')
+    .replace(/%/g, '\\%')
+    .replace(/\$/g, '\\$')
+    .replace(/#/g, '\\#')
+    .replace(/{/g, '\\{')
+    .replace(/}/g, '\\}')
+    .replace(/~/g, '\\textasciitilde ')
+    .replace(/\^/g, '\\textasciicircum ');
+}
+
+function tableToLaTeX(table) {
+  if (!table.rows.length && !table.headers.length) return '';
+
+  const alignment = 'l'.repeat(table.columns);
+  let latex = [];
+
+  latex.push('\\begin{table}[h]');
+  latex.push('\\centering');
+  
+  if (table.caption) {
+    latex.push(`\\caption{${escapeLaTeX(table.caption)}}`);
+  }
+  
+  latex.push(`\\label{tab:${table.number}}`);
+  latex.push(`\\begin{tabular}{|${alignment.split('').join('|')}|}`);
+  latex.push('\\hline');
+
+  if (table.headers.length) {
+    const headerLine = table.headers
+      .map(h => escapeLaTeX(h.text))
+      .join(' & ');
+    latex.push(headerLine + ' \\\\');
+    latex.push('\\hline');
+  }
+
+  table.rows.forEach(row => {
+    const rowLine = row
+      .map(cell => escapeLaTeX(cell.text))
+      .join(' & ');
+    latex.push(rowLine + ' \\\\');
+    latex.push('\\hline');
+  });
+
+  latex.push('\\end{tabular}');
+  latex.push('\\end{table}');
+
+  return latex.join('\n');
+}
+
+function escapeXML(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function tableToXML(table) {
+  let xml = [];
+  
+  xml.push('<?xml version="1.0" encoding="UTF-8"?>');
+  xml.push(`<table id="${table.id}" number="${table.number}" xmlns="http://www.w3.org/1999/xhtml">`);
+
+  if (table.caption) {
+    xml.push(`  <caption>${escapeXML(table.caption)}</caption>`);
+  }
+
+  if (table.headers.length) {
+    xml.push('  <thead>');
+    xml.push('    <tr>');
+    table.headers.forEach(header => {
+      xml.push(`      <th>${escapeXML(header.text)}</th>`);
+    });
+    xml.push('    </tr>');
+    xml.push('  </thead>');
+  }
+
+  xml.push('  <tbody>');
+  table.rows.forEach(row => {
+    xml.push('    <tr>');
+    row.forEach(cell => {
+      xml.push(`      <td>${escapeXML(cell.text)}</td>`);
+    });
+    xml.push('    </tr>');
+  });
+  xml.push('  </tbody>');
+  
+  xml.push('</table>');
+
+  return xml.join('\n');
+}
+
+function resetTableCounter() {
+  tableCounter = 1;
+}
 // Asegurar que existe el directorio de salida
 if (!fs.existsSync(OUTPUT_HTML_DIR)) {
   fs.mkdirSync(OUTPUT_HTML_DIR, { recursive: true });
@@ -548,281 +743,13 @@ function processAuthorsWithIcons(authors, article = null, lang = 'es') {
 
 
 
-
-// ==================================================
-// MODELO DE DATOS (AST) - Fuente de verdad única
-// ==================================================
-
-/**
- * Parsea una tabla de jQuery/Cheerio a un modelo de datos (AST) enriquecido.
- * @param {Object} $ - Instancia de Cheerio o jQuery.
- * @param {Object} $table - Elemento de la tabla seleccionado con Cheerio/jQuery.
- * @returns {Object} Modelo de la tabla (AST).
- */
-function parseTableToAST($, $table) {
-  // --- Metadatos de la tabla ---
-  const table = {
-    id: $table.attr('id') || null,
-    caption: $table.find('caption').text().trim() || null,
-    class: $table.attr('class') || null,
-    style: $table.attr('style') || null,
-    columns: 0,
-    headers: [],   // Array para la fila de encabezados (si existe)
-    rows: []       // Array para las filas de datos
-  };
-
-  const rows = $table.find('tr');
-  let headerProcessed = false;
-
-  rows.each((i, row) => {
-    const rowData = [];
-    const $cells = $(row).find('th, td');
-    const isHeaderRow = !headerProcessed && $(row).find('th').length > 0;
-
-    // Procesar cada celda de la fila
-    $cells.each((j, cell) => {
-      const $cell = $(cell);
-      const cellText = $cell.text().trim().replace(/\s+/g, ' ');
-
-      rowData.push({
-        text: cellText,
-        colspan: parseInt($cell.attr('colspan') || '1', 10),
-        rowspan: parseInt($cell.attr('rowspan') || '1', 10),
-        class: $cell.attr('class') || null,
-        style: $cell.attr('style') || null,
-        type: cell.tagName.toLowerCase(), // 'th' o 'td'
-        alignment: $cell.attr('align') || null // Un extra útil
-      });
-    });
-
-    // Asignar la fila procesada a headers o rows
-    if (isHeaderRow) {
-      table.headers = rowData;
-      headerProcessed = true;
-    } else {
-      table.rows.push(rowData);
-    }
-  });
-
-  // Calcular el número máximo de columnas para tablas irregulares (con colspan)
-  table.columns = Math.max(
-    table.headers.reduce((sum, cell) => sum + cell.colspan, 0),
-    ...table.rows.map(r => r.reduce((sum, cell) => sum + cell.colspan, 0))
-  );
-
-  return table;
-}
-
-// ==================================================
-// UTILIDADES DE POST-PROCESADO
-// ==================================================
-
-/**
- * Contador global para la numeración automática de tablas.
- * En un sistema real, esto podría ser parte de un contexto de documento más grande.
- */
-let tableCounter = 1;
-
-/**
- * Añade un número de tabla al modelo.
- * Reinicia el contador si es necesario.
- * @param {Object} table - Modelo de tabla (AST).
- * @returns {Object} El mismo modelo, con la propiedad 'number' añadida.
- */
-function numberTable(table) {
-  table.number = tableCounter++;
-  return table;
-}
-
-/**
- * Reinicia el contador de tablas. Útil para empezar un nuevo documento.
- */
-function resetTableCounter() {
-  tableCounter = 1;
-}
-
-// ==================================================
-// EXPORTADORES (usan el modelo, NO el HTML original)
-// ==================================================
-
-/**
- * Genera CSV desde el modelo de tabla.
- * @param {Object} table - Modelo de tabla (AST).
- * @returns {string} String en formato CSV.
- */
-function generateCSVFromAST(table) {
-  const csvRows = [];
-
-  // Función para escapar y formatear una celda para CSV
-  const formatCellForCSV = (cell) => {
-    let text = cell.text || '';
-    text = text.replace(/"/g, '""'); // Escapar comillas dobles
-    return `"${text}"`; // Siempre entrecomillar
-  };
-
-  // Añadir headers si existen
-  if (table.headers.length > 0) {
-    csvRows.push(table.headers.map(formatCellForCSV).join(','));
-  }
-
-  // Añadir filas de datos
-  table.rows.forEach(row => {
-    csvRows.push(row.map(formatCellForCSV).join(','));
-  });
-
-  return csvRows.join('\n');
-}
-
-/**
- * Genera JSON desde el modelo de tabla.
- * @param {Object} table - Modelo de tabla (AST).
- * @param {boolean} pretty - Si debe formatear el JSON con indentación.
- * @returns {string} String en formato JSON.
- */
-function generateJSONFromAST(table, pretty = true) {
-  // Podemos devolver el modelo directamente, o una versión simplificada si se prefiere.
-  // En este caso, devolvemos el modelo enriquecido.
-  if (pretty) {
-    return JSON.stringify(table, null, 2);
-  } else {
-    return JSON.stringify(table);
-  }
-}
-
-/**
- * Genera LaTeX desde el modelo de tabla.
- * @param {Object} table - Modelo de tabla (AST).
- * @returns {string} Código LaTeX de la tabla.
- */
-function generateLaTeXFromAST(table) {
-  if (!table || (!table.headers.length && !table.rows.length)) {
-    return '% LaTeX: Tabla vacía o inválida';
-  }
-
-  const latex = [];
-  const alignment = 'l'.repeat(table.columns); // Mejorable: extraer alineación de celdas
-
-  // --- Inicio de la tabla ---
-  latex.push('\\begin{table}[h]');
-  latex.push('\\centering');
-
-  // --- Caption y Label (usando la numeración) ---
-  if (table.caption) {
-    // Escapar caracteres especiales en el caption
-    const escapedCaption = escapeLatexText(table.caption);
-    latex.push(`\\caption{${escapedCaption}}`);
-  } else if (table.number) {
-    // Si no hay caption pero sí número, poner un caption genérico
-    latex.push(`\\caption{Tabla generada ${table.number}}`);
-  }
-  
-  if (table.number) {
-    latex.push(`\\label{tab:${table.number}}`);
-  }
-
-  // --- Estructura de la tabla (tabular) ---
-  latex.push(`\\begin{tabular}{|${alignment.split('').join('|')}|}`);
-  latex.push('\\hline');
-
-  // --- Fila de encabezados ---
-  if (table.headers.length > 0) {
-    const headerRow = table.headers.map(cell => escapeLatexText(cell.text)).join(' & ');
-    latex.push(headerRow + ' \\\\');
-    latex.push('\\hline');
-  }
-
-  // --- Filas de datos ---
-  table.rows.forEach(row => {
-    const dataRow = row.map(cell => escapeLatexText(cell.text)).join(' & ');
-    latex.push(dataRow + ' \\\\');
-    latex.push('\\hline');
-  });
-
-  // --- Cierre de la tabla ---
-  latex.push('\\end{tabular}');
-  latex.push('\\end{table}');
-
-  return latex.join('\n');
-
-  // Función auxiliar para escapar caracteres especiales de LaTeX
-  function escapeLatexText(text) {
-    if (!text) return '';
-    return text
-      .replace(/\\/g, '\\textbackslash ')
-      .replace(/_/g, '\\_')
-      .replace(/&/g, '\\&')
-      .replace(/%/g, '\\%')
-      .replace(/\$/g, '\\$')
-      .replace(/#/g, '\\#')
-      .replace(/{/g, '\\{')
-      .replace(/}/g, '\\}')
-      .replace(/~/g, '\\textasciitilde ')
-      .replace(/\^/g, '\\textasciicircum ');
-  }
-}
-
-/**
- * Genera XML (similar a XHTML) desde el modelo de tabla.
- * @param {Object} table - Modelo de tabla (AST).
- * @returns {string} String en formato XML.
- */
-function generateXMLFromAST(table) {
-  const xml = [];
-
-  xml.push('<?xml version="1.0" encoding="UTF-8"?>');
-  // Usar un namespace como en XHTML, y añadir el id si existe
-  const tableIdAttr = table.id ? ` id="${table.id}"` : '';
-  xml.push(`<table${tableIdAttr} xmlns="http://www.w3.org/1999/xhtml">`);
-
-  // --- Caption ---
-  if (table.caption) {
-    xml.push(`  <caption>${escapeXML(table.caption)}</caption>`);
-  }
-
-  // --- Thead (si hay headers) ---
-  if (table.headers.length > 0) {
-    xml.push('  <thead>');
-    xml.push('    <tr>');
-    table.headers.forEach(cell => {
-      // th en lugar de td para headers
-      xml.push(`      <th>${escapeXML(cell.text)}</th>`);
-    });
-    xml.push('    </tr>');
-    xml.push('  </thead>');
-  }
-
-  // --- Tbody (siempre, aunque esté vacío) ---
-  xml.push('  <tbody>');
-  table.rows.forEach(row => {
-    xml.push('    <tr>');
-    row.forEach(cell => {
-      xml.push(`      <td>${escapeXML(cell.text)}</td>`);
-    });
-    xml.push('    </tr>');
-  });
-  xml.push('  </tbody>');
-
-  xml.push('</table>');
-  return xml.join('\n');
-
-  // Función auxiliar para escapar XML
-  function escapeXML(text) {
-    if (!text) return '';
-    return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;');
-  }
-}
-
-
-// ========== FUNCIÓN PARA PROCESAR TABLAS CON BOTONES DE DESCARGA (ACTUALIZADA) ==========
+// ========== FUNCIÓN PARA PROCESAR TABLAS CON BOTONES DE DESCARGA (ACTUALIZADA CON MODELO) ==========
 function processTablesWithDownload($, html) {
   if (!html) return html;
   
-  // Nota: No crear una nueva instancia de cheerio, usar la que ya existe
+  // Resetear contador de tablas para cada artículo
+  resetTableCounter();
+  
   let tableIndex = 0;
   
   $('table').each((i, el) => {
@@ -832,122 +759,109 @@ function processTablesWithDownload($, html) {
     $el.attr('id', tableId);
     $el.addClass('article-table');
     
-    // Generar todos los formatos
-    const csvContent = generateCSVFromTable($, $el);
-    const jsonContent = generateJSONFromTable($, $el);
-    const latexContent = generateLaTeXFromTable($, $el);
-    const xmlContent = generateXMLFromTable($, $el);
+    // USAR EL MODELO INTERMEDIO - Parsear la tabla UNA vez
+    const tableModel = parseTable($, $el);
     
-    // Generar HTML de la tabla con BOM para Excel
+    // Generar todos los formatos usando el modelo
+    const csvContent = tableToCSV(tableModel);
+    const jsonContent = tableToJSON(tableModel);
+    const latexContent = tableToLaTeX(tableModel);
+    const xmlContent = tableToXML(tableModel);
+    
+    // Generar HTML de la tabla
     const tableHtml = $.html($el);
     
     // Añadir BOM (Byte Order Mark) para UTF-8 en Excel
     const BOM = '\uFEFF';
     
-    // Crear el wrapper con botones - AHORA CON JSON, LATEX Y XML
+    // Crear el wrapper con botones
     const tableWrapper = `
     <div class="table-download-wrapper">
-  <div class="table-header">
-    <span class="table-label">Tabla ${tableIndex}</span>
+      <div class="table-header">
+        <span class="table-label">Tabla ${tableIndex}</span>
 
-    <div class="table-download-buttons">
+        <div class="table-download-buttons">
+          <!-- CSV -->
+          <a href="data:text/csv;charset=utf-8,${encodeURIComponent(BOM + csvContent)}"
+             download="tabla-${tableIndex}.csv"
+             class="table-download-btn"
+             title="Descargar como CSV">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 12h6"/>
+              <path d="M9 16h6"/>
+              <path d="M9 8h3"/>
+              <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>
+              <path d="M14 2v6h6"/>
+            </svg>
+            <span>CSV</span>
+          </a>
 
-      <!-- CSV -->
-      <a href="data:text/csv;charset=utf-8,${encodeURIComponent(BOM + csvContent)}"
-         download="tabla-${tableIndex}.csv"
-         class="table-download-btn"
-         title="Descargar como CSV">
+          <!-- Excel -->
+          <a href="data:application/vnd.ms-excel;charset=utf-8,${encodeURIComponent(BOM + tableHtml)}"
+             download="tabla-${tableIndex}.xls"
+             class="table-download-btn"
+             title="Descargar como Excel">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <line x1="3" y1="9" x2="21" y2="9"/>
+              <line x1="3" y1="15" x2="21" y2="15"/>
+              <line x1="9" y1="3" x2="9" y2="21"/>
+              <line x1="15" y1="3" x2="15" y2="21"/>
+            </svg>
+            <span>Excel</span>
+          </a>
 
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2"
-             stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 12h6"/>
-          <path d="M9 16h6"/>
-          <path d="M9 8h3"/>
-          <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>
-          <path d="M14 2v6h6"/>
-        </svg>
+          <!-- JSON -->
+          <a href="data:application/json;charset=utf-8,${encodeURIComponent(jsonContent)}"
+             download="tabla-${tableIndex}.json"
+             class="table-download-btn"
+             title="Descargar como JSON">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 20c-1.5 0-2.5-1-2.5-2.5v-3.5c0-1-1-1.5-2-1.5s-2-.5-2-1.5v-1c0-1 1-1.5 2-1.5s2-.5 2-1.5v-3.5c0-1.5 1-2.5 2.5-2.5"/>
+              <path d="M14 4c1.5 0 2.5 1 2.5 2.5v3.5c0 1 1 1.5 2 1.5s2 .5 2 1.5v1c0 1-1 1.5-2 1.5s-2 .5-2 1.5v3.5c0 1.5-1 2.5-2.5 2.5"/>
+            </svg>
+            <span>JSON</span>
+          </a>
 
-        <span>CSV</span>
-      </a>
+          <!-- LaTeX -->
+          <a href="data:text/plain;charset=utf-8,${encodeURIComponent(latexContent)}"
+             download="tabla-${tableIndex}.tex"
+             class="table-download-btn"
+             title="Descargar como LaTeX">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 4h-12l7 8-7 8h12"/>
+            </svg>
+            <span>LaTeX</span>
+          </a>
 
+          <!-- XML -->
+          <a href="data:application/xml;charset=utf-8,${encodeURIComponent(xmlContent)}"
+             download="tabla-${tableIndex}.xml"
+             class="table-download-btn"
+             title="Descargar como XML">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="16 18 22 12 16 6"/>
+              <polyline points="8 6 2 12 8 18"/>
+            </svg>
+            <span>XML</span>
+          </a>
+        </div>
+      </div>
 
-      <!-- Excel -->
-      <a href="data:application/vnd.ms-excel;charset=utf-8,${encodeURIComponent(BOM + tableHtml)}"
-         download="tabla-${tableIndex}.xls"
-         class="table-download-btn"
-         title="Descargar como Excel">
-
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2"
-             stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <line x1="3" y1="9" x2="21" y2="9"/>
-          <line x1="3" y1="15" x2="21" y2="15"/>
-          <line x1="9" y1="3" x2="9" y2="21"/>
-          <line x1="15" y1="3" x2="15" y2="21"/>
-        </svg>
-
-        <span>Excel</span>
-      </a>
-
-
-      <!-- JSON -->
-      <a href="data:application/json;charset=utf-8,${encodeURIComponent(jsonContent)}"
-         download="tabla-${tableIndex}.json"
-         class="table-download-btn"
-         title="Descargar como JSON">
-
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2"
-             stroke-linecap="round" stroke-linejoin="round">
-          <path d="M10 20c-1.5 0-2.5-1-2.5-2.5v-3.5c0-1-1-1.5-2-1.5s-2-.5-2-1.5v-1c0-1 1-1.5 2-1.5s2-.5 2-1.5v-3.5c0-1.5 1-2.5 2.5-2.5"/>
-          <path d="M14 4c1.5 0 2.5 1 2.5 2.5v3.5c0 1 1 1.5 2 1.5s2 .5 2 1.5v1c0 1-1 1.5-2 1.5s-2 .5-2 1.5v3.5c0 1.5-1 2.5-2.5 2.5"/>
-        </svg>
-
-        <span>JSON</span>
-      </a>
-
-
-      <!-- LaTeX -->
-      <a href="data:text/plain;charset=utf-8,${encodeURIComponent(latexContent)}"
-         download="tabla-${tableIndex}.tex"
-         class="table-download-btn"
-         title="Descargar como LaTeX">
-
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2"
-             stroke-linecap="round" stroke-linejoin="round">
-          <path d="M19 4h-12l7 8-7 8h12"/>
-        </svg>
-
-        <span>LaTeX</span>
-      </a>
-
-
-      <!-- XML -->
-      <a href="data:application/xml;charset=utf-8,${encodeURIComponent(xmlContent)}"
-         download="tabla-${tableIndex}.xml"
-         class="table-download-btn"
-         title="Descargar como XML">
-
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2"
-             stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="16 18 22 12 16 6"/>
-          <polyline points="8 6 2 12 8 18"/>
-        </svg>
-
-        <span>XML</span>
-      </a>
-
+      <div class="table-wrapper">
+        ${$.html($el)}
+      </div>
     </div>
-  </div>
-
-  <div class="table-wrapper">
-    ${$.html($el)}
-  </div>
-</div>
     `;
     
     $el.replaceWith(tableWrapper);
@@ -1019,17 +933,22 @@ function processCodeBlocks(html) {
     $el.parent().replaceWith(codeHtml);
   });
   
-  // PROCESAR TABLAS CON BOTONES DE DESCARGA (AHORA PASAMOS $)
+  // PROCESAR TABLAS CON BOTONES DE DESCARGA (AHORA CON MODELO INTERMEDIO)
   let processedHtml = $.html();
-  processedHtml = processTablesWithDownload($, processedHtml);
+  // Resetear contador de tablas antes de procesar
+  resetTableCounter();
+  
+  // Volver a cargar el HTML para procesar tablas
+  const $2 = cheerio.load(processedHtml, { decodeEntities: false });
+  processedHtml = processTablesWithDownload($2, processedHtml);
   
   // Volver a cargar el HTML procesado para continuar con imágenes y ecuaciones
-  const $2 = cheerio.load(processedHtml, { decodeEntities: false });
+  const $3 = cheerio.load(processedHtml, { decodeEntities: false });
   
   // Procesar imágenes - CON target="_blank" para abrir en nueva pestaña
   let figureIndex = 0;
-  $2('img').each((i, el) => {
-    const $el = $2(el);
+  $3('img').each((i, el) => {
+    const $el = $3(el);
     const alt = $el.attr('alt') || '';
     const src = $el.attr('src') || '';
     const style = $el.attr('style') || '';
@@ -1066,14 +985,14 @@ function processCodeBlocks(html) {
   
   // Procesar ecuaciones
   let equationIndex = 0;
-  $2('.MathJax_Display, .math-container').each((i, el) => {
-    const $el = $2(el);
+  $3('.MathJax_Display, .math-container').each((i, el) => {
+    const $el = $3(el);
     equationIndex++;
     const equationId = `equation-${equationIndex}`;
     $el.attr('id', equationId);
   });
   
-  return $2.html();
+  return $3.html();
 }
 
 // ========== FUNCIÓN PRINCIPAL ==========
