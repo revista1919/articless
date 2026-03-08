@@ -11,20 +11,6 @@ const JOURNAL_NAME_ES = 'Revista Nacional de las Ciencias para Estudiantes';
 const JOURNAL_NAME_EN = 'The National Review of Sciences for Students';
 const LOGO_ES = 'https://www.revistacienciasestudiantes.com/assets/logo.png';
 const LOGO_EN = 'https://www.revistacienciasestudiantes.com/logoEN.png';
-// ========== SVG ICONS PARA TOC (Elegance Edition) ==========
-const tocIcons = {
-  // Un diseño de marco más sutil con un punto de enfoque artístico
-  figure: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>`,
-
-  // Una tabla abstracta que resalta la cabecera, evitando el exceso de líneas
-  table: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5zm0 5h18M10 3v18"/></svg>`,
-
-  // Brackets más estilizados y modernos
-  code: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 16 4-4-4-4M6 8l-4 4 4 4M14.5 4l-5 16"/></svg>`,
-
-  // Un símbolo de sumatoria (sigma) que representa "ecuación" de forma universal y académica
-  equation: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 21h10a1 1 0 0 0 1-1v-1a1 1 0 0 0-1-1h-2.17a2 2 0 0 1-1.41-.59l-4.42-4.41a2 2 0 0 1 0-2.82l4.42-4.41A2 2 0 0 1 14.83 5H17a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H7"/></svg>`
-};
 // Asegurar que existe el directorio de salida
 if (!fs.existsSync(OUTPUT_HTML_DIR)) {
   fs.mkdirSync(OUTPUT_HTML_DIR, { recursive: true });
@@ -560,7 +546,7 @@ function processAuthorsWithIcons(authors, article = null, lang = 'es') {
   return authorElements.join('<span class="author-separator">, </span>');
 }
 
-
+// ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML ==========
 // ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML ==========
 function processCodeBlocks(html) {
   if (!html) return html;
@@ -662,7 +648,6 @@ const codeHtml = `
   return $.html();
 }
 // ========== FUNCIÓN PARA EXTRAER ELEMENTOS ESPECIALES DEL ARTÍCULO ==========
-// ========== FUNCIÓN PARA EXTRAER ELEMENTOS ESPECIALES DEL ARTÍCULO ==========
 function extractSpecialElements(html) {
   if (!html) return [];
   
@@ -679,16 +664,13 @@ function extractSpecialElements(html) {
     const id = $fig.attr('id') || `figure-${index + 1}`;
     $fig.attr('id', id);
     
-    // Añadir un marcador visible para el enlace
-    $fig.prepend(`<span id="${id}-marker" style="display: block; height: 0; width: 0; visibility: hidden; position: relative; top: -100px;"></span>`);
-    
     elements.push({
       type: 'figure',
       id: id,
       title: $caption.text().trim() || `Figura ${index + 1}`,
       level: 0,
       order: index,
-      icon: 'figure' // Cambiamos a texto para luego usar SVG
+      icon: '📷'
     });
   });
   
@@ -696,7 +678,7 @@ function extractSpecialElements(html) {
   $('table.article-table').each((index, el) => {
     const $table = $(el);
     
-    // Intentar encontrar caption
+    // Intentar encontrar caption (si existe en tu HTML)
     const $caption = $table.find('caption').first();
     const captionText = $caption.text().trim();
     
@@ -704,16 +686,13 @@ function extractSpecialElements(html) {
     const id = $table.attr('id') || `table-${index + 1}`;
     $table.attr('id', id);
     
-    // Añadir marcador
-    $table.before(`<span id="${id}-marker" style="display: block; height: 0; width: 0; visibility: hidden; position: relative; top: -100px;"></span>`);
-    
     elements.push({
       type: 'table',
       id: id,
       title: captionText || `Tabla ${index + 1}`,
       level: 0,
-      order: index + 100,
-      icon: 'table'
+      order: index + 100, // Las tablas después de las figuras
+      icon: '📊'
     });
   });
   
@@ -726,16 +705,13 @@ function extractSpecialElements(html) {
     const id = $code.attr('id') || `code-${index + 1}`;
     $code.attr('id', id);
     
-    // Añadir marcador
-    $code.before(`<span id="${id}-marker" style="display: block; height: 0; width: 0; visibility: hidden; position: relative; top: -100px;"></span>`);
-    
     elements.push({
       type: 'code',
       id: id,
-      title: `Código (${language})`,
+      title: `Bloque de código (${language})`,
       level: 0,
       order: index + 200,
-      icon: 'code'
+      icon: '💻'
     });
   });
   
@@ -743,13 +719,12 @@ function extractSpecialElements(html) {
   $('.MathJax_Display, .math-container').each((index, el) => {
     const $math = $(el);
     
-    const equationLabel = `Ecuación ${index + 1}`;
+    // Intentar encontrar etiqueta de ecuación (ej: (1), [eq:1])
+    const equationLabel = $math.find('.equation-label, .eq-number').text().trim() || 
+                         `Ecuación ${index + 1}`;
     
     const id = $math.attr('id') || `equation-${index + 1}`;
     $math.attr('id', id);
-    
-    // Añadir marcador
-    $math.before(`<span id="${id}-marker" style="display: block; height: 0; width: 0; visibility: hidden; position: relative; top: -100px;"></span>`);
     
     elements.push({
       type: 'equation',
@@ -757,11 +732,11 @@ function extractSpecialElements(html) {
       title: equationLabel,
       level: 0,
       order: index + 300,
-      icon: 'equation'
+      icon: '∫'
     });
   });
   
-  // Ordenar elementos por su aparición
+  // Ordenar elementos por su aparición en el documento
   elements.sort((a, b) => a.order - b.order);
   
   return elements;
@@ -831,66 +806,6 @@ async function generateArticleHtml(article) {
   // Procesar HTML del artículo (con bloques de código, tablas, etc.)
   const processedHtmlEs = processCodeBlocks(article.html_es || '');
   const processedHtmlEn = processCodeBlocks(article.html_en || '');
-  
-  // ===== CORRECCIÓN AQUÍ =====
-  // Procesar headings y elementos especiales para español
-  const $es = cheerio.load(processedHtmlEs);
-  const headingsEs = [];
-  $es('.article-container h2').each((index, el) => {
-    const $el = $es(el);
-    // Si no tiene id, se lo asignamos
-    let id = $el.attr('id');
-    if (!id) {
-      id = `section-${index + 1}`;
-      $el.attr('id', id);
-    }
-    headingsEs.push({
-      type: 'heading',
-      id: id,
-      title: $el.text().trim(),
-      level: 2,
-      order: index,
-      icon: null
-    });
-  });
-  
-  // Obtener elementos especiales de la versión en español
-  const specialElementsEs = extractSpecialElements(processedHtmlEs);
-  
-  // Combinar headings y elementos especiales para español
-  const allTocItemsEs = [
-    ...headingsEs.map(h => ({ ...h, type: 'heading' })),
-    ...specialElementsEs
-  ];
-  
-  // Procesar headings y elementos especiales para inglés
-  const $en = cheerio.load(processedHtmlEn);
-  const headingsEn = [];
-  $en('.article-container h2').each((index, el) => {
-    const $el = $en(el);
-    let id = $el.attr('id');
-    if (!id) {
-      id = `section-${index + 1}`;
-      $el.attr('id', id);
-    }
-    headingsEn.push({
-      type: 'heading',
-      id: id,
-      title: $el.text().trim(),
-      level: 2,
-      order: index,
-      icon: null
-    });
-  });
-
-  // Extraer elementos especiales de la versión en inglés
-  const specialElementsEn = extractSpecialElements(processedHtmlEn);
-
-  const allTocItemsEn = [
-    ...headingsEn.map(h => ({ ...h, type: 'heading' })),
-    ...specialElementsEn
-  ];
-  // ===== FIN DE LA CORRECCIÓN =====
 
   // Procesar referencias
   const referencesHtml = (() => {
@@ -934,8 +849,6 @@ async function generateArticleHtml(article) {
     abstractParagraphs,
     referencesHtml,
     htmlContent: processedHtmlEs,
-    specialElements: specialElementsEs, 
-    allTocItems: allTocItemsEs, 
     domain: DOMAIN,
     oaSvg,
     orcidSvg,
@@ -968,8 +881,6 @@ async function generateArticleHtml(article) {
     abstractParagraphs,
     referencesHtml,
     htmlContent: processedHtmlEn,
-    specialElements: specialElementsEn,
-    allTocItems: allTocItemsEn,
     domain: DOMAIN,
     oaSvg,
     orcidSvg,
@@ -981,6 +892,7 @@ async function generateArticleHtml(article) {
   fs.writeFileSync(filePathEn, htmlContentEn, 'utf8');
   console.log(`✅ Generado: ${filePathEn}`);
 }
+
 function generateHtmlTemplate({
   lang,
   article,
@@ -1001,12 +913,10 @@ function generateHtmlTemplate({
   abstractParagraphs,
   referencesHtml,
   htmlContent,
-  allTocItems = [],
   domain,
   oaSvg,
   orcidSvg,
   emailSvg,
-  specialElements = [], // NUEVO
   ccLogoSvg
 }) {
   const isSpanish = lang === 'es';
@@ -2825,85 +2735,7 @@ body {
     .reference-item a:hover {
       border-bottom: 1px solid #005a7d;
     }
-/* Estilos para elementos especiales en el TOC */
-/* Estilos para elementos especiales en el TOC */
-.toc-item.toc-special {
-  margin: 0;
-  border-left: 2px solid transparent;
-}
 
-.toc-item.toc-special a {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8rem;
-  padding: 0.3rem 0.5rem 0.3rem 1rem;
-  color: var(--text-light);
-  text-decoration: none;
-  transition: all 0.2s ease;
-  border-left: 2px solid transparent;
-  margin-left: -1px;
-}
-
-.toc-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.2rem;
-  height: 1.2rem;
-  opacity: 0.7;
-  transition: opacity 0.2s;
-  color: currentColor;
-}
-
-.toc-icon svg {
-  width: 100%;
-  height: 100%;
-  stroke: currentColor;
-}
-
-.toc-item.toc-special:hover .toc-icon {
-  opacity: 1;
-}
-
-/* Colores específicos por tipo al hacer hover/active */
-.toc-figure a:hover,
-.toc-figure a.active {
-  color: #4ec9b0;
-  border-left-color: #4ec9b0;
-}
-
-.toc-table a:hover,
-.toc-table a.active {
-  color: #569cd6;
-  border-left-color: #569cd6;
-}
-
-.toc-code a:hover,
-.toc-code a.active {
-  color: #ce9178;
-  border-left-color: #ce9178;
-}
-
-.toc-equation a:hover,
-.toc-equation a.active {
-  color: #c586c0;
-  border-left-color: #c586c0;
-}
-
-/* Tooltip para indicar que se puede abrir en nueva pestaña */
-.toc-item a[data-type]::after {
-  content: "↗";
-  margin-left: auto;
-  font-size: 0.7rem;
-  opacity: 0;
-  transition: opacity 0.2s;
-  color: var(--text-muted);
-}
-
-.toc-item a[data-type]:hover::after {
-  opacity: 1;
-}
         .right-sidebar {
       position: sticky;
       top: 100px;
@@ -3500,24 +3332,11 @@ body {
 </div>
 
   <div class="main-wrapper">
-<nav class="toc-sidebar">
-  <div class="toc-title">${t.contents}</div>
-  <ul class="toc-list" id="toc-list">
-    ${allTocItems.map(item => {
-      if (item.type === 'heading') {
-        return `<li class="toc-item"><a href="#${item.id}">${item.title}</a></li>`;
-      } else {
-        // Elemento especial
-        return `<li class="toc-item toc-special toc-${item.type}">
-          <a href="#${item.id}" class="special-link" data-type="${item.type}">
-            <span class="toc-icon">${tocIcons[item.icon] || ''}</span>
-            <span class="toc-title-text">${item.title}</span>
-          </a>
-        </li>`;
-      }
-    }).join('')}
-  </ul>
-</nav>
+    <!-- Left Sidebar - Table of Contents -->
+    <nav class="toc-sidebar">
+      <div class="toc-title">${t.contents}</div>
+      <ul class="toc-list" id="toc-list"></ul>
+    </nav>
 
     <!-- Main Content -->
     <main class="article-container">
@@ -3951,9 +3770,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ========== GENERAR TABLA DE CONTENIDOS PARA MÓVIL ==========
-// Esta función DEBE estar dentro de etiquetas <script> en tu HTML
-// y DEBE ser tratada como una cadena de texto en tu plantilla del servidor
-
 function generateMobileTOC() {
   const mobileTocList = document.getElementById('mobile-toc-list');
   if (!mobileTocList) return;
@@ -3968,7 +3784,7 @@ function generateMobileTOC() {
   const abstractItem = document.createElement('li');
   abstractItem.className = 'sd-mobile-nav-item';
   
-  // Construir el HTML del resumen
+  // Usar concatenación normal en lugar de template string anidado
   abstractItem.innerHTML = '<a href="#abstract" class="sd-mobile-nav-link mobile-toc-link" data-target="abstract">' +
     '<svg viewBox="0 0 24 24" width="20" height="20">' +
       '<path d="M4 6H20v2H4zM4 12H20v2H4zM4 18H20v2H4z"/>' +
@@ -3977,51 +3793,6 @@ function generateMobileTOC() {
   '</a>';
   
   mobileTocList.appendChild(abstractItem);
-  
-  // Añadir elementos especiales (imágenes, tablas, código, ecuaciones)
-  document.querySelectorAll('.image-figure, .table-wrapper, .code-block-wrapper, .MathJax_Display, .math-container').forEach((el, index) => {
-    const id = el.id;
-    if (!id) return;
-    
-    let icon = '';
-    let type = '';
-    
-    if (el.classList.contains('image-figure')) {
-      icon = '📷';
-      type = 'figure';
-    } else if (el.classList.contains('table-wrapper')) {
-      icon = '📊';
-      type = 'table';
-    } else if (el.classList.contains('code-block-wrapper')) {
-      icon = '💻';
-      type = 'code';
-    } else if (el.classList.contains('MathJax_Display') || el.classList.contains('math-container')) {
-      icon = '∫';
-      type = 'equation';
-    }
-    
-    let title = '';
-    if (type === 'figure') {
-      const caption = el.querySelector('figcaption');
-      title = caption ? caption.textContent : (isSpanish ? 'Figura' : 'Figure') + ' ' + (index + 1);
-    } else if (type === 'table') {
-      const caption = el.querySelector('caption');
-      title = caption ? caption.textContent : (isSpanish ? 'Tabla' : 'Table') + ' ' + (index + 1);
-    } else {
-      title = (isSpanish ? 'Elemento' : 'Element') + ' ' + (index + 1);
-    }
-    
-    // Crear elemento para elemento especial
-    const specialItem = document.createElement('li');
-    specialItem.className = 'sd-mobile-nav-item mobile-special-item mobile-' + type;
-    
-    specialItem.innerHTML = '<a href="#' + id + '" class="sd-mobile-nav-link mobile-toc-link" data-target="' + id + '">' +
-      '<span style="font-size:1.2rem; margin-right:8px;">' + icon + '</span>' +
-      title +
-    '</a>';
-    
-    mobileTocList.appendChild(specialItem);
-  });
   
   // Obtener todos los encabezados h2 del artículo
   const headings = document.querySelectorAll('.article-container h2');
@@ -4066,7 +3837,7 @@ function generateMobileTOC() {
     
     mobileTocList.appendChild(li);
   });
-}
+  
   // Añadir evento de cierre del menú al hacer clic en los enlaces
   document.querySelectorAll('.mobile-toc-link').forEach(link => {
     link.addEventListener('click', (e) => {
@@ -4146,6 +3917,28 @@ function switchTab(device, tabName) {
 // ========== GENERATE DESKTOP TABLE OF CONTENTS ==========
 document.addEventListener('DOMContentLoaded', () => {
   const tocList = document.getElementById('toc-list');
+  if (tocList) {
+    const headings = document.querySelectorAll('.article-container h2');
+    
+    headings.forEach((heading, index) => {
+      if (heading.id === 'citations' || heading.closest('.citation-box')) return;
+      
+      const id = heading.id || 'section-' + index;
+      heading.id = id;
+      
+      const li = document.createElement('li');
+      li.className = 'toc-item';
+      const link = document.createElement('a');
+      link.href = '#' + id;
+      link.textContent = heading.textContent;
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+      });
+      li.appendChild(link);
+      tocList.appendChild(li);
+    });
+  }
 
   // Smooth scroll for all internal links
   document.querySelectorAll('a[href^="#"]').forEach(anchor => {
@@ -4274,67 +4067,7 @@ document.addEventListener('keydown', (e) => {
     closeMobileMenu();
   }
 });
-// ========== FUNCIÓN PARA MANEJAR CLICKS EN ELEMENTOS ESPECIALES ==========
-// ========== FUNCIÓN PARA MANEJAR CLICKS EN ELEMENTOS ESPECIALES ==========
-function handleSpecialLinkClick(event, elementId) {
-  // Esta función ya no es necesaria porque los enlaces funcionan naturalmente
-  // Pero la dejamos por compatibilidad
-  return true;
-}
 
-// Actualizar el observer del TOC
-document.addEventListener('DOMContentLoaded', () => {
-  // Observer para elementos especiales
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        // Remover active de todos
-        document.querySelectorAll('.toc-item a').forEach(link => {
-          link.classList.remove('active');
-        });
-        
-        // Buscar el enlace que apunta a este elemento
-        const targetLink = document.querySelector('.toc-item a[href="#' + entry.target.id + '"]');
-        if (targetLink) {
-          targetLink.classList.add('active');
-        }
-      }
-    });
-  }, { threshold: 0.3, rootMargin: '-80px 0px -80px 0px' });
-
-  // Observar todos los elementos especiales
-  setTimeout(() => {
-    document.querySelectorAll('.image-figure, .table-wrapper, .code-block-wrapper, .MathJax_Display, .math-container, #abstract').forEach(el => {
-      if (el.id) observer.observe(el);
-    });
-  }, 500); // Pequeño retraso para asegurar que el DOM esté listo
-
-  // Smooth scroll para todos los enlaces internos
-  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-    anchor.addEventListener('click', function(e) {
-      const href = this.getAttribute('href');
-      if (href === '#') return;
-      
-      const target = document.querySelector(href);
-      if (target) {
-        e.preventDefault();
-        
-        // Calcular posición considerando el header fijo
-        const headerOffset = 100;
-        const elementPosition = target.getBoundingClientRect().top;
-        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-        
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: 'smooth'
-        });
-        
-        // Actualizar URL sin recargar
-        history.pushState(null, null, href);
-      }
-    });
-  });
-});
 // ========== MATHJAX ==========
 if (window.MathJax) {
   MathJax.typesetPromise();
