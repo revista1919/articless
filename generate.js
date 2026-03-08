@@ -648,6 +648,7 @@ const codeHtml = `
   return $.html();
 }
 // ========== FUNCIÓN PARA EXTRAER ELEMENTOS ESPECIALES DEL ARTÍCULO ==========
+// ========== FUNCIÓN PARA EXTRAER ELEMENTOS ESPECIALES DEL ARTÍCULO ==========
 function extractSpecialElements(html) {
   if (!html) return [];
   
@@ -3198,6 +3199,9 @@ body {
   }
     }
   </style>
+  <script>
+    window.__SPECIAL_ELEMENTS__ = ${JSON.stringify(extractSpecialElements(htmlContent))};
+  </script>
 </head>
 <body>
   <header class="sd-header">
@@ -3334,23 +3338,9 @@ body {
   <div class="main-wrapper">
     <!-- Left Sidebar - Table of Contents -->
     <nav class="toc-sidebar">
-  <div class="toc-title">${t.contents}</div>
-  <ul class="toc-list" id="toc-list">
-    ${allTocItems.map(item => {
-      if (item.type === 'heading') {
-        return `<li class="toc-item"><a href="#${item.id}">${item.title}</a></li>`;
-      } else {
-        // Elemento especial (figure, table, code, equation)
-        return `<li class="toc-item toc-special toc-${item.type}">
-          <a href="#${item.id}" class="special-link" data-type="${item.type}">
-            <span class="toc-icon">${tocIcons[item.icon] || ''}</span>
-            <span class="toc-title-text">${item.title}</span>
-          </a>
-        </li>`;
-      }
-    }).join('')}
-  </ul>
-</nav>
+      <div class="toc-title">${t.contents}</div>
+      <ul class="toc-list" id="toc-list"></ul>
+    </nav>
 
     <!-- Main Content -->
     <main class="article-container">
@@ -3929,45 +3919,123 @@ function switchTab(device, tabName) {
 }
 
 // ========== GENERATE DESKTOP TABLE OF CONTENTS ==========
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
+  var tocList = document.getElementById('toc-list');
+  if (!tocList) return;
+
+  // --- AÑADIR ELEMENTOS ESPECIALES (FIGURAS, TABLAS, ETC.) ---
+  var specialElements = window.__SPECIAL_ELEMENTS__ || [];
+  
+  // Definir iconos para cada tipo - usando concatenación normal
+  var iconMap = {
+    figure: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15L16 10 5 21"/></svg>',
+    table: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5zm0 5h18M10 3v18"/></svg>',
+    code: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m18 16 4-4-4-4M6 8l-4 4 4 4M14.5 4l-5 16"/></svg>',
+    equation: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 7h3a2 2 0 0 1 2 2v6a2 2 0 0 0 2 2h3"/><path d="M7 11h4"/><path d="M17 7h.01"/><circle cx="18.5" cy="15.5" r="2.5"/></svg>'
+  };
+
+  if (specialElements.length > 0) {
+    // Crear un separador visual
+    var separator = document.createElement('li');
+    separator.className = 'toc-separator';
+    separator.innerHTML = '<span style="display:block; font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); margin:1rem 0 0.5rem 0; padding-left:1rem;">FIGURAS Y TABLAS</span>';
+    tocList.appendChild(separator);
+
+    for (var i = 0; i < specialElements.length; i++) {
+      var element = specialElements[i];
+      var li = document.createElement('li');
+      li.className = 'toc-item toc-special';
+      var link = document.createElement('a');
+      link.href = '#' + element.id;
+      
+      // Usar el icono correspondiente o un texto por defecto
+      var icon = iconMap[element.type] || '•';
+      link.innerHTML = icon + ' <span style="margin-left: 6px;">' + element.title + '</span>';
+      
+      link.addEventListener('click', (function(id) {
+        return function(e) {
+          e.preventDefault();
+          document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+        };
+      })(element.id));
+      
+      li.appendChild(link);
+      tocList.appendChild(li);
+    }
+  }
+
+  // --- AÑADIR ENCABEZADOS H2 ---
+  var headings = document.querySelectorAll('.article-container h2');
+  
+  for (var j = 0; j < headings.length; j++) {
+    var heading = headings[j];
+    if (heading.id === 'citations' || heading.closest('.citation-box')) continue;
+    
+    var id = heading.id || 'section-' + j;
+    heading.id = id;
+    
+    var li = document.createElement('li');
+    li.className = 'toc-item';
+    var link = document.createElement('a');
+    link.href = '#' + id;
+    link.textContent = heading.textContent;
+    
+    link.addEventListener('click', (function(sectionId) {
+      return function(e) {
+        e.preventDefault();
+        document.getElementById(sectionId).scrollIntoView({ behavior: 'smooth' });
+      };
+    })(id));
+    
+    li.appendChild(link);
+    tocList.appendChild(li);
+  }
+
   // Smooth scroll for all internal links
-  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-    anchor.addEventListener('click', function (e) {
-      const href = this.getAttribute('href');
+  var anchors = document.querySelectorAll('a[href^="#"]');
+  for (var k = 0; k < anchors.length; k++) {
+    var anchor = anchors[k];
+    anchor.addEventListener('click', function(e) {
+      var href = this.getAttribute('href');
       if (href === '#') return;
       
-      const target = document.querySelector(href);
+      var target = document.querySelector(href);
       if (target) {
         e.preventDefault();
         target.scrollIntoView({ behavior: 'smooth' });
       }
     });
-  });
+  }
 
   // Active section highlighting for desktop TOC
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
+  var observer = new IntersectionObserver(function(entries) {
+    for (var l = 0; l < entries.length; l++) {
+      var entry = entries[l];
       if (entry.isIntersecting) {
-        document.querySelectorAll('.toc-item a').forEach(link => {
+        var links = document.querySelectorAll('.toc-item a');
+        for (var m = 0; m < links.length; m++) {
+          var link = links[m];
           link.classList.remove('active');
           if (link.getAttribute('href') === '#' + entry.target.id) {
             link.classList.add('active');
           }
-        });
+        }
       }
-    });
+    }
   }, { threshold: 0.3, rootMargin: '-80px 0px -80px 0px' });
 
-  // Observar headings y elementos especiales
-  document.querySelectorAll('.article-container h2, #abstract, .image-figure, .table-wrapper, .code-block-wrapper, .MathJax_Display, .math-container').forEach(el => {
+  // Observar elementos relevantes
+  var elementsToObserve = document.querySelectorAll('.article-container h2, #abstract, [id^="figure-"], [id^="table-"], [id^="code-"], [id^="equation-"]');
+  for (var n = 0; n < elementsToObserve.length; n++) {
+    var el = elementsToObserve[n];
     if (el.id) observer.observe(el);
-  });
+  }
   
-  // Generar TOC móvil inicial
-  generateMobileTOC();
+  // Generar TOC móvil inicial (asegúrate de que esta función existe)
+  if (typeof generateMobileTOC === 'function') {
+    generateMobileTOC();
+  }
 });
-
-
 // ========== ACTIVE SECTION HIGHLIGHTING FOR MOBILE TOC ==========
 // Crear un observer separado para el TOC móvil
 document.addEventListener('DOMContentLoaded', () => {
