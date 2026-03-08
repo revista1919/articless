@@ -581,70 +581,96 @@ function generateCSVFromTable($, $table) {
 }
 
 function generateJSONFromTable($, $table) {
+
   const result = {
-    table: [],
     headers: [],
-    rows: []
+    rows: [],
+    data: []
   };
-  
-  // Extraer datos de la tabla
-  $table.find('tr').each((i, row) => {
+
+  const rows = $table.find('tr');
+
+  rows.each((i, row) => {
+
     const rowData = [];
-    
+
     $(row).find('th, td').each((j, cell) => {
-      const cellText = $(cell).text().trim().replace(/\s+/g, ' ').replace(/\n/g, ' ');
+
+      const cellText = $(cell)
+        .text()
+        .trim()
+        .replace(/\s+/g, ' ')
+        .replace(/\n/g, ' ');
+
       rowData.push(cellText);
+
     });
-    
+
     if (i === 0) {
-      // Primera fila son headers
       result.headers = rowData;
     } else {
-      // Filas de datos
       result.rows.push(rowData);
     }
+
   });
-  
-  // También crear un array de objetos para mayor usabilidad
+
   if (result.headers.length > 0) {
+
     result.data = result.rows.map(row => {
+
       const obj = {};
+
       result.headers.forEach((header, index) => {
-        obj[header] = row[index] || '';
+
+        const key = header
+          .toLowerCase()
+          .replace(/\s+/g, '_')
+          .replace(/[^\w]/g, '');
+
+        obj[key] = row[index] || '';
+
       });
+
       return obj;
+
     });
-  } else {
-    result.data = result.rows;
+
   }
-  
+
   return JSON.stringify(result, null, 2);
+
 }
 
 function generateLaTeXFromTable($, $table) {
+
   let latex = [];
-  
-  // Determinar alineación basada en número de columnas
+
   const firstRow = $table.find('tr').first();
   const colCount = firstRow.find('th, td').length;
-  const alignment = 'l'.repeat(colCount); // Puedes cambiarlo a 'c' o 'r' según prefieras
-  
-  // Iniciar tabla LaTeX
+
+  const alignment = 'l'.repeat(colCount);
+
   latex.push('\\begin{table}[h]');
   latex.push('\\centering');
   latex.push('\\caption{Tabla generada desde el artículo}');
   latex.push('\\label{tab:generada}');
   latex.push('\\begin{tabular}{|' + alignment.split('').join('|') + '|}');
   latex.push('\\hline');
-  
-  // Procesar filas
+
   $table.find('tr').each((i, row) => {
+
     const rowData = [];
-    
+
     $(row).find('th, td').each((j, cell) => {
-      let cellText = $(cell).text().trim().replace(/\s+/g, ' ').replace(/\n/g, ' ');
-      // Escapar caracteres especiales de LaTeX
+
+      let cellText = $(cell)
+        .text()
+        .trim()
+        .replace(/\s+/g, ' ')
+        .replace(/\n/g, ' ');
+
       cellText = cellText
+        .replace(/\\/g, '\\textbackslash ')
         .replace(/_/g, '\\_')
         .replace(/&/g, '\\&')
         .replace(/%/g, '\\%')
@@ -654,51 +680,83 @@ function generateLaTeXFromTable($, $table) {
         .replace(/}/g, '\\}')
         .replace(/~/g, '\\textasciitilde ')
         .replace(/\^/g, '\\textasciicircum ');
-      
+
       rowData.push(cellText);
+
     });
-    
+
     latex.push(rowData.join(' & ') + ' \\\\');
     latex.push('\\hline');
+
   });
-  
-  // Cerrar tabla LaTeX
+
   latex.push('\\end{tabular}');
   latex.push('\\end{table}');
-  
+
   return latex.join('\n');
 }
 
 function generateXMLFromTable($, $table) {
   const xml = [];
   const tableIndex = $table.attr('id')?.replace('table-', '') || '1';
-  
+
   xml.push('<?xml version="1.0" encoding="UTF-8"?>');
-  xml.push('<table id="' + tableIndex + '" xmlns="http://www.w3.org/1999/xhtml">');
-  
-  // Procesar filas
-  $table.find('tr').each((i, row) => {
-    xml.push('  <row>');
-    
-    $(row).find('th, td').each((j, cell) => {
-      const tagName = cell.tagName.toLowerCase(); // 'th' o 'td'
-      const cellText = $(cell).text().trim().replace(/\s+/g, ' ').replace(/\n/g, ' ');
-      // Escapar caracteres especiales XML
+  xml.push(`<table id="${tableIndex}" xmlns="http://www.w3.org/1999/xhtml">`);
+
+  const rows = $table.find('tr');
+
+  let headerDone = false;
+
+  rows.each((i, row) => {
+    const $cells = $(row).find('th, td');
+
+    // Detectar si es fila de encabezado
+    const isHeader = $(row).find('th').length > 0 && !headerDone;
+
+    if (isHeader) {
+      xml.push('  <thead>');
+      xml.push('    <tr>');
+    } else {
+      if (!headerDone) {
+        xml.push('  </thead>');
+        xml.push('  <tbody>');
+        headerDone = true;
+      }
+      xml.push('    <tr>');
+    }
+
+    $cells.each((j, cell) => {
+      const tagName = cell.tagName.toLowerCase();
+      const cellText = $(cell)
+        .text()
+        .trim()
+        .replace(/\s+/g, ' ')
+        .replace(/\n/g, ' ');
+
       const escapedText = cellText
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&apos;');
-      
-      xml.push(`    <${tagName}>${escapedText}</${tagName}>`);
+
+      xml.push(`      <${tagName}>${escapedText}</${tagName}>`);
     });
-    
-    xml.push('  </row>');
+
+    xml.push('    </tr>');
+
+    if (isHeader) {
+      xml.push('  </thead>');
+      xml.push('  <tbody>');
+      headerDone = true;
+    }
   });
-  
+
+  xml.push('  </tbody>');
   xml.push('</table>');
+
   return xml.join('\n');
+
 }
 // ========== FUNCIÓN PARA PROCESAR TABLAS CON BOTONES DE DESCARGA (CORREGIDA) ==========
 // ========== FUNCIÓN PARA PROCESAR TABLAS CON BOTONES DE DESCARGA (ACTUALIZADA) ==========
@@ -730,84 +788,107 @@ function processTablesWithDownload($, html) {
     // Crear el wrapper con botones - AHORA CON JSON, LATEX Y XML
     const tableWrapper = `
     <div class="table-download-wrapper">
-      <div class="table-header">
-        <span class="table-label">Tabla ${tableIndex}</span>
-        <div class="table-download-buttons">
-          <!-- Botón CSV -->
-          <a href="data:text/csv;charset=utf-8,${encodeURIComponent(BOM + csvContent)}" 
-             download="tabla-${tableIndex}.csv" 
-             class="table-download-btn" 
-             title="Descargar como CSV">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="7 10 12 15 17 10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            <span>CSV</span>
-          </a>
-          
-          <!-- Botón Excel (HTML) -->
-          <a href="data:application/vnd.ms-excel;charset=utf-8,${encodeURIComponent(BOM + tableHtml)}" 
-             download="tabla-${tableIndex}.xls" 
-             class="table-download-btn"
-             title="Descargar como Excel (HTML)">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <rect x="2" y="3" width="20" height="18" rx="2" ry="2"/>
-              <line x1="8" y1="9" x2="16" y2="9"/>
-              <line x1="8" y1="13" x2="16" y2="13"/>
-              <line x1="8" y1="17" x2="12" y2="17"/>
-            </svg>
-            <span>Excel</span>
-          </a>
-          
-          <!-- NUEVO: Botón JSON -->
-          <a href="data:application/json;charset=utf-8,${encodeURIComponent(jsonContent)}" 
-             download="tabla-${tableIndex}.json" 
-             class="table-download-btn"
-             title="Descargar como JSON">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
-              <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
-              <circle cx="16" cy="13" r="1" fill="currentColor"/>
-              <circle cx="16" cy="17" r="1" fill="currentColor"/>
-            </svg>
-            <span>JSON</span>
-          </a>
-          
-          <!-- NUEVO: Botón LaTeX -->
-          <a href="data:text/plain;charset=utf-8,${encodeURIComponent(latexContent)}" 
-             download="tabla-${tableIndex}.tex" 
-             class="table-download-btn"
-             title="Descargar como LaTeX">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M4 7h3a2 2 0 0 1 2 2v6a2 2 0 0 0 2 2h3"/>
-              <path d="M7 11h4"/>
-              <path d="M17 7h.01"/>
-              <circle cx="18.5" cy="15.5" r="2.5"/>
-            </svg>
-            <span>LaTeX</span>
-          </a>
-          
-          <!-- NUEVO: Botón XML -->
-          <a href="data:application/xml;charset=utf-8,${encodeURIComponent(xmlContent)}" 
-             download="tabla-${tableIndex}.xml" 
-             class="table-download-btn"
-             title="Descargar como XML">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M21 10.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h10.5"/>
-              <polyline points="16 2 22 8 16 8"/>
-              <line x1="10" y1="14" x2="21" y2="14"/>
-              <line x1="10" y1="18" x2="18" y2="18"/>
-              <line x1="3" y1="10" x2="8" y2="10"/>
-            </svg>
-            <span>XML</span>
-          </a>
-        </div>
-      </div>
-      <div class="table-wrapper">
-        ${$.html($el)}
-      </div>
+  <div class="table-header">
+    <span class="table-label">Tabla ${tableIndex}</span>
+
+    <div class="table-download-buttons">
+
+      <!-- CSV -->
+      <a href="data:text/csv;charset=utf-8,${encodeURIComponent(BOM + csvContent)}"
+         download="tabla-${tableIndex}.csv"
+         class="table-download-btn"
+         title="Descargar como CSV">
+
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 12h6"/>
+          <path d="M9 16h6"/>
+          <path d="M9 8h3"/>
+          <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>
+          <path d="M14 2v6h6"/>
+        </svg>
+
+        <span>CSV</span>
+      </a>
+
+
+      <!-- Excel -->
+      <a href="data:application/vnd.ms-excel;charset=utf-8,${encodeURIComponent(BOM + tableHtml)}"
+         download="tabla-${tableIndex}.xls"
+         class="table-download-btn"
+         title="Descargar como Excel">
+
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <line x1="3" y1="9" x2="21" y2="9"/>
+          <line x1="3" y1="15" x2="21" y2="15"/>
+          <line x1="9" y1="3" x2="9" y2="21"/>
+          <line x1="15" y1="3" x2="15" y2="21"/>
+        </svg>
+
+        <span>Excel</span>
+      </a>
+
+
+      <!-- JSON -->
+      <a href="data:application/json;charset=utf-8,${encodeURIComponent(jsonContent)}"
+         download="tabla-${tableIndex}.json"
+         class="table-download-btn"
+         title="Descargar como JSON">
+
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 20c-1.5 0-2.5-1-2.5-2.5v-3.5c0-1-1-1.5-2-1.5s-2-.5-2-1.5v-1c0-1 1-1.5 2-1.5s2-.5 2-1.5v-3.5c0-1.5 1-2.5 2.5-2.5"/>
+          <path d="M14 4c1.5 0 2.5 1 2.5 2.5v3.5c0 1 1 1.5 2 1.5s2 .5 2 1.5v1c0 1-1 1.5-2 1.5s-2 .5-2 1.5v3.5c0 1.5-1 2.5-2.5 2.5"/>
+        </svg>
+
+        <span>JSON</span>
+      </a>
+
+
+      <!-- LaTeX -->
+      <a href="data:text/plain;charset=utf-8,${encodeURIComponent(latexContent)}"
+         download="tabla-${tableIndex}.tex"
+         class="table-download-btn"
+         title="Descargar como LaTeX">
+
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 4h-12l7 8-7 8h12"/>
+        </svg>
+
+        <span>LaTeX</span>
+      </a>
+
+
+      <!-- XML -->
+      <a href="data:application/xml;charset=utf-8,${encodeURIComponent(xmlContent)}"
+         download="tabla-${tableIndex}.xml"
+         class="table-download-btn"
+         title="Descargar como XML">
+
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="16 18 22 12 16 6"/>
+          <polyline points="8 6 2 12 8 18"/>
+        </svg>
+
+        <span>XML</span>
+      </a>
+
     </div>
+  </div>
+
+  <div class="table-wrapper">
+    ${$.html($el)}
+  </div>
+</div>
     `;
     
     $el.replaceWith(tableWrapper);
