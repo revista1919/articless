@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 const cheerio = require('cheerio');
 // ... al inicio del archivo, junto a los otros require
@@ -2396,27 +2397,20 @@ body {
     }
 
     .article-table th {
-  border-bottom: 1.5px solid var(--nature-black);
-  background: transparent;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 12px 15px;
-  color: var(--nature-black);
-  text-align: left;
-  word-wrap: break-word;
-  word-break: break-word;
-  overflow-wrap: break-word;
-}
+      border-bottom: 1.5px solid var(--nature-black);
+      background: transparent;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 12px 15px;
+      color: var(--nature-black);
+      text-align: left;
+    }
 
-.article-table td {
-  padding: 12px 15px;
-  border: none;
-  border-bottom: 1px solid #eee;
-  word-wrap: break-word;
-  word-break: break-word;
-  overflow-wrap: break-word;
-  hyphens: auto;
-}
+    .article-table td {
+      padding: 12px 15px;
+      border: none;
+      border-bottom: 1px solid #eee;
+    }
 
     .article-table tr:last-child td {
       border-bottom: none;
