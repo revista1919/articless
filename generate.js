@@ -3884,6 +3884,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ========== FUNCIÓN PRINCIPAL PARA INICIALIZAR LA TOC ==========
+// ========== FUNCIÓN PRINCIPAL PARA INICIALIZAR LA TOC ==========
 function initializeTableOfContents() {
   var tocList = document.getElementById('toc-list');
   if (!tocList) return;
@@ -3891,8 +3892,29 @@ function initializeTableOfContents() {
   // Limpiar TOC existente
   tocList.innerHTML = '';
 
-  // Obtener todos los encabezados H2 del artículo
-  var headings = document.querySelectorAll('.article-container h2');
+  // BUSCAR TODOS LOS ENCABEZADOS DENTRO DEL ARTÍCULO
+  // Versión más específica: busca dentro del article
+  var headings = document.querySelectorAll('article h2');
+  
+  // Si no encuentra, intenta con el contenedor principal
+  if (headings.length === 0) {
+    headings = document.querySelectorAll('.article-container h2');
+  }
+  
+  // Si aún no encuentra, intenta con cualquier h2 en la página (excluyendo los de la sidebar)
+  if (headings.length === 0) {
+    var allHeadings = document.querySelectorAll('h2');
+    headings = [];
+    for (var i = 0; i < allHeadings.length; i++) {
+      var h = allHeadings[i];
+      // Excluir h2 que estén en sidebars o que sean parte de la UI
+      if (!h.closest('.toc-sidebar') && !h.closest('.right-sidebar') && !h.closest('.info-tabs')) {
+        headings.push(h);
+      }
+    }
+  }
+
+  console.log('Encabezados encontrados:', headings.length); // Para depuración
   
   for (var i = 0; i < headings.length; i++) {
     var heading = headings[i];
@@ -3923,10 +3945,19 @@ function initializeTableOfContents() {
     tocList.appendChild(li);
   }
 
-  // Añadir elementos especiales (figuras, tablas, código, ecuaciones)
+  // Si no se encontraron encabezados, mostrar mensaje de depuración
+  if (headings.length === 0) {
+    console.warn('No se encontraron encabezados H2 en el artículo');
+    // Opcional: mostrar un mensaje en la TOC
+    var li = document.createElement('li');
+    li.className = 'toc-item';
+    li.innerHTML = '<span style="color: #999; font-style: italic;">Sin secciones</span>';
+    tocList.appendChild(li);
+  }
+
+  // Añadir elementos especiales a la TOC (figuras, tablas, etc.)
   addSpecialElementsToTOC();
 }
-
 // ========== AÑADIR ELEMENTOS ESPECIALES A LA TOC ==========
 function addSpecialElementsToTOC() {
   var tocList = document.getElementById('toc-list');
