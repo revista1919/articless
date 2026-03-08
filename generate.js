@@ -647,7 +647,100 @@ const codeHtml = `
   
   return $.html();
 }
-
+// ========== FUNCIÓN PARA EXTRAER ELEMENTOS ESPECIALES DEL ARTÍCULO ==========
+function extractSpecialElements(html) {
+  if (!html) return [];
+  
+  const $ = cheerio.load(html, { decodeEntities: false });
+  const elements = [];
+  
+  // 1. Detectar Figuras (imágenes con caption)
+  $('figure.image-figure').each((index, el) => {
+    const $fig = $(el);
+    const $img = $fig.find('img');
+    const $caption = $fig.find('figcaption');
+    
+    // Generar un ID único si no existe
+    const id = $fig.attr('id') || `figure-${index + 1}`;
+    $fig.attr('id', id);
+    
+    elements.push({
+      type: 'figure',
+      id: id,
+      title: $caption.text().trim() || `Figura ${index + 1}`,
+      level: 0,
+      order: index,
+      icon: '📷'
+    });
+  });
+  
+  // 2. Detectar Tablas
+  $('table.article-table').each((index, el) => {
+    const $table = $(el);
+    
+    // Intentar encontrar caption (si existe en tu HTML)
+    const $caption = $table.find('caption').first();
+    const captionText = $caption.text().trim();
+    
+    // Generar ID
+    const id = $table.attr('id') || `table-${index + 1}`;
+    $table.attr('id', id);
+    
+    elements.push({
+      type: 'table',
+      id: id,
+      title: captionText || `Tabla ${index + 1}`,
+      level: 0,
+      order: index + 100, // Las tablas después de las figuras
+      icon: '📊'
+    });
+  });
+  
+  // 3. Detectar Bloques de Código
+  $('.code-block-wrapper').each((index, el) => {
+    const $code = $(el);
+    const $header = $code.find('.code-language');
+    const language = $header.text().trim() || 'código';
+    
+    const id = $code.attr('id') || `code-${index + 1}`;
+    $code.attr('id', id);
+    
+    elements.push({
+      type: 'code',
+      id: id,
+      title: `Bloque de código (${language})`,
+      level: 0,
+      order: index + 200,
+      icon: '💻'
+    });
+  });
+  
+  // 4. Detectar Ecuaciones (MathJax)
+  $('.MathJax_Display, .math-container').each((index, el) => {
+    const $math = $(el);
+    
+    // Intentar encontrar etiqueta de ecuación (ej: (1), [eq:1])
+    const equationLabel = $math.find('.equation-label, .eq-number').text().trim() || 
+                         `Ecuación ${index + 1}`;
+    
+    const id = $math.attr('id') || `equation-${index + 1}`;
+    $math.attr('id', id);
+    
+    elements.push({
+      type: 'equation',
+      id: id,
+      title: equationLabel,
+      level: 0,
+      order: index + 300,
+      icon: '∫'
+    });
+  });
+  
+  // Ordenar elementos por su aparición en el documento
+  elements.sort((a, b) => a.order - b.order);
+  
+  return elements;
+}
 // ========== FUNCIÓN PRINCIPAL ==========
 async function generateAll() {
   console.log('🚀 Iniciando generación de artículos estáticos...');
@@ -713,7 +806,8 @@ async function generateArticleHtml(article) {
   // Procesar HTML del artículo (con bloques de código, tablas, etc.)
   const processedHtmlEs = processCodeBlocks(article.html_es || '');
   const processedHtmlEn = processCodeBlocks(article.html_en || '');
-
+  const specialElementsEs = extractSpecialElements(processedHtmlEs);
+  const specialElementsEn = extractSpecialElements(processedHtmlEn);
   // Procesar referencias
   const referencesHtml = (() => {
     if (!article.referencias) return '<p>No hay referencias disponibles.</p>';
@@ -756,6 +850,7 @@ async function generateArticleHtml(article) {
     abstractParagraphs,
     referencesHtml,
     htmlContent: processedHtmlEs,
+    specialElements: specialElementsEs, 
     domain: DOMAIN,
     oaSvg,
     orcidSvg,
@@ -788,6 +883,7 @@ async function generateArticleHtml(article) {
     abstractParagraphs,
     referencesHtml,
     htmlContent: processedHtmlEn,
+    specialElements: specialElementsEn,
     domain: DOMAIN,
     oaSvg,
     orcidSvg,
@@ -824,6 +920,7 @@ function generateHtmlTemplate({
   oaSvg,
   orcidSvg,
   emailSvg,
+  specialElements = [], // NUEVO
   ccLogoSvg
 }) {
   const isSpanish = lang === 'es';
@@ -2642,7 +2739,50 @@ body {
     .reference-item a:hover {
       border-bottom: 1px solid #005a7d;
     }
+/* Estilos para elementos especiales en el TOC */
+.toc-item.toc-special {
+  margin-left: 0.5rem;
+  border-left: 2px solid var(--border-color);
+}
 
+.toc-item.toc-special a {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  padding: 0.3rem 0.5rem 0.3rem 1rem;
+}
+
+.toc-icon {
+  font-size: 1rem;
+  min-width: 1.2rem;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.toc-item.toc-special:hover .toc-icon {
+  opacity: 1;
+}
+
+/* Colores específicos por tipo */
+.toc-figure a { border-left-color: #4ec9b0; }
+.toc-table a { border-left-color: #569cd6; }
+.toc-code a { border-left-color: #ce9178; }
+.toc-equation a { border-left-color: #c586c0; }
+
+/* Tooltip para indicar que se puede abrir en nueva pestaña */
+.toc-item a[data-type]::after {
+  content: "↗";
+  margin-left: auto;
+  font-size: 0.7rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+  color: var(--text-muted);
+}
+
+.toc-item a[data-type]:hover::after {
+  opacity: 1;
+}
         .right-sidebar {
       position: sticky;
       top: 100px;
@@ -3243,7 +3383,20 @@ body {
     <nav class="toc-sidebar">
       <div class="toc-title">${t.contents}</div>
       <ul class="toc-list" id="toc-list"></ul>
-    </nav>
+      <!-- NUEVO: Elementos especiales -->
+      ${specialElements.map(el => `
+        <li class="toc-item toc-special toc-${el.type}">
+          <a href="#${el.id}" 
+             class="special-link" 
+             data-type="${el.type}"
+             onclick="handleSpecialLinkClick(event, '${el.id}')">
+            <span class="toc-icon">${el.icon}</span>
+            <span class="toc-title-text">${el.title}</span>
+          </a>
+        </li>
+      `).join('')}
+    </ul>
+  </nav>
 
     <!-- Main Content -->
     <main class="article-container">
@@ -3677,6 +3830,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ========== GENERAR TABLA DE CONTENIDOS PARA MÓVIL ==========
+// Esta función DEBE estar dentro de etiquetas <script> en tu HTML
+// y DEBE ser tratada como una cadena de texto en tu plantilla del servidor
+
 function generateMobileTOC() {
   const mobileTocList = document.getElementById('mobile-toc-list');
   if (!mobileTocList) return;
@@ -3691,7 +3847,7 @@ function generateMobileTOC() {
   const abstractItem = document.createElement('li');
   abstractItem.className = 'sd-mobile-nav-item';
   
-  // Usar concatenación normal en lugar de template string anidado
+  // Construir el HTML del resumen
   abstractItem.innerHTML = '<a href="#abstract" class="sd-mobile-nav-link mobile-toc-link" data-target="abstract">' +
     '<svg viewBox="0 0 24 24" width="20" height="20">' +
       '<path d="M4 6H20v2H4zM4 12H20v2H4zM4 18H20v2H4z"/>' +
@@ -3700,6 +3856,51 @@ function generateMobileTOC() {
   '</a>';
   
   mobileTocList.appendChild(abstractItem);
+  
+  // Añadir elementos especiales (imágenes, tablas, código, ecuaciones)
+  document.querySelectorAll('.image-figure, .table-wrapper, .code-block-wrapper, .MathJax_Display, .math-container').forEach((el, index) => {
+    const id = el.id;
+    if (!id) return;
+    
+    let icon = '';
+    let type = '';
+    
+    if (el.classList.contains('image-figure')) {
+      icon = '📷';
+      type = 'figure';
+    } else if (el.classList.contains('table-wrapper')) {
+      icon = '📊';
+      type = 'table';
+    } else if (el.classList.contains('code-block-wrapper')) {
+      icon = '💻';
+      type = 'code';
+    } else if (el.classList.contains('MathJax_Display') || el.classList.contains('math-container')) {
+      icon = '∫';
+      type = 'equation';
+    }
+    
+    let title = '';
+    if (type === 'figure') {
+      const caption = el.querySelector('figcaption');
+      title = caption ? caption.textContent : (isSpanish ? 'Figura' : 'Figure') + ' ' + (index + 1);
+    } else if (type === 'table') {
+      const caption = el.querySelector('caption');
+      title = caption ? caption.textContent : (isSpanish ? 'Tabla' : 'Table') + ' ' + (index + 1);
+    } else {
+      title = (isSpanish ? 'Elemento' : 'Element') + ' ' + (index + 1);
+    }
+    
+    // Crear elemento para elemento especial
+    const specialItem = document.createElement('li');
+    specialItem.className = 'sd-mobile-nav-item mobile-special-item mobile-' + type;
+    
+    specialItem.innerHTML = '<a href="#' + id + '" class="sd-mobile-nav-link mobile-toc-link" data-target="' + id + '">' +
+      '<span style="font-size:1.2rem; margin-right:8px;">' + icon + '</span>' +
+      title +
+    '</a>';
+    
+    mobileTocList.appendChild(specialItem);
+  });
   
   // Obtener todos los encabezados h2 del artículo
   const headings = document.querySelectorAll('.article-container h2');
@@ -3744,7 +3945,7 @@ function generateMobileTOC() {
     
     mobileTocList.appendChild(li);
   });
-  
+}
   // Añadir evento de cierre del menú al hacer clic en los enlaces
   document.querySelectorAll('.mobile-toc-link').forEach(link => {
     link.addEventListener('click', (e) => {
@@ -3974,7 +4175,60 @@ document.addEventListener('keydown', (e) => {
     closeMobileMenu();
   }
 });
+// ========== FUNCIÓN PARA MANEJAR CLICKS EN ELEMENTOS ESPECIALES ==========
+function handleSpecialLinkClick(event, elementId) {
+  // Si se hace clic con Ctrl/Cmd o botón central, dejar comportamiento por defecto
+  if (event.ctrlKey || event.metaKey || event.button === 1) {
+    return true; // Permitir apertura en nueva pestaña
+  }
+  
+  // Click normal: desplazamiento suave
+  event.preventDefault();
+  const target = document.getElementById(elementId);
+  if (target) {
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    
+    // Efecto visual de resaltado
+    target.style.transition = 'box-shadow 0.3s, background 0.3s';
+    target.style.boxShadow = '0 0 0 3px rgba(0, 90, 125, 0.3)';
+    target.style.background = 'rgba(0, 90, 125, 0.05)';
+    
+    setTimeout(() => {
+      target.style.boxShadow = '';
+      target.style.background = '';
+    }, 2000);
+  }
+}
 
+// También añadir al observer del TOC para resaltar elementos especiales
+document.addEventListener('DOMContentLoaded', () => {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        // Resaltar en TOC regular
+        document.querySelectorAll('.toc-item a').forEach(link => {
+          link.classList.remove('active');
+          if (link.getAttribute('href') === '#' + entry.target.id) {
+            link.classList.add('active');
+          }
+        });
+        
+        // Resaltar en TOC especial
+        document.querySelectorAll('.toc-special a').forEach(link => {
+          link.classList.remove('active');
+          if (link.getAttribute('href') === '#' + entry.target.id) {
+            link.classList.add('active');
+          }
+        });
+      }
+    });
+  }, { threshold: 0.3, rootMargin: '-80px 0px -80px 0px' });
+
+  // Observar todos los elementos especiales además de los h2
+  document.querySelectorAll('.article-container h2, #abstract, .image-figure, .table-wrapper, .code-block-wrapper, .MathJax_Display, .math-container').forEach(el => {
+    if (el.id) observer.observe(el);
+  });
+});
 // ========== MATHJAX ==========
 if (window.MathJax) {
   MathJax.typesetPromise();
