@@ -831,8 +831,33 @@ async function generateArticleHtml(article) {
   // Procesar HTML del artículo (con bloques de código, tablas, etc.)
   const processedHtmlEs = processCodeBlocks(article.html_es || '');
   const processedHtmlEn = processCodeBlocks(article.html_en || '');
-  const specialElementsEs = extractSpecialElements(processedHtmlEs);
-  const specialElementsEn = extractSpecialElements(processedHtmlEn);
+  // Después de obtener processedHtmlEs y processedHtmlEn
+const $ = cheerio.load(processedHtmlEs);
+const headings = [];
+$('.article-container h2').each((index, el) => {
+  const $el = $(el);
+  // Si no tiene id, se lo asignamos
+  let id = $el.attr('id');
+  if (!id) {
+    id = `section-${index + 1}`;
+    $el.attr('id', id);
+  }
+  headings.push({
+    type: 'heading',
+    id: id,
+    title: $el.text().trim(),
+    level: 2,
+    order: index,
+    icon: null  // los encabezados no llevan icono en tu diseño
+  });
+});
+
+// Obtener elementos especiales (ya existente)
+const specialElementsEs = extractSpecialElements(processedHtmlEs);
+  const allTocItems = [
+  ...headings.map(h => ({ ...h, type: 'heading' })),
+  ...specialElementsEs
+];
   // Procesar referencias
   const referencesHtml = (() => {
     if (!article.referencias) return '<p>No hay referencias disponibles.</p>';
@@ -3440,23 +3465,23 @@ body {
 
   <div class="main-wrapper">
     <!-- Left Sidebar - Table of Contents -->
+// Dentro de generateHtmlTemplate, donde se construye la barra lateral izquierda:
 <nav class="toc-sidebar">
   <div class="toc-title">${t.contents}</div>
   <ul class="toc-list" id="toc-list">
-    <!-- Resumen siempre primero -->
-    <li class="toc-item">
-      <a href="#abstract">${t.abstract}</a>
-    </li>
-    
-    <!-- Elementos especiales -->
-    ${specialElements.map(el => `
-    <li class="toc-item toc-special toc-${el.type}">
-      <a href="#${el.id}" class="special-link" data-type="${el.type}">
-        <span class="toc-icon">${tocIcons[el.icon] || ''}</span>
-        <span class="toc-title-text">${el.title}</span>
-      </a>
-    </li>
-    `).join('')}
+    ${allTocItems.map(item => {
+      if (item.type === 'heading') {
+        return `<li class="toc-item"><a href="#${item.id}">${item.title}</a></li>`;
+      } else {
+        // Elemento especial
+        return `<li class="toc-item toc-special toc-${item.type}">
+          <a href="#${item.id}" class="special-link" data-type="${item.type}">
+            <span class="toc-icon">${tocIcons[item.icon] || ''}</span>
+            <span class="toc-title-text">${item.title}</span>
+          </a>
+        </li>`;
+      }
+    }).join('')}
   </ul>
 </nav>
 
@@ -4087,28 +4112,6 @@ function switchTab(device, tabName) {
 // ========== GENERATE DESKTOP TABLE OF CONTENTS ==========
 document.addEventListener('DOMContentLoaded', () => {
   const tocList = document.getElementById('toc-list');
-  if (tocList) {
-    const headings = document.querySelectorAll('.article-container h2');
-    
-    headings.forEach((heading, index) => {
-      if (heading.id === 'citations' || heading.closest('.citation-box')) return;
-      
-      const id = heading.id || 'section-' + index;
-      heading.id = id;
-      
-      const li = document.createElement('li');
-      li.className = 'toc-item';
-      const link = document.createElement('a');
-      link.href = '#' + id;
-      link.textContent = heading.textContent;
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
-      });
-      li.appendChild(link);
-      tocList.appendChild(li);
-    });
-  }
 
   // Smooth scroll for all internal links
   document.querySelectorAll('a[href^="#"]').forEach(anchor => {
