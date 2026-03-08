@@ -546,7 +546,94 @@ function processAuthorsWithIcons(authors, article = null, lang = 'es') {
   return authorElements.join('<span class="author-separator">, </span>');
 }
 
-// ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML ==========
+// ========== FUNCIÓN PARA PROCESAR TABLAS CON BOTONES DE DESCARGA ==========
+function processTablesWithDownload(html) {
+  if (!html) return html;
+  
+  const $ = cheerio.load(html, { decodeEntities: false });
+  let tableIndex = 0;
+  
+  $('table').each((i, el) => {
+    const $el = $(el);
+    tableIndex++;
+    const tableId = `table-${tableIndex}`;
+    $el.attr('id', tableId);
+    $el.addClass('article-table');
+    
+    // Generar CSV de la tabla
+    const csvContent = generateCSVFromTable($el);
+    
+    // Generar HTML de la tabla (para Excel/HTML)
+    const tableHtml = $.html($el);
+    
+    // Crear el wrapper con botones
+    const tableWrapper = `
+    <div class="table-download-wrapper">
+      <div class="table-header">
+        <span class="table-label">Tabla ${tableIndex}</span>
+        <div class="table-download-buttons">
+          <a href="data:text/csv;charset=utf-8,${encodeURIComponent(csvContent)}" 
+             download="tabla-${tableIndex}.csv" 
+             class="table-download-btn" 
+             title="Descargar como CSV">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            <span>CSV</span>
+          </a>
+          <a href="data:application/vnd.ms-excel;charset=utf-8,${encodeURIComponent(tableHtml)}" 
+             download="tabla-${tableIndex}.xls" 
+             class="table-download-btn"
+             title="Descargar como Excel (HTML)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <rect x="2" y="3" width="20" height="18" rx="2" ry="2"/>
+              <line x1="8" y1="9" x2="16" y2="9"/>
+              <line x1="8" y1="13" x2="16" y2="13"/>
+              <line x1="8" y1="17" x2="12" y2="17"/>
+            </svg>
+            <span>Excel</span>
+          </a>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        ${$.html($el)}
+      </div>
+    </div>
+    `;
+    
+    $el.replaceWith(tableWrapper);
+  });
+  
+  return $.html();
+}
+
+// ========== FUNCIÓN PARA GENERAR CSV DESDE UNA TABLA ==========
+function generateCSVFromTable($table) {
+  let csv = [];
+  
+  // Procesar filas
+  $table.find('tr').each((i, row) => {
+    let rowData = [];
+    
+    // Procesar celdas (th o td)
+    $(row).find('th, td').each((j, cell) => {
+      let cellText = $(cell).text().trim();
+      // Escapar comillas y caracteres especiales para CSV
+      cellText = cellText.replace(/"/g, '""');
+      // Envolver en comillas si contiene coma o salto de línea
+      if (cellText.includes(',') || cellText.includes('\n') || cellText.includes('"')) {
+        cellText = `"${cellText}"`;
+      }
+      rowData.push(cellText);
+    });
+    
+    csv.push(rowData.join(','));
+  });
+  
+  return csv.join('\n');
+}
 // ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML ==========
 function processCodeBlocks(html) {
   if (!html) return html;
@@ -610,21 +697,17 @@ function processCodeBlocks(html) {
     $el.parent().replaceWith(codeHtml);
   });
   
-  // Procesar tablas - AÑADIR IDs
-  let tableIndex = 0;
-  $('table').each((i, el) => {
-    const $el = $(el);
-    tableIndex++;
-    const tableId = `table-${tableIndex}`;
-    $el.attr('id', tableId);
-    $el.addClass('article-table');
-    $el.wrap('<div class="table-wrapper"></div>');
-  });
+  // PROCESAR TABLAS CON BOTONES DE DESCARGA
+  let processedHtml = $.html();
+  processedHtml = processTablesWithDownload(processedHtml);
   
-  // Procesar imágenes - AÑADIR IDs a los figures
+  // Volver a cargar el HTML procesado para continuar con imágenes y ecuaciones
+  const $2 = cheerio.load(processedHtml, { decodeEntities: false });
+  
+  // Procesar imágenes - CON target="_blank" para abrir en nueva pestaña
   let figureIndex = 0;
-  $('img').each((i, el) => {
-    const $el = $(el);
+  $2('img').each((i, el) => {
+    const $el = $2(el);
     const alt = $el.attr('alt') || '';
     const src = $el.attr('src') || '';
     const style = $el.attr('style') || '';
@@ -646,24 +729,30 @@ function processCodeBlocks(html) {
     figureIndex++;
     const figureId = `figure-${figureIndex}`;
     
+    // Envolver la imagen en un enlace para abrir en nueva pestaña
+    // ¡Esto usa HTML nativo, sin JavaScript!
+    if (src) {
+      $el.wrap(`<a href="${src}" target="_blank" rel="noopener noreferrer" class="image-link"></a>`);
+    }
+    
     if (alt) {
-      $el.wrap(`<figure class="image-figure${floatClass}" id="${figureId}"></figure>`);
-      $el.after(`<figcaption class="image-caption">${alt}</figcaption>`);
+      $el.parent().wrap(`<figure class="image-figure${floatClass}" id="${figureId}"></figure>`);
+      $el.parent().after(`<figcaption class="image-caption">${alt}</figcaption>`);
     } else {
-      $el.wrap(`<figure class="image-figure${floatClass}" id="${figureId}"></figure>`);
+      $el.parent().wrap(`<figure class="image-figure${floatClass}" id="${figureId}"></figure>`);
     }
   });
   
   // Procesar ecuaciones - AÑADIR IDs
   let equationIndex = 0;
-  $('.MathJax_Display, .math-container').each((i, el) => {
-    const $el = $(el);
+  $2('.MathJax_Display, .math-container').each((i, el) => {
+    const $el = $2(el);
     equationIndex++;
     const equationId = `equation-${equationIndex}`;
     $el.attr('id', equationId);
   });
   
-  return $.html();
+  return $2.html();
 }
 // ========== FUNCIÓN PRINCIPAL ==========
 async function generateAll() {
@@ -2376,6 +2465,115 @@ body {
   border: 1px solid #3c3c3c;
   margin-bottom: 8px;
   z-index: 100;
+}
+  /* ===== TABLAS CON BOTONES DE DESCARGA ===== */
+.table-download-wrapper {
+  margin: 2rem 0;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1.5rem;
+  background: var(--bg-soft);
+  border-bottom: 1px solid var(--border-color);
+  font-family: 'Inter', sans-serif;
+}
+
+.table-label {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--nature-blue);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.table-download-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.table-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.3rem 0.8rem;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-main);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.table-download-btn:hover {
+  background: var(--nature-blue);
+  border-color: var(--nature-blue);
+  color: white;
+}
+
+.table-download-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  padding: 0 1.5rem 1.5rem 1.5rem;
+}
+
+/* ===== IMÁGENES QUE ABREN EN NUEVA PESTAÑA ===== */
+.image-link {
+  display: inline-block;
+  max-width: 100%;
+  cursor: zoom-in;
+  transition: opacity 0.2s;
+  text-decoration: none;
+  border-bottom: none;
+}
+
+.image-link:hover {
+  opacity: 0.9;
+}
+
+.image-link::after {
+  content: "↗";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
+.image-link:hover::after {
+  opacity: 1;
+}
+
+/* Ajuste para figuras con enlaces */
+.image-figure {
+  position: relative;
+}
+
+.image-figure .image-link {
+  position: relative;
+  display: inline-block;
 }
     /* ===== TABLES - ESTILO ACADÉMICO BOOKTABS ===== */
     .table-wrapper {
