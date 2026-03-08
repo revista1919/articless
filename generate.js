@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const cheerio = require('cheerio');
 // ... al inicio del archivo, junto a los otros require
-const fetch = (...args) => import('node-fetch').then(module => module.default(...args));
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 // ========== CONFIGURACIÓN ==========
 const ARTICLES_JSON = path.join(__dirname, 'articles.json');
 const OUTPUT_HTML_DIR = path.join(__dirname, 'articles');
@@ -547,15 +547,11 @@ function processAuthorsWithIcons(authors, article = null, lang = 'es') {
 }
 
 // ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML ==========
-// ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML (VERSIÓN CORREGIDA) ==========
+// ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML ==========
 function processCodeBlocks(html) {
   if (!html) return html;
   
   const $ = cheerio.load(html, { decodeEntities: false });
-  let codeIndex = 0;
-  let tableIndex = 0;
-  let figureIndex = 0;
-  let equationIndex = 0;
   
   // Procesar bloques de código
   $('pre code, pre').each((i, el) => {
@@ -573,120 +569,54 @@ function processCodeBlocks(html) {
       language = classAttr.split('lang-')[1].split(' ')[0];
     }
     
-    // CORRECCIÓN: No reemplazar con un nuevo elemento, sino modificar el existente
-    codeIndex++;
-    const codeId = `code-${codeIndex}`;
-    
-    // Si es un elemento <pre> directamente, necesitamos modificarlo adecuadamente
-    if ($el.is('pre')) {
-      // Es un <pre> directamente, necesitamos extraer el código
-      const $pre = $el;
-      $pre.attr('id', codeId);
-      $pre.addClass('code-block');
-      
-      // Envolver el contenido existente en una estructura adecuada
-      $pre.wrap('<div class="code-block-wrapper"></div>');
-      const $wrapper = $pre.parent('.code-block-wrapper');
-      
-      // Crear header
-      const header = `
-        <div class="code-header">
-          <span class="code-language">${language || 'código'}</span>
-          <button class="code-copy-btn" onclick="copyCode('${codeId}', this)" title="Copiar código (Ctrl+C)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-            <span class="copy-text">Copiar</span>
-          </button>
-        </div>
-      `;
-      
-      // Crear contenedor para líneas de números
-      let lineNumbersHtml = '';
-      for (let i = 1; i <= lineCount; i++) {
-        lineNumbersHtml += `<span class="code-line-number">${i}</span>`;
-      }
-      
-      const lineNumbers = `
-        <div class="code-line-numbers" aria-hidden="true">
-          ${lineNumbersHtml}
-        </div>
-      `;
-      
-      // Envolver el contenido actual en la estructura correcta
-      $pre.wrap('<div class="code-block-container"></div>');
-      const $container = $pre.parent('.code-block-container');
-      
-      // Insertar header antes del container
-      $wrapper.prepend(header);
-      
-      // Insertar números de línea antes del pre
-      $container.prepend(lineNumbers);
-      
-    } else if ($el.is('code') && $el.parent().is('pre')) {
-      // Es <code> dentro de <pre>, esta es la estructura más común
-      const $code = $el;
-      const $pre = $code.parent('pre');
-      
-      $code.attr('id', codeId);
-      
-      // Envolver todo en la estructura correcta
-      $pre.wrap('<div class="code-block-wrapper"></div>');
-      const $wrapper = $pre.parent('.code-block-wrapper');
-      
-      // Crear header
-      const header = `
-        <div class="code-header">
-          <span class="code-language">${language || 'código'}</span>
-          <button class="code-copy-btn" onclick="copyCode('${codeId}', this)" title="Copiar código (Ctrl+C)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-            <span class="copy-text">Copiar</span>
-          </button>
-        </div>
-      `;
-      
-      // Crear números de línea
-      let lineNumbersHtml = '';
-      for (let i = 1; i <= lineCount; i++) {
-        lineNumbersHtml += `<span class="code-line-number">${i}</span>`;
-      }
-      
-      // Envolver el pre en un container para los números de línea
-      $pre.wrap('<div class="code-block-container"></div>');
-      const $container = $pre.parent('.code-block-container');
-      
-      // Insertar header y números de línea
-      $wrapper.prepend(header);
-      $container.prepend(`
-        <div class="code-line-numbers" aria-hidden="true">
-          ${lineNumbersHtml}
-        </div>
-      `);
-      
-      // Procesar las líneas del código para envolver cada línea
-      const codeText = $code.html();
-      // No escapar doblemente, ya que el HTML ya está escapado
-      $code.html(lines.map(line => 
-        `<span class="line">${line || ' '}</span>`
-      ).join('\n'));
+    // Generar números de línea
+    let lineNumbersHtml = '';
+    for (let i = 1; i <= lineCount; i++) {
+      lineNumbersHtml += `<span class="code-line-number">${i}</span>`;
     }
+    
+    // Escapar código y envolver cada línea para hover
+    const escapedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const wrappedLines = lines.map(line => 
+      `<span class="line">${line || ' '}</span>`
+    ).join('\n');
+    
+    const codeId = `code-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // NUEVO HTML con numeración de líneas y estructura VS Code
+    // NUEVO HTML con numeración de líneas y estructura VS Code - MEJORADO PARA MÓVIL
+const codeHtml = `
+  <div class="code-block-wrapper">
+    <div class="code-header">
+      <span class="code-language">${language || 'código'}</span>
+      <button class="code-copy-btn" onclick="copyCode('${codeId}', this)" title="Copiar código (Ctrl+C)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+        <span class="copy-text">Copiar</span>
+      </button>
+    </div>
+    <div class="code-block-container">
+      <div class="code-line-numbers" aria-hidden="true">
+        ${lineNumbersHtml}
+      </div>
+      <pre id="${codeId}" class="code-block ${language ? `language-${language}` : ''}"><code class="${language ? `language-${language}` : ''}">${wrappedLines}</code></pre>
+    </div>
+  </div>
+`;
+    
+    $el.parent().replaceWith(codeHtml);
   });
   
-  // Procesar tablas (igual que antes)
+  // Procesar tablas
   $('table').each((i, el) => {
     const $el = $(el);
-    tableIndex++;
-    const tableId = `table-${tableIndex}`;
-    $el.attr('id', tableId);
     $el.addClass('article-table');
     $el.wrap('<div class="table-wrapper"></div>');
   });
   
-  // Procesar imágenes (igual que antes)
+  // Procesar imágenes
   $('img').each((i, el) => {
     const $el = $(el);
     const alt = $el.attr('alt') || '';
@@ -707,26 +637,109 @@ function processCodeBlocks(html) {
       floatClass = ' float-right';
     }
     
-    figureIndex++;
-    const figureId = `figure-${figureIndex}`;
-    
     if (alt) {
-      $el.wrap(`<figure class="image-figure${floatClass}" id="${figureId}"></figure>`);
+      $el.wrap(`<figure class="image-figure${floatClass}"></figure>`);
       $el.after(`<figcaption class="image-caption">${alt}</figcaption>`);
     } else {
-      $el.wrap(`<figure class="image-figure${floatClass}" id="${figureId}"></figure>`);
+      $el.wrap(`<figure class="image-figure${floatClass}"></figure>`);
     }
   });
   
-  // Procesar ecuaciones (igual que antes)
-  $('.MathJax_Display, .math-container').each((i, el) => {
-    const $el = $(el);
-    equationIndex++;
-    const equationId = `equation-${equationIndex}`;
-    $el.attr('id', equationId);
+  return $.html();
+}
+// ========== FUNCIÓN PARA EXTRAER ELEMENTOS ESPECIALES DEL ARTÍCULO ==========
+function extractSpecialElements(html) {
+  if (!html) return [];
+  
+  const $ = cheerio.load(html, { decodeEntities: false });
+  const elements = [];
+  
+  // 1. Detectar Figuras (imágenes con caption)
+  $('figure.image-figure').each((index, el) => {
+    const $fig = $(el);
+    const $img = $fig.find('img');
+    const $caption = $fig.find('figcaption');
+    
+    // Generar un ID único si no existe
+    const id = $fig.attr('id') || `figure-${index + 1}`;
+    $fig.attr('id', id);
+    
+    elements.push({
+      type: 'figure',
+      id: id,
+      title: $caption.text().trim() || `Figura ${index + 1}`,
+      level: 0,
+      order: index,
+      icon: '📷'
+    });
   });
   
-  return $.html();
+  // 2. Detectar Tablas
+  $('table.article-table').each((index, el) => {
+    const $table = $(el);
+    
+    // Intentar encontrar caption (si existe en tu HTML)
+    const $caption = $table.find('caption').first();
+    const captionText = $caption.text().trim();
+    
+    // Generar ID
+    const id = $table.attr('id') || `table-${index + 1}`;
+    $table.attr('id', id);
+    
+    elements.push({
+      type: 'table',
+      id: id,
+      title: captionText || `Tabla ${index + 1}`,
+      level: 0,
+      order: index + 100, // Las tablas después de las figuras
+      icon: '📊'
+    });
+  });
+  
+  // 3. Detectar Bloques de Código
+  $('.code-block-wrapper').each((index, el) => {
+    const $code = $(el);
+    const $header = $code.find('.code-language');
+    const language = $header.text().trim() || 'código';
+    
+    const id = $code.attr('id') || `code-${index + 1}`;
+    $code.attr('id', id);
+    
+    elements.push({
+      type: 'code',
+      id: id,
+      title: `Bloque de código (${language})`,
+      level: 0,
+      order: index + 200,
+      icon: '💻'
+    });
+  });
+  
+  // 4. Detectar Ecuaciones (MathJax)
+  $('.MathJax_Display, .math-container').each((index, el) => {
+    const $math = $(el);
+    
+    // Intentar encontrar etiqueta de ecuación (ej: (1), [eq:1])
+    const equationLabel = $math.find('.equation-label, .eq-number').text().trim() || 
+                         `Ecuación ${index + 1}`;
+    
+    const id = $math.attr('id') || `equation-${index + 1}`;
+    $math.attr('id', id);
+    
+    elements.push({
+      type: 'equation',
+      id: id,
+      title: equationLabel,
+      level: 0,
+      order: index + 300,
+      icon: '∫'
+    });
+  });
+  
+  // Ordenar elementos por su aparición en el documento
+  elements.sort((a, b) => a.order - b.order);
+  
+  return elements;
 }
 // ========== FUNCIÓN PRINCIPAL ==========
 async function generateAll() {
@@ -2460,27 +2473,20 @@ body {
     }
 
     .article-table th {
-  border-bottom: 1.5px solid var(--nature-black);
-  background: transparent;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 12px 15px;
-  color: var(--nature-black);
-  text-align: left;
-  word-wrap: break-word;
-  word-break: break-word;
-  overflow-wrap: break-word;
-}
+      border-bottom: 1.5px solid var(--nature-black);
+      background: transparent;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 12px 15px;
+      color: var(--nature-black);
+      text-align: left;
+    }
 
-.article-table td {
-  padding: 12px 15px;
-  border: none;
-  border-bottom: 1px solid #eee;
-  word-wrap: break-word;
-  word-break: break-word;
-  overflow-wrap: break-word;
-  hyphens: auto;
-}
+    .article-table td {
+      padding: 12px 15px;
+      border: none;
+      border-bottom: 1px solid #eee;
+    }
 
     .article-table tr:last-child td {
       border-bottom: none;
@@ -2489,187 +2495,7 @@ body {
     .article-table tr:hover {
       background-color: var(--bg-soft);
     }
-/* ===== TOOLBAR PROFESIONAL - EDICIÓN REFINADA ===== */
 
-/* ===== ELEMENTOS ESPECIALES - TOOLBAR PROFESIONAL ===== */
-.special-element-toolbar {
-  position: absolute;
-  top: -40px;
-  right: 0;
-  display: flex;
-  gap: 8px;
-  background: white;
-  border-radius: 8px;
-  padding: 4px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  border: 1px solid var(--border-color);
-  opacity: 0;
-  transform: translateY(5px);
-  transition: all 0.2s ease;
-  z-index: 50;
-  font-family: 'Inter', sans-serif;
-}
-
-.special-element-container {
-  position: relative;
-  margin: 2.5rem 0;
-}
-
-.special-element-container:hover .special-element-toolbar {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.toolbar-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
-  background: white;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--text-main);
-  cursor: pointer;
-  transition: all 0.2s;
-  text-decoration: none;
-}
-
-.toolbar-btn:hover {
-  background: var(--nature-blue);
-  border-color: var(--nature-blue);
-  color: white;
-}
-
-.toolbar-btn svg {
-  width: 14px;
-  height: 14px;
-  stroke: currentColor;
-  fill: none;
-}
-
-/* Modal para visualización en pantalla completa */
-.special-modal {
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.9);
-  z-index: 10000;
-  overflow-y: auto;
-}
-
-.special-modal.active {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.special-modal-content {
-  background: white;
-  max-width: 95vw;
-  max-height: 95vh;
-  overflow: auto;
-  border-radius: 8px;
-  position: relative;
-  padding: 2rem;
-}
-
-.special-modal-close {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  background: none;
-  border: none;
-  font-size: 2rem;
-  cursor: pointer;
-  color: var(--text-muted);
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: all 0.2s;
-}
-
-.special-modal-close:hover {
-  background: var(--bg-soft);
-  color: var(--nature-blue);
-}
-
-/* Tabla de descargas */
-.download-format-menu {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  background: white;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  padding: 0.5rem 0;
-  min-width: 150px;
-  z-index: 100;
-  display: none;
-}
-
-.download-format-menu.active {
-  display: block;
-}
-
-.format-option {
-  display: block;
-  width: 100%;
-  padding: 0.5rem 1rem;
-  border: none;
-  background: none;
-  text-align: left;
-  font-size: 0.85rem;
-  color: var(--text-main);
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.format-option:hover {
-  background: var(--bg-soft);
-  color: var(--nature-blue);
-}
-
-/* Badge para elementos especiales */
-.special-badge {
-  display: inline-block;
-  background: var(--nature-blue);
-  color: white;
-  font-size: 0.65rem;
-  padding: 2px 8px;
-  border-radius: 12px;
-  margin-left: 8px;
-  vertical-align: middle;
-}
-
-/* Tooltip mejorado */
-[data-tooltip] {
-  position: relative;
-}
-
-[data-tooltip]:hover::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--nature-black);
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 0.7rem;
-  white-space: nowrap;
-  margin-bottom: 5px;
-  z-index: 1000;
-}
     /* ===== FIGURES AND FLOATING ELEMENTS ===== */
     .image-figure {
       margin: 1.5rem 0;
@@ -3372,7 +3198,6 @@ body {
   }
     }
   </style>
- 
 </head>
 <body>
   <header class="sd-header">
@@ -3863,283 +3688,130 @@ body {
 
 <script>
 // ========== FUNCIONES PARA MENÚ MÓVIL ==========
-var mobileSearchVisible = false;
+let mobileSearchVisible = false;
 
 function toggleMobileMenu() {
-  var menu = document.getElementById('mobileMenu');
-  var overlay = document.getElementById('mobileOverlay');
+  const menu = document.getElementById('mobileMenu');
+  const overlay = document.getElementById('mobileOverlay');
   
-  if (menu && overlay) {
-    menu.classList.toggle('active');
-    overlay.classList.toggle('active');
-    
-    if (menu.classList.contains('active')) {
-      document.body.style.overflow = 'hidden';
-      generateMobileTOC();
-    } else {
-      document.body.style.overflow = '';
-    }
+  menu.classList.toggle('active');
+  overlay.classList.toggle('active');
+  
+  // Prevenir scroll del body cuando el menú está abierto
+  if (menu.classList.contains('active')) {
+    document.body.style.overflow = 'hidden';
+    // Generar TOC móvil cada vez que se abre el menú
+    generateMobileTOC();
+  } else {
+    document.body.style.overflow = '';
   }
 }
 
 function closeMobileMenu() {
-  var menu = document.getElementById('mobileMenu');
-  var overlay = document.getElementById('mobileOverlay');
+  const menu = document.getElementById('mobileMenu');
+  const overlay = document.getElementById('mobileOverlay');
   
   if (menu) menu.classList.remove('active');
   if (overlay) overlay.classList.remove('active');
   document.body.style.overflow = '';
-}
-
-function toggleMobileSearch() {
-  var menu = document.getElementById('mobileMenu');
-  var overlay = document.getElementById('mobileOverlay');
   
-  if (menu && overlay) {
-    menu.classList.add('active');
-    overlay.classList.add('active');
-    document.body.style.overflow = 'hidden';
-    
-    generateMobileTOC();
-    
-    setTimeout(function() {
-      var mobileSearchInput = document.getElementById('mobile-search-input');
-      if (mobileSearchInput) {
-        mobileSearchInput.focus();
-        mobileSearchInput.select();
-      }
-    }, 300);
+  // También cerrar la búsqueda si está abierta
+  const mobileSearch = document.getElementById('mobileSearch');
+  if (mobileSearchVisible) {
+    mobileSearch.style.display = 'none';
+    mobileSearchVisible = false;
   }
 }
 
+function toggleMobileSearch() {
+  // Abrir el menú móvil
+  const menu = document.getElementById('mobileMenu');
+  const overlay = document.getElementById('mobileOverlay');
+  
+  menu.classList.add('active');
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+  
+  // Generar el TOC móvil
+  generateMobileTOC();
+  
+  // Pequeño retraso para asegurar que el menú esté renderizado
+  setTimeout(() => {
+    const mobileSearchInput = document.getElementById('mobile-search-input');
+    if (mobileSearchInput) {
+      mobileSearchInput.focus();
+      // Opcional: seleccionar todo el texto existente
+      mobileSearchInput.select();
+    }
+  }, 300); // 300ms es suficiente para la animación del menú
+}
 function handleMobileSearch(e) {
   e.preventDefault();
-  var queryInput = document.getElementById('mobile-search-input');
-  var query = queryInput ? queryInput.value.trim() : '';
+  const query = document.getElementById('mobile-search-input').value.trim();
   if (query) {
-    var encodedQuery = encodeURIComponent(query).replace(/%20/g, '+');
+    const encodedQuery = encodeURIComponent(query).replace(/%20/g, '+');
     window.location.href = '/article?article_search=' + encodedQuery;
   }
 }
 
 // ========== FUNCIÓN DE BÚSQUEDA PRINCIPAL ==========
-document.addEventListener('DOMContentLoaded', function() {
-  var searchForm = document.getElementById('search-form');
+document.addEventListener('DOMContentLoaded', () => {
+  const searchForm = document.getElementById('search-form');
   if (searchForm) {
-    searchForm.addEventListener('submit', function(e) {
+    searchForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      var queryInput = document.getElementById('search-input');
-      var query = queryInput ? queryInput.value.trim() : '';
+      const query = document.getElementById('search-input').value.trim();
       if (query) {
-        var encodedQuery = encodeURIComponent(query).replace(/%20/g, '+');
+        const encodedQuery = encodeURIComponent(query).replace(/%20/g, '+');
         window.location.href = '/article?article_search=' + encodedQuery;
       }
     });
   }
-  
-  // Inicializar todo cuando el DOM esté listo
-  initializeTableOfContents();
-  generateMobileTOC();
-  setupIntersectionObserver();
-  wrapSpecialElements();
-  setupSmoothScrolling();
 });
-
-// ========== FUNCIÓN PRINCIPAL PARA INICIALIZAR LA TOC ==========
-// ========== FUNCIÓN PRINCIPAL PARA INICIALIZAR LA TOC ==========
-function initializeTableOfContents() {
-console.log('TOC inicializada')
-  var tocList = document.getElementById('toc-list');
-  if (!tocList) return;
-
-  // Limpiar TOC existente
-  tocList.innerHTML = '';
-
-  // BUSCAR TODOS LOS ENCABEZADOS DENTRO DEL ARTÍCULO
-  // Versión más específica: busca dentro del article
-  var headings = document.querySelectorAll('article h2');
-  
-  // Si no encuentra, intenta con el contenedor principal
-  if (headings.length === 0) {
-    headings = document.querySelectorAll('.article-container h2');
-  }
-  
-  // Si aún no encuentra, intenta con cualquier h2 en la página (excluyendo los de la sidebar)
-  if (headings.length === 0) {
-    var allHeadings = document.querySelectorAll('h2');
-    headings = [];
-    for (var i = 0; i < allHeadings.length; i++) {
-      var h = allHeadings[i];
-      // Excluir h2 que estén en sidebars o que sean parte de la UI
-      if (!h.closest('.toc-sidebar') && !h.closest('.right-sidebar') && !h.closest('.info-tabs')) {
-        headings.push(h);
-      }
-    }
-  }
-
-  console.log('Encabezados encontrados:', headings.length); // Para depuración
-  
-  for (var i = 0; i < headings.length; i++) {
-    var heading = headings[i];
-    
-    // Ignorar ciertos encabezados si es necesario
-    if (heading.id === 'citations' || heading.closest('.citation-box')) continue;
-    
-    // Asegurar que el encabezado tenga un ID
-    var id = heading.id || 'section-' + i;
-    heading.id = id;
-    
-    // Crear elemento de la TOC
-    var li = document.createElement('li');
-    li.className = 'toc-item';
-    
-    var link = document.createElement('a');
-    link.href = '#' + id;
-    link.textContent = heading.textContent;
-    
-    link.addEventListener('click', (function(sectionId) {
-      return function(e) {
-        e.preventDefault();
-        document.getElementById(sectionId).scrollIntoView({ behavior: 'smooth' });
-      };
-    })(id));
-    
-    li.appendChild(link);
-    tocList.appendChild(li);
-  }
-
-  // Si no se encontraron encabezados, mostrar mensaje de depuración
-  if (headings.length === 0) {
-    console.warn('No se encontraron encabezados H2 en el artículo');
-    // Opcional: mostrar un mensaje en la TOC
-    var li = document.createElement('li');
-    li.className = 'toc-item';
-    li.innerHTML = '<span style="color: #999; font-style: italic;">Sin secciones</span>';
-    tocList.appendChild(li);
-  }
-
-  // Añadir elementos especiales a la TOC (figuras, tablas, etc.)
-  addSpecialElementsToTOC();
-}
-// ========== AÑADIR ELEMENTOS ESPECIALES A LA TOC ==========
-function addSpecialElementsToTOC() {
-  var tocList = document.getElementById('toc-list');
-  if (!tocList) return;
-
-  var specialElements = [];
-  
-  // Detectar figuras
-  var figures = document.querySelectorAll('figure.image-figure[id^="figure-"]');
-  for (var i = 0; i < figures.length; i++) {
-    var fig = figures[i];
-    var caption = fig.querySelector('.image-caption');
-    specialElements.push({
-      type: 'figure',
-      id: fig.id,
-      title: caption ? caption.textContent.trim() : 'Figura ' + (i + 1),
-      icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15L16 10 5 21"/></svg>'
-    });
-  }
-  
-  // Detectar tablas
-  var tables = document.querySelectorAll('table.article-table[id^="table-"]');
-  for (var i = 0; i < tables.length; i++) {
-    var table = tables[i];
-    specialElements.push({
-      type: 'table',
-      id: table.id,
-      title: 'Tabla ' + (i + 1),
-      icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5zm0 5h18M10 3v18"/></svg>'
-    });
-  }
-  
-  // Detectar código
-  var codes = document.querySelectorAll('.code-block-wrapper[id^="code-"]');
-  for (var i = 0; i < codes.length; i++) {
-    var code = codes[i];
-    var language = code.querySelector('.code-language');
-    specialElements.push({
-      type: 'code',
-      id: code.id,
-      title: language ? 'Código (' + language.textContent.trim() + ')' : 'Código ' + (i + 1),
-      icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m18 16 4-4-4-4M6 8l-4 4 4 4M14.5 4l-5 16"/></svg>'
-    });
-  }
-  
-  // Detectar ecuaciones
-  var equations = document.querySelectorAll('[id^="equation-"]');
-  for (var i = 0; i < equations.length; i++) {
-    var eq = equations[i];
-    specialElements.push({
-      type: 'equation',
-      id: eq.id,
-      title: 'Ecuación ' + (i + 1),
-      icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 7h3a2 2 0 0 1 2 2v6a2 2 0 0 0 2 2h3"/><path d="M7 11h4"/><path d="M17 7h.01"/><circle cx="18.5" cy="15.5" r="2.5"/></svg>'
-    });
-  }
-
-  // Añadir separador y elementos especiales si existen
-  if (specialElements.length > 0) {
-    var separator = document.createElement('li');
-    separator.className = 'toc-separator';
-    separator.innerHTML = '<span style="display:block; font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:var(--text-muted); margin:1rem 0 0.5rem 0; padding-left:1rem;">FIGURAS Y TABLAS</span>';
-    tocList.appendChild(separator);
-
-    for (var j = 0; j < specialElements.length; j++) {
-      var element = specialElements[j];
-      var li = document.createElement('li');
-      li.className = 'toc-item toc-special';
-      
-      var link = document.createElement('a');
-      link.href = '#' + element.id;
-      link.innerHTML = element.icon + ' <span style="margin-left: 6px;">' + element.title + '</span>';
-      
-      link.addEventListener('click', (function(elId) {
-        return function(e) {
-          e.preventDefault();
-          document.getElementById(elId).scrollIntoView({ behavior: 'smooth' });
-        };
-      })(element.id));
-      
-      li.appendChild(link);
-      tocList.appendChild(li);
-    }
-  }
-}
 
 // ========== GENERAR TABLA DE CONTENIDOS PARA MÓVIL ==========
 function generateMobileTOC() {
-  var mobileTocList = document.getElementById('mobile-toc-list');
+  const mobileTocList = document.getElementById('mobile-toc-list');
   if (!mobileTocList) return;
   
-  var isSpanish = document.documentElement.lang === 'es';
+  // Guardar el idioma actual
+  const isSpanish = document.documentElement.lang === 'es';
+  
+  // Limpiar lista existente
   mobileTocList.innerHTML = '';
   
-  // Añadir Resumen/Abstract
-  var abstractItem = document.createElement('li');
+  // Añadir resumen siempre
+  const abstractItem = document.createElement('li');
   abstractItem.className = 'sd-mobile-nav-item';
+  
+  // Usar concatenación normal en lugar de template string anidado
   abstractItem.innerHTML = '<a href="#abstract" class="sd-mobile-nav-link mobile-toc-link" data-target="abstract">' +
     '<svg viewBox="0 0 24 24" width="20" height="20">' +
       '<path d="M4 6H20v2H4zM4 12H20v2H4zM4 18H20v2H4z"/>' +
     '</svg>' +
     (isSpanish ? 'Resumen' : 'Abstract') +
   '</a>';
+  
   mobileTocList.appendChild(abstractItem);
   
-  // Añadir encabezados H2
-  var headings = document.querySelectorAll('.article-container h2');
-  for (var i = 0; i < headings.length; i++) {
-    var heading = headings[i];
-    if (heading.id === 'citations' || heading.closest('.citation-box')) continue;
+  // Obtener todos los encabezados h2 del artículo
+  const headings = document.querySelectorAll('.article-container h2');
+  
+  headings.forEach((heading, index) => {
+    // Ignorar ciertos encabezados que no queremos en el TOC
+    if (heading.id === 'citations' || heading.closest('.citation-box')) return;
     
-    var id = heading.id || 'section-' + i;
+    // Asegurar que el encabezado tenga un ID
+    const id = heading.id || 'section-' + index;
     heading.id = id;
     
-    var li = document.createElement('li');
+    // Crear elemento de menú
+    const li = document.createElement('li');
     li.className = 'sd-mobile-nav-item';
     
-    var iconPath = '<path d="M4 6H20v2H4zM4 12H20v2H4zM4 18H20v2H4z"/>';
-    var headingText = heading.textContent.toLowerCase();
+    // Determinar ícono según el tipo de sección
+    let iconPath = '';
+    const headingText = heading.textContent.toLowerCase();
     
     if (headingText.includes('referencia') || headingText.includes('reference')) {
       iconPath = '<path d="M4 6H20v2H4zM4 12H20v2H4zM4 18H20v2H4z"/>';
@@ -4151,124 +3823,69 @@ function generateMobileTOC() {
       iconPath = '<path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4V4c0-1.1-.9-2-2-2z"/>';
     } else if (headingText.includes('licen') || headingText.includes('license')) {
       iconPath = '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>';
+    } else {
+      iconPath = '<path d="M4 6H20v2H4zM4 12H20v2H4zM4 18H20v2H4z"/>';
     }
     
+    // Construir el HTML con concatenación
     li.innerHTML = '<a href="#' + id + '" class="sd-mobile-nav-link mobile-toc-link" data-target="' + id + '">' +
-      '<svg viewBox="0 0 24 24" width="20" height="20">' + iconPath + '</svg>' +
+      '<svg viewBox="0 0 24 24" width="20" height="20">' +
+        iconPath +
+      '</svg>' +
       heading.textContent +
     '</a>';
     
     mobileTocList.appendChild(li);
-  }
+  });
   
-  // Añadir eventos a los enlaces móviles
-  var mobileLinks = document.querySelectorAll('.mobile-toc-link');
-  for (var i = 0; i < mobileLinks.length; i++) {
-    var link = mobileLinks[i];
-    link.addEventListener('click', function(e) {
-      var targetId = this.getAttribute('data-target');
+  // Añadir evento de cierre del menú al hacer clic en los enlaces
+  document.querySelectorAll('.mobile-toc-link').forEach(link => {
+    link.addEventListener('click', (e) => {
+      const targetId = link.getAttribute('data-target');
       if (targetId) {
         e.preventDefault();
-        var targetElement = document.getElementById(targetId);
+        const targetElement = document.getElementById(targetId);
         if (targetElement) {
           targetElement.scrollIntoView({ behavior: 'smooth' });
-          closeMobileMenu();
+          closeMobileMenu(); // Cerrar el menú después de navegar
         }
       }
     });
-  }
-}
-
-// ========== CONFIGURAR INTERSECTION OBSERVER PARA HIGHLIGHTING ==========
-function setupIntersectionObserver() {
-  var observer = new IntersectionObserver(function(entries) {
-    for (var i = 0; i < entries.length; i++) {
-      var entry = entries[i];
-      if (entry.isIntersecting) {
-        // Actualizar TOC desktop
-        var desktopLinks = document.querySelectorAll('.toc-item a');
-        for (var j = 0; j < desktopLinks.length; j++) {
-          var link = desktopLinks[j];
-          link.classList.remove('active');
-          if (link.getAttribute('href') === '#' + entry.target.id) {
-            link.classList.add('active');
-          }
-        }
-        
-        // Actualizar TOC móvil
-        var mobileLinks = document.querySelectorAll('.mobile-toc-link');
-        for (var k = 0; k < mobileLinks.length; k++) {
-          var mlink = mobileLinks[k];
-          mlink.classList.remove('active');
-          if (mlink.getAttribute('data-target') === entry.target.id) {
-            mlink.classList.add('active');
-          }
-        }
-      }
-    }
-  }, { threshold: 0.3, rootMargin: '-80px 0px -80px 0px' });
-
-  // Observar todos los elementos relevantes
-  var elementsToObserve = document.querySelectorAll(
-    '.article-container h2, #abstract, [id^="figure-"], [id^="table-"], [id^="code-"], [id^="equation-"]'
-  );
-  
-  for (var i = 0; i < elementsToObserve.length; i++) {
-    var el = elementsToObserve[i];
-    if (el.id) observer.observe(el);
-  }
-}
-
-// ========== CONFIGURAR SCROLL SUAVE ==========
-function setupSmoothScrolling() {
-  var anchors = document.querySelectorAll('a[href^="#"]');
-  for (var i = 0; i < anchors.length; i++) {
-    var anchor = anchors[i];
-    anchor.addEventListener('click', function(e) {
-      var href = this.getAttribute('href');
-      if (href === '#') return;
-      
-      var target = document.querySelector(href);
-      if (target) {
-        e.preventDefault();
-        target.scrollIntoView({ behavior: 'smooth' });
-      }
-    });
-  }
+  });
 }
 
 // ========== HIGHLIGHT JS ==========
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', () => {
   if (window.hljs) {
-    var codeBlocks = document.querySelectorAll('pre code');
-    for (var i = 0; i < codeBlocks.length; i++) {
-      hljs.highlightElement(codeBlocks[i]);
-    }
+    document.querySelectorAll('pre code').forEach((block) => {
+      hljs.highlightElement(block);
+    });
   }
 });
 
 // ========== FUNCIÓN PARA COPIAR CÓDIGO ==========
 function copyCode(codeId, btn) {
-  var codeElement = document.getElementById(codeId);
+  const codeElement = document.getElementById(codeId);
   if (!codeElement) return;
   
-  var code = codeElement.textContent || codeElement.innerText;
+  const code = codeElement.textContent || codeElement.innerText;
   
-  navigator.clipboard.writeText(code).then(function() {
-    var originalHtml = btn.innerHTML;
+  navigator.clipboard.writeText(code).then(() => {
+    const originalText = btn.innerText;
+    const originalHtml = btn.innerHTML;
     
     btn.innerHTML = '✓ Copiado';
     btn.style.background = '#22c55e';
     btn.style.color = 'white';
     btn.style.borderColor = '#22c55e';
     
-    setTimeout(function() {
+    setTimeout(() => {
       btn.innerHTML = originalHtml;
       btn.style.background = '';
       btn.style.color = '';
       btn.style.borderColor = '';
     }, 2000);
-  }).catch(function(err) {
+  }).catch(err => {
     console.error('Error copying code:', err);
     alert('No se pudo copiar el código');
   });
@@ -4277,480 +3894,200 @@ function copyCode(codeId, btn) {
 // ========== TAB SWITCHING ==========
 function switchTab(device, tabName) {
   if (device === 'desktop') {
-    var desktopPanels = document.querySelectorAll('#desktop-citations, #desktop-metadata');
-    for (var i = 0; i < desktopPanels.length; i++) {
-      desktopPanels[i].classList.remove('active');
-    }
-    var desktopBtns = document.querySelectorAll('.right-sidebar .tab-button');
-    for (var i = 0; i < desktopBtns.length; i++) {
-      desktopBtns[i].classList.remove('active');
-    }
-    var panel = document.getElementById('desktop-' + tabName);
-    if (panel) panel.classList.add('active');
-    if (event && event.target) event.target.classList.add('active');
-  } else {
-    var mobilePanels = document.querySelectorAll('#mobile-citations, #mobile-metadata');
-    for (var i = 0; i < mobilePanels.length; i++) {
-      mobilePanels[i].classList.remove('active');
-    }
-    var mobileBtns = document.querySelectorAll('.mobile-info .tab-button');
-    for (var i = 0; i < mobileBtns.length; i++) {
-      mobileBtns[i].classList.remove('active');
-    }
-    var panel = document.getElementById('mobile-' + tabName);
-    if (panel) panel.classList.add('active');
-    if (event && event.target) event.target.classList.add('active');
-  }
-}
-
-// ========== FUNCIONES PARA ELEMENTOS ESPECIALES ==========
-function wrapSpecialElements() {
-  // Envolver figuras
-  var figures = document.querySelectorAll('figure.image-figure[id^="figure-"]');
-  for (var i = 0; i < figures.length; i++) {
-    wrapWithToolbar(figures[i], 'figure', getElementTitle(figures[i], 'figure'));
-  }
-  
-  // Envolver tablas
-  var tables = document.querySelectorAll('table.article-table[id^="table-"]');
-  for (var i = 0; i < tables.length; i++) {
-    wrapWithToolbar(tables[i], 'table', getElementTitle(tables[i], 'table'));
-  }
-  
-  // Envolver bloques de código
-  var codes = document.querySelectorAll('.code-block-wrapper[id^="code-"]');
-  for (var i = 0; i < codes.length; i++) {
-    wrapWithToolbar(codes[i], 'code', getElementTitle(codes[i], 'code'));
-  }
-  
-  // Envolver ecuaciones
-  var equations = document.querySelectorAll('[id^="equation-"]');
-  for (var i = 0; i < equations.length; i++) {
-    wrapWithToolbar(equations[i], 'equation', 'Ecuación');
-  }
-}
-
-function getElementTitle(element, type) {
-  if (type === 'figure') {
-    var caption = element.querySelector('.image-caption');
-    return caption ? caption.textContent.trim() : 'Figura';
-  } else if (type === 'code') {
-    var language = element.querySelector('.code-language');
-    return language ? 'Código (' + language.textContent.trim() + ')' : 'Código';
-  }
-  return type === 'table' ? 'Tabla' : 'Ecuación';
-}
-
-function wrapWithToolbar(element, type, title) {
-  if (element.parentElement && element.parentElement.classList.contains('special-element-container')) {
-    return;
-  }
-  
-  var container = document.createElement('div');
-  container.className = 'special-element-container';
-  container.setAttribute('data-element-type', type);
-  
-  element.parentNode.insertBefore(container, element);
-  container.appendChild(element);
-  
-  var toolbar = document.createElement('div');
-  toolbar.className = 'special-element-toolbar';
-  
-  var buttons = [];
-  
-  // Botón pantalla completa
-  buttons.push('<button class="toolbar-btn" onclick="openInModal(\'' + element.id + '\')" data-tooltip="Ver en pantalla completa">' +
-      '<svg viewBox="0 0 24 24" width="14" height="14">' +
-        '<path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>' +
-      '</svg>' +
-      '<span class="toolbar-label">Pantalla completa</span>' +
-    '</button>');
-  
-  // Botón nueva pestaña
-  buttons.push('<button class="toolbar-btn" onclick="openInNewTab(\'' + element.id + '\')" data-tooltip="Abrir en nueva pestaña">' +
-      '<svg viewBox="0 0 24 24" width="14" height="14">' +
-        '<path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>' +
-      '</svg>' +
-      '<span class="toolbar-label">Nueva pestaña</span>' +
-    '</button>');
-  
-  // Botones específicos para tablas
-  if (type === 'table') {
-    buttons.push('<div style="position: relative;">' +
-    '<button class="toolbar-btn" onclick="toggleDownloadMenu(this, \'' + element.id + '\', event)" data-tooltip="Descargar tabla">' +
-          '<svg viewBox="0 0 24 24" width="14" height="14">' +
-            '<path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>' +
-          '</svg>' +
-          '<span class="toolbar-label">Descargar</span>' +
-        '</button>' +
-        '<div class="download-format-menu">' +
-          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'csv\')">CSV</button>' +
-          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'excel\')">Excel</button>' +
-          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'json\')">JSON</button>' +
-          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'markdown\')">Markdown</button>' +
-          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'latex\')">LaTeX</button>' +
-          '<button class="format-option" onclick="downloadTable(\'' + element.id + '\', \'html\')">HTML</button>' +
-        '</div>' +
-      '</div>');
-  }
-  
-  // Botón copiar para código
-  if (type === 'code') {
-    buttons.push('<button class="toolbar-btn" onclick="copyElementContent(\'' + element.id + '\')" data-tooltip="Copiar contenido">' +
-        '<svg viewBox="0 0 24 24" width="14" height="14">' +
-          '<rect x="9" y="9" width="13" height="13" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/>' +
-          '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" fill="none" stroke="currentColor" stroke-width="2"/>' +
-        '</svg>' +
-        '<span class="toolbar-label">Copiar</span>' +
-      '</button>');
-  }
-  
-  toolbar.innerHTML = buttons.join('');
-  container.appendChild(toolbar);
-  
-  var badge = document.createElement('span');
-  badge.className = 'special-badge';
-  badge.textContent = type === 'figure' ? 'Figura' : 
-                      type === 'table' ? 'Tabla' : 
-                      type === 'code' ? 'Código' : 'Ecuación';
-  container.insertBefore(badge, element);
-}
-
-// Funciones para modal
-window.openInModal = function(elementId) {
-  var element = document.getElementById(elementId);
-  if (!element) return;
-  
-  var modal = document.getElementById('special-modal');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'special-modal';
-    modal.className = 'special-modal';
-    modal.innerHTML = '<div class="special-modal-content">' +
-      '<button class="special-modal-close" onclick="closeModal()">&times;</button>' +
-      '</div>';
-    document.body.appendChild(modal);
-    
-    document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape' && modal.classList.contains('active')) {
-        closeModal();
-      }
+    document.querySelectorAll('#desktop-citations, #desktop-metadata').forEach(panel => {
+      panel.classList.remove('active');
     });
+    document.querySelectorAll('.right-sidebar .tab-button').forEach(btn => {
+      btn.classList.remove('active');
+    });
+    document.getElementById('desktop-' + tabName).classList.add('active');
+    if (event) event.target.classList.add('active');
+  } else {
+    document.querySelectorAll('#mobile-citations, #mobile-metadata').forEach(panel => {
+      panel.classList.remove('active');
+    });
+    document.querySelectorAll('.mobile-info .tab-button').forEach(btn => {
+      btn.classList.remove('active');
+    });
+    document.getElementById('mobile-' + tabName).classList.add('active');
+    if (event) event.target.classList.add('active');
+  }
+}
+
+// ========== GENERATE DESKTOP TABLE OF CONTENTS ==========
+document.addEventListener('DOMContentLoaded', () => {
+  const tocList = document.getElementById('toc-list');
+  if (tocList) {
+    const headings = document.querySelectorAll('.article-container h2');
     
-    modal.addEventListener('click', function(e) {
-      if (e.target === modal) {
-        closeModal();
-      }
+    headings.forEach((heading, index) => {
+      if (heading.id === 'citations' || heading.closest('.citation-box')) return;
+      
+      const id = heading.id || 'section-' + index;
+      heading.id = id;
+      
+      const li = document.createElement('li');
+      li.className = 'toc-item';
+      const link = document.createElement('a');
+      link.href = '#' + id;
+      link.textContent = heading.textContent;
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+      });
+      li.appendChild(link);
+      tocList.appendChild(li);
     });
   }
-  
-  var modalContent = modal.querySelector('.special-modal-content');
-  var clone = element.cloneNode(true);
-  clone.classList.add('in-modal');
-  
-  // Limpiar contenido existente (excepto el botón de cerrar)
-  while (modalContent.children.length > 1) {
-    modalContent.removeChild(modalContent.lastChild);
-  }
-  modalContent.appendChild(clone);
-  
-  modal.classList.add('active');
-  document.body.style.overflow = 'hidden';
-}
 
-window.closeModal = function() {
-  var modal = document.getElementById('special-modal');
-  if (modal) {
-    modal.classList.remove('active');
-    document.body.style.overflow = '';
-  }
-}
+  // Smooth scroll for all internal links
+  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function (e) {
+      const href = this.getAttribute('href');
+      if (href === '#') return;
+      
+      const target = document.querySelector(href);
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  });
 
-window.openInNewTab = function(elementId) {
-  var element = document.getElementById(elementId);
+  // Active section highlighting for desktop TOC
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        document.querySelectorAll('.toc-item a').forEach(link => {
+          link.classList.remove('active');
+          if (link.getAttribute('href') === '#' + entry.target.id) {
+            link.classList.add('active');
+          }
+        });
+      }
+    });
+  }, { threshold: 0.3, rootMargin: '-80px 0px -80px 0px' });
+
+  document.querySelectorAll('.article-container h2, #abstract').forEach(h => {
+    if (h.id) observer.observe(h);
+  });
+  
+  // Generar TOC móvil inicial
+  generateMobileTOC();
+});
+
+// ========== ACTIVE SECTION HIGHLIGHTING FOR MOBILE TOC ==========
+// Crear un observer separado para el TOC móvil
+document.addEventListener('DOMContentLoaded', () => {
+  const mobileObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        document.querySelectorAll('.mobile-toc-link').forEach(link => {
+          link.classList.remove('active');
+          if (link.getAttribute('data-target') === entry.target.id) {
+            link.classList.add('active');
+          }
+        });
+      }
+    });
+  }, { threshold: 0.3, rootMargin: '-80px 0px -80px 0px' });
+
+  document.querySelectorAll('.article-container h2, #abstract').forEach(el => {
+    if (el.id) mobileObserver.observe(el);
+  });
+});
+
+// ========== COPY RICH TEXT FUNCTION ==========
+function copyRichText(id, event) {
+  const element = document.getElementById(id);
   if (!element) return;
   
-  var title = element.getAttribute('data-title') || 'Elemento especial';
-  var content = element.outerHTML;
+  const htmlContent = element.innerHTML;
+  const plainText = element.innerText || element.textContent;
   
-  var newWindow = window.open('', '_blank');
-  newWindow.document.write('<!DOCTYPE html>' +
-    '<html><head><title>' + title + ' - Revista Nacional</title>' +
-    '<meta charset="UTF-8">' +
-    '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
-    '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono&display=swap" rel="stylesheet">' +
-    '<style>body{font-family:"Inter",sans-serif;padding:2rem;max-width:1200px;margin:0 auto;background:#f8f9fa;}' +
-    '.container{background:white;padding:2rem;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);}' +
-    'h1{font-size:1.5rem;color:#005a7d;margin-bottom:1.5rem;}' +
-    'pre{background:#1e1e1e;padding:1rem;border-radius:4px;overflow-x:auto;}' +
-    'code{font-family:"JetBrains Mono",monospace;}' +
-    'img{max-width:100%;height:auto;}' +
-    'table{width:100%;border-collapse:collapse;margin:1rem 0;}' +
-    'th,td{border:1px solid #ddd;padding:8px;text-align:left;}' +
-    'th{background:#f0f0f0;}' +
-    '.close-btn{position:fixed;top:1rem;right:1rem;padding:0.5rem 1rem;background:#005a7d;color:white;border:none;border-radius:4px;cursor:pointer;}' +
-    '</style></head><body>' +
-    '<div class="container"><h1>' + title + '</h1>' +
-    '<div id="element-container">' + content + '</div></div>' +
-    '<button class="close-btn" onclick="window.close()">Cerrar ventana</button>' +
-    '</body></html>');
-  newWindow.document.close();
-}
-
-// Funciones para descarga de tablas
-window.downloadTable = function(tableId, format) {
-  var table = document.getElementById(tableId);
-  if (!table) return;
+  const clipboardItem = new ClipboardItem({
+    'text/plain': new Blob([plainText], { type: 'text/plain' }),
+    'text/html': new Blob([htmlContent], { type: 'text/html' })
+  });
   
-  var content = '';
-  var filename = 'table-' + tableId;
-  var mimeType = '';
-  
-  switch(format) {
-    case 'csv':
-      content = tableToCSV(table);
-      mimeType = 'text/csv';
-      filename += '.csv';
-      break;
-    case 'excel':
-      content = tableToExcel(table);
-      mimeType = 'application/vnd.ms-excel';
-      filename += '.xls';
-      break;
-    case 'json':
-      content = tableToJSON(table);
-      mimeType = 'application/json';
-      filename += '.json';
-      break;
-    case 'markdown':
-      content = tableToMarkdown(table);
-      mimeType = 'text/markdown';
-      filename += '.md';
-      break;
-    case 'latex':
-      content = tableToLaTeX(table);
-      mimeType = 'text/plain';
-      filename += '.tex';
-      break;
-    case 'html':
-      content = table.outerHTML;
-      mimeType = 'text/html';
-      filename += '.html';
-      break;
-    default:
-      return;
-  }
-  
-  var blob = new Blob([content], { type: mimeType });
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  
-  showToast('Tabla descargada como ' + format.toUpperCase());
-}
-
-function tableToCSV(table) {
-  var rows = table.querySelectorAll('tr');
-  var csv = [];
-  
-  for (var i = 0; i < rows.length; i++) {
-    var row = rows[i];
-    var cells = row.querySelectorAll('th, td');
-    var rowData = [];
+  navigator.clipboard.write([clipboardItem]).then(() => {
+    const btn = event.target;
+    const originalText = btn.innerText;
+    const originalBg = btn.style.background;
+    const originalColor = btn.style.color;
     
-    for (var j = 0; j < cells.length; j++) {
-      var cell = cells[j];
-      var text = cell.textContent.trim();
-      if (text.includes(',') || text.includes('"') || text.includes('\n')) {
-        text = '"' + text.replace(/"/g, '""') + '"';
-      }
-      rowData.push(text);
-    }
+    btn.innerText = document.documentElement.lang === 'es' ? '✓ Copiado' : '✓ Copied';
+    btn.style.background = '#22c55e';
+    btn.style.color = 'white';
+    btn.style.borderColor = '#22c55e';
     
-    csv.push(rowData.join(','));
-  }
-  
-  return csv.join('\n');
-}
-
-function tableToExcel(table) {
-  return '<html><head><meta charset="UTF-8"><title>Tabla exportada</title></head><body>' +
-    table.outerHTML + '</body></html>';
-}
-
-function tableToJSON(table) {
-  var headers = [];
-  var data = [];
-  
-  var headerRow = table.querySelector('tr');
-  if (headerRow) {
-    var headerCells = headerRow.querySelectorAll('th, td');
-    for (var i = 0; i < headerCells.length; i++) {
-      headers.push(headerCells[i].textContent.trim());
-    }
-  }
-  
-  var rows = table.querySelectorAll('tr');
-  for (var i = 1; i < rows.length; i++) {
-    var row = rows[i];
-    var cells = row.querySelectorAll('td');
-    var rowData = {};
-    
-    for (var j = 0; j < cells.length; j++) {
-      if (headers[j]) {
-        rowData[headers[j]] = cells[j].textContent.trim();
-      } else {
-        rowData['columna_' + j] = cells[j].textContent.trim();
-      }
-    }
-    
-    data.push(rowData);
-  }
-  
-  return JSON.stringify(data, null, 2);
-}
-
-function tableToMarkdown(table) {
-  var rows = table.querySelectorAll('tr');
-  var markdown = [];
-  
-  for (var i = 0; i < rows.length; i++) {
-    var row = rows[i];
-    var cells = row.querySelectorAll('th, td');
-    var rowData = [];
-    
-    for (var j = 0; j < cells.length; j++) {
-      rowData.push(cells[j].textContent.trim());
-    }
-    
-    if (i === 0) {
-      markdown.push('| ' + rowData.join(' | ') + ' |');
-      var separators = [];
-      for (var j = 0; j < rowData.length; j++) {
-        separators.push(' --- ');
-      }
-      markdown.push('|' + separators.join('|') + '|');
-    } else {
-      markdown.push('| ' + rowData.join(' | ') + ' |');
-    }
-  }
-  
-  return markdown.join('\n');
-}
-
-function tableToLaTeX(table) {
-  var rows = table.querySelectorAll('tr');
-  var latex = ['\\begin{table}[h]', '\\centering', '\\begin{tabular}{'];
-  
-  var firstRow = rows[0];
-  var colCount = firstRow ? firstRow.querySelectorAll('th, td').length : 0;
-  
-  latex.push('{|' + 'c'.repeat(colCount) + '|}');
-  latex.push('}');
-  latex.push('\\hline');
-  
-  for (var i = 0; i < rows.length; i++) {
-    var row = rows[i];
-    var cells = row.querySelectorAll('th, td');
-    var rowData = [];
-    
-    for (var j = 0; j < cells.length; j++) {
-      var text = cells[j].textContent.trim();
-      text = text.replace(/_/g, '\\_')
-                 .replace(/&/g, '\\&')
-                 .replace(/%/g, '\\%')
-                 .replace(/\$/g, '\\$')
-                 .replace(/#/g, '\\#')
-                 .replace(/{/g, '\\{')
-                 .replace(/}/g, '\\}');
-      rowData.push(text);
-    }
-    
-    latex.push(rowData.join(' & ') + ' \\\\');
-    latex.push('\\hline');
-  }
-  
-  latex.push('\\end{tabular}');
-  latex.push('\\caption{Título de la tabla}');
-  latex.push('\\label{tab:' + table.id + '}');
-  latex.push('\\end{table}');
-  
-  return latex.join('\n');
-}
-
-window.showToast = function(message, duration) {
-  if (duration === undefined) duration = 2000;
-  
-  var toast = document.createElement('div');
-  toast.textContent = message;
-  toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#005a7d;color:white;' +
-    'padding:12px 24px;border-radius:8px;font-family:"Inter",sans-serif;font-size:0.9rem;' +
-    'box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:10001;animation:slideIn 0.3s ease;';
-  
-  document.head.insertAdjacentHTML('beforeend', 
-    '<style>@keyframes slideIn{from{transform:translateX(100%);opacity:0;}to{transform:translateX(0);opacity:1;}}</style>');
-  
-  document.body.appendChild(toast);
-  
-  setTimeout(function() {
-    toast.style.animation = 'slideIn 0.3s ease reverse';
-    setTimeout(function() { toast.remove(); }, 300);
-  }, duration);
-}
-
-window.toggleDownloadMenu = function(btn, tableId, event) {
-  if (event) {
-    event.stopPropagation();
-  }
-  
-  var activeMenus = document.querySelectorAll('.download-format-menu.active');
-  for (var i = 0; i < activeMenus.length; i++) {
-    if (activeMenus[i] !== btn.nextElementSibling) {
-      activeMenus[i].classList.remove('active');
-    }
-  }
-  
-  var menu = btn.nextElementSibling;
-  if (menu) {
-    menu.classList.toggle('active');
-    
-    if (menu.classList.contains('active')) {
-      var closeMenu = function(e) {
-        if (!menu.contains(e.target) && e.target !== btn) {
-          menu.classList.remove('active');
-          document.removeEventListener('click', closeMenu);
-        }
-      };
-      setTimeout(function() { document.addEventListener('click', closeMenu); }, 100);
-    }
-  }
-}
-window.copyElementContent = function(elementId) {
-  var element = document.getElementById(elementId);
-  if (!element) return;
-  
-  var text = '';
-  
-  if (element.classList.contains('code-block-wrapper')) {
-    var codeElement = element.querySelector('code');
-    text = codeElement ? codeElement.textContent : element.textContent;
-  } else {
-    text = element.textContent;
-  }
-  
-  navigator.clipboard.writeText(text).then(function() {
-    showToast('Contenido copiado al portapapeles');
-  }).catch(function(err) {
-    console.error('Error copying:', err);
-    showToast('Error al copiar', 3000);
+    setTimeout(() => {
+      btn.innerText = originalText;
+      btn.style.background = originalBg;
+      btn.style.color = originalColor;
+      btn.style.borderColor = '';
+    }, 2000);
+  }).catch(err => {
+    console.error('Error copying rich text: ', err);
+    fallbackCopy(plainText, event.target);
   });
 }
+
+function fallbackCopy(text, btn) {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  
+  const originalText = btn.innerText;
+  
+  try {
+    document.execCommand('copy');
+    btn.innerText = document.documentElement.lang === 'es' ? '✓ Copiado' : '✓ Copied';
+    btn.style.background = '#22c55e';
+    btn.style.color = 'white';
+    setTimeout(() => {
+      btn.innerText = originalText;
+      btn.style.background = 'white';
+      btn.style.color = '';
+    }, 2000);
+  } catch (err) {
+    console.error('Fallback copy failed:', err);
+    alert('No se pudo copiar. Por favor, selecciona el texto manualmente.');
+  }
+  
+  document.body.removeChild(textarea);
+}
+
+// ========== CERRAR MENÚ CON TECLA ESCAPE ==========
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeMobileMenu();
+  }
+});
+
+// ========== MATHJAX ==========
+if (window.MathJax) {
+  MathJax.typesetPromise();
+}
+
+// ========== INICIALIZACIÓN ADICIONAL ==========
+document.addEventListener('DOMContentLoaded', () => {
+  // Cerrar menú al hacer clic en un enlace (por si acaso)
+  const mobileLinks = document.querySelectorAll('.sd-mobile-nav-link');
+  mobileLinks.forEach(link => {
+    link.addEventListener('click', () => {
+      // No cerrar si es un enlace externo o tiene target _blank
+      if (!link.hasAttribute('target') || link.getAttribute('target') !== '_blank') {
+        setTimeout(closeMobileMenu, 150); // Pequeño retraso para permitir la navegación
+      }
+    });
+  });
+});
 </script>
+</body>
 </html>`;
 }
 
