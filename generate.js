@@ -2429,76 +2429,75 @@ body {
     }
 /* ===== TOOLBAR PROFESIONAL - EDICIÓN REFINADA ===== */
 
-:root {
-  --glass-bg: rgba(255, 255, 255, 0.85);
-  --glass-border: rgba(255, 255, 255, 0.4);
-  --premium-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
-  --accent-color: #3b82f6; /* Azul moderno más suave */
+/* ===== ELEMENTOS ESPECIALES - TOOLBAR PROFESIONAL ===== */
+.special-element-toolbar {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  display: flex;
+  gap: 8px;
+  background: white;
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  border: 1px solid var(--border-color);
+  opacity: 0;
+  transform: translateY(5px);
+  transition: all 0.2s ease;
+  z-index: 50;
+  font-family: 'Inter', sans-serif;
 }
 
 .special-element-container {
   position: relative;
-  margin: 3rem 0;
-  transition: transform 0.3s ease;
-}
-
-.special-element-toolbar {
-  position: absolute;
-  top: -25px; /* Más pegado al elemento para cohesión visual */
-  right: 12px;
-  display: flex;
-  gap: 6px;
-  background: var(--glass-bg);
-  backdrop-filter: blur(12px) saturate(180%);
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
-  border-radius: 12px;
-  padding: 6px;
-  box-shadow: var(--premium-shadow);
-  border: 1px solid var(--glass-border);
-  opacity: 0;
-  transform: translateY(10px) scale(0.95);
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); /* Efecto spring/elástico */
-  z-index: 50;
+  margin: 2.5rem 0;
 }
 
 .special-element-container:hover .special-element-toolbar {
   opacity: 1;
-  transform: translateY(0) scale(1);
+  transform: translateY(0);
 }
 
 .toolbar-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: #4b5563; /* Gris profundo */
+  gap: 4px;
+  padding: 6px 12px;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-main);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s;
+  text-decoration: none;
 }
 
 .toolbar-btn:hover {
-  background: white;
-  color: var(--accent-color);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  transform: translateY(-1px);
+  background: var(--nature-blue);
+  border-color: var(--nature-blue);
+  color: white;
 }
 
-/* Modal Estilo Galería de Arte */
+.toolbar-btn svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  fill: none;
+}
+
+/* Modal para visualización en pantalla completa */
 .special-modal {
   display: none;
   position: fixed;
-  inset: 0;
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(10px);
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.9);
   z-index: 10000;
-  padding: 40px;
-  animation: fadeIn 0.3s ease;
+  overflow-y: auto;
 }
 
 .special-modal.active {
@@ -2509,115 +2508,105 @@ body {
 
 .special-modal-content {
   background: white;
-  max-width: 90vw;
-  max-height: 85vh;
-  border-radius: 20px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  position: relative;
-  padding: 3rem;
+  max-width: 95vw;
+  max-height: 95vh;
   overflow: auto;
-  border: 1px solid rgba(0,0,0,0.05);
+  border-radius: 8px;
+  position: relative;
+  padding: 2rem;
 }
 
-/* Botón cerrar minimalista */
 .special-modal-close {
   position: absolute;
-  top: 1.5rem;
-  right: 1.5rem;
-  width: 32px;
-  height: 32px;
-  background: #f3f4f6;
-  border-radius: 50%;
+  top: 1rem;
+  right: 1rem;
+  background: none;
   border: none;
+  font-size: 2rem;
   cursor: pointer;
+  color: var(--text-muted);
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 50%;
   transition: all 0.2s;
 }
 
 .special-modal-close:hover {
-  background: #ef4444;
-  color: white;
-  transform: rotate(90deg);
+  background: var(--bg-soft);
+  color: var(--nature-blue);
 }
 
-/* Menú de Descarga Estilo iOS */
+/* Tabla de descargas */
 .download-format-menu {
   position: absolute;
-  top: calc(100% + 8px);
+  top: 100%;
   right: 0;
-  background: var(--glass-bg);
-  backdrop-filter: blur(15px);
-  border-radius: 14px;
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--premium-shadow);
-  padding: 8px;
-  min-width: 180px;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  padding: 0.5rem 0;
+  min-width: 150px;
+  z-index: 100;
   display: none;
-  animation: slideDown 0.2s ease;
+}
+
+.download-format-menu.active {
+  display: block;
 }
 
 .format-option {
-  padding: 10px 12px;
-  border-radius: 8px;
-  font-size: 0.8rem;
-  color: #374151;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: block;
+  width: 100%;
+  padding: 0.5rem 1rem;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 0.85rem;
+  color: var(--text-main);
+  cursor: pointer;
   transition: background 0.2s;
 }
 
 .format-option:hover {
-  background: rgba(59, 130, 246, 0.1);
-  color: var(--accent-color);
+  background: var(--bg-soft);
+  color: var(--nature-blue);
 }
 
-/* Badge sutil */
+/* Badge para elementos especiales */
 .special-badge {
-  background: #eff6ff;
-  color: #3b82f6;
-  font-size: 0.6rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  padding: 3px 10px;
-  border-radius: 20px;
-  border: 1px solid rgba(59, 130, 246, 0.2);
+  display: inline-block;
+  background: var(--nature-blue);
+  color: white;
+  font-size: 0.65rem;
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin-left: 8px;
+  vertical-align: middle;
 }
 
-/* Tooltip elegante */
-[data-tooltip]::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: 125%;
-  left: 50%;
-  transform: translateX(-50%) translateY(5px);
-  background: #1f2937;
-  color: white;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 0.7rem;
-  font-weight: 500;
-  opacity: 0;
-  pointer-events: none;
-  transition: all 0.2s ease;
+/* Tooltip mejorado */
+[data-tooltip] {
+  position: relative;
 }
 
 [data-tooltip]:hover::after {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-
-/* Animaciones */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideDown {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--nature-black);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  margin-bottom: 5px;
+  z-index: 1000;
 }
     /* ===== FIGURES AND FLOATING ELEMENTS ===== */
     .image-figure {
