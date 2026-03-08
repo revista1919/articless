@@ -546,7 +546,40 @@ function processAuthorsWithIcons(authors, article = null, lang = 'es') {
   return authorElements.join('<span class="author-separator">, </span>');
 }
 
-// ========== FUNCIÓN PARA PROCESAR TABLAS CON BOTONES DE DESCARGA ==========
+
+// ========== FUNCIÓN PARA GENERAR CSV DESDE UNA TABLA (CORREGIDA) ==========
+function generateCSVFromTable($table) {
+  let csv = [];
+  
+  // IMPORTANTE: Usar el $table directamente, no crear una nueva instancia de Cheerio
+  // Procesar filas
+  $table.find('tr').each((i, row) => {
+    let rowData = [];
+    
+    // Procesar celdas (th o td)
+    $(row).find('th, td').each((j, cell) => {
+      // Obtener texto de la celda y limpiarlo
+      let cellText = $(cell).text().trim();
+      
+      // Eliminar espacios extras y normalizar saltos de línea
+      cellText = cellText.replace(/\s+/g, ' ').replace(/\n/g, ' ');
+      
+      // Escapar comillas para CSV
+      cellText = cellText.replace(/"/g, '""');
+      
+      // Envolver en comillas dobles siempre (para evitar problemas con comas y caracteres especiales)
+      cellText = `"${cellText}"`;
+      
+      rowData.push(cellText);
+    });
+    
+    csv.push(rowData.join(','));
+  });
+  
+  return csv.join('\n');
+}
+
+// ========== FUNCIÓN PARA PROCESAR TABLAS CON BOTONES DE DESCARGA (CORREGIDA) ==========
 function processTablesWithDownload(html) {
   if (!html) return html;
   
@@ -560,11 +593,14 @@ function processTablesWithDownload(html) {
     $el.attr('id', tableId);
     $el.addClass('article-table');
     
-    // Generar CSV de la tabla
+    // Generar CSV de la tabla (AHORA PASAMOS $el DIRECTAMENTE)
     const csvContent = generateCSVFromTable($el);
     
-    // Generar HTML de la tabla (para Excel/HTML)
+    // Generar HTML de la tabla con BOM para Excel (para caracteres especiales)
     const tableHtml = $.html($el);
+    
+    // Añadir BOM (Byte Order Mark) para UTF-8 en Excel
+    const BOM = '\uFEFF';
     
     // Crear el wrapper con botones
     const tableWrapper = `
@@ -572,7 +608,7 @@ function processTablesWithDownload(html) {
       <div class="table-header">
         <span class="table-label">Tabla ${tableIndex}</span>
         <div class="table-download-buttons">
-          <a href="data:text/csv;charset=utf-8,${encodeURIComponent(csvContent)}" 
+          <a href="data:text/csv;charset=utf-8,${encodeURIComponent(BOM + csvContent)}" 
              download="tabla-${tableIndex}.csv" 
              class="table-download-btn" 
              title="Descargar como CSV">
@@ -583,7 +619,7 @@ function processTablesWithDownload(html) {
             </svg>
             <span>CSV</span>
           </a>
-          <a href="data:application/vnd.ms-excel;charset=utf-8,${encodeURIComponent(tableHtml)}" 
+          <a href="data:application/vnd.ms-excel;charset=utf-8,${encodeURIComponent(BOM + tableHtml)}" 
              download="tabla-${tableIndex}.xls" 
              class="table-download-btn"
              title="Descargar como Excel (HTML)">
@@ -607,36 +643,6 @@ function processTablesWithDownload(html) {
   });
   
   return $.html();
-}
-
-// ========== FUNCIÓN PARA GENERAR CSV DESDE UNA TABLA ==========
-// ========== FUNCIÓN PARA GENERAR CSV DESDE UNA TABLA ==========
-function generateCSVFromTable($table) {
-  let csv = [];
-  
-  // Necesitas crear una instancia de Cheerio para usar $
-  const $ = cheerio.load($table.html(), { decodeEntities: false });
-  
-  // Procesar filas - ahora $ está definido
-  $('tr').each((i, row) => {
-    let rowData = [];
-    
-    // Procesar celdas (th o td)
-    $(row).find('th, td').each((j, cell) => {
-      let cellText = $(cell).text().trim();
-      // Escapar comillas y caracteres especiales para CSV
-      cellText = cellText.replace(/"/g, '""');
-      // Envolver en comillas si contiene coma o salto de línea
-      if (cellText.includes(',') || cellText.includes('\n') || cellText.includes('"')) {
-        cellText = `"${cellText}"`;
-      }
-      rowData.push(cellText);
-    });
-    
-    csv.push(rowData.join(','));
-  });
-  
-  return csv.join('\n');
 }
 // ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML ==========
 function processCodeBlocks(html) {
@@ -2470,114 +2476,122 @@ body {
   margin-bottom: 8px;
   z-index: 100;
 }
-  /* ===== TABLAS CON BOTONES DE DESCARGA ===== */
+  /* ===== TABLAS ESTILO ACADÉMICO (TIPO BOOKTABS) ===== */
 .table-download-wrapper {
-  margin: 2rem 0;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  overflow: hidden;
-  background: white;
+  margin: 2.5rem 0;
+  background: transparent;
+  /* Eliminamos el borde exterior y el radio para un look más limpio */
 }
 
 .table-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem 1.5rem;
-  background: var(--bg-soft);
-  border-bottom: 1px solid var(--border-color);
-  font-family: 'Inter', sans-serif;
+  align-items: baseline; /* Alinea texto con base de botones */
+  padding: 0.5rem 0;
+  background: transparent;
+  border-bottom: 1.5px solid var(--text-main, #222); /* Línea superior gruesa tipo LaTeX */
+  font-family: 'Inter', 'Latin Modern Roman', serif;
 }
 
 .table-label {
-  font-weight: 600;
-  font-size: 0.85rem;
-  color: var(--nature-blue);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-main, #222);
+  text-transform: none; /* Menos agresivo que uppercase */
+  letter-spacing: -0.01em;
 }
 
 .table-download-buttons {
   display: flex;
-  gap: 0.5rem;
+  gap: 1rem;
 }
 
 .table-download-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 0.3rem 0.8rem;
-  background: white;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  color: var(--text-main);
+  gap: 6px;
+  padding: 0.2rem 0; /* Solo padding vertical, el espacio lo da el gap */
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #666);
   font-size: 0.75rem;
-  font-weight: 500;
+  font-variant: small-caps; /* Toque académico elegante */
   text-decoration: none;
-  transition: all 0.2s;
+  transition: color 0.2s ease;
+  border-bottom: 1px solid transparent;
 }
 
 .table-download-btn:hover {
-  background: var(--nature-blue);
-  border-color: var(--nature-blue);
-  color: white;
+  color: var(--nature-blue, #0056b3);
+  border-bottom: 1px solid var(--nature-blue, #0056b3);
+  background: transparent;
 }
 
 .table-download-btn svg {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
+  opacity: 0.7;
 }
 
 .table-wrapper {
   overflow-x: auto;
-  padding: 0 1.5rem 1.5rem 1.5rem;
+  padding: 1rem 0; /* Eliminamos padding lateral para alinear con el texto */
 }
 
-/* ===== IMÁGENES QUE ABREN EN NUEVA PESTAÑA ===== */
+/* Nota: Para que la tabla interna parezca LaTeX, aplica esto a tu <table>:
+   border-top: 2px solid #222;
+   border-bottom: 2px solid #222;
+   th { border-bottom: 1px solid #222; }
+*/
+
+/* ===== IMÁGENES (ESTILO GALERÍA DE ARTE/MUSEO) ===== */
 .image-link {
   display: inline-block;
-  max-width: 100%;
+  position: relative;
   cursor: zoom-in;
-  transition: opacity 0.2s;
-  text-decoration: none;
-  border-bottom: none;
+  transition: filter 0.3s ease;
+  line-height: 0; /* Evita espacios fantasma bajo la imagen */
 }
 
 .image-link:hover {
-  opacity: 0.9;
+  filter: brightness(0.95);
 }
 
+/* Indicador de expansión discreto */
 .image-link::after {
-  content: "↗";
+  content: "⤢"; /* Ícono más fino */
   position: absolute;
-  top: 8px;
-  right: 8px;
-  background: rgba(0,0,0,0.6);
-  color: white;
-  width: 24px;
-  height: 24px;
-  border-radius: 12px;
+  bottom: 12px;
+  right: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #333;
+  width: 28px;
+  height: 28px;
+  border-radius: 2px; /* Cuadrado minimalista */
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 16px;
   opacity: 0;
-  transition: opacity 0.2s;
-  pointer-events: none;
+  transition: opacity 0.2s ease;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
 .image-link:hover::after {
   opacity: 1;
 }
 
-/* Ajuste para figuras con enlaces */
 .image-figure {
-  position: relative;
+  margin: 2rem 0;
+  text-align: center;
 }
 
-.image-figure .image-link {
-  position: relative;
-  display: inline-block;
+/* Pie de figura estilo académico */
+.image-figure figcaption {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-muted, #555);
+  font-style: italic;
 }
     /* ===== TABLES - ESTILO ACADÉMICO BOOKTABS ===== */
     .table-wrapper {
