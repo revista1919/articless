@@ -4314,7 +4314,7 @@ function wrapWithToolbar(element, type, title) {
   // Botones específicos para tablas
   if (type === 'table') {
     buttons.push('<div style="position: relative;">' +
-        '<button class="toolbar-btn" onclick="toggleDownloadMenu(this, \'' + element.id + '\')" data-tooltip="Descargar tabla">' +
+    '<button class="toolbar-btn" onclick="toggleDownloadMenu(this, \'' + element.id + '\', event)" data-tooltip="Descargar tabla">' +
           '<svg viewBox="0 0 24 24" width="14" height="14">' +
             '<path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>' +
           '</svg>' +
@@ -4640,8 +4640,10 @@ window.showToast = function(message, duration) {
   }, duration);
 }
 
-window.toggleDownloadMenu = function(btn, tableId) {
-  event.stopPropagation();
+window.toggleDownloadMenu = function(btn, tableId, event) {
+  if (event) {
+    event.stopPropagation();
+  }
   
   var activeMenus = document.querySelectorAll('.download-format-menu.active');
   for (var i = 0; i < activeMenus.length; i++) {
@@ -4665,7 +4667,6 @@ window.toggleDownloadMenu = function(btn, tableId) {
     }
   }
 }
-
 window.copyElementContent = function(elementId) {
   var element = document.getElementById(elementId);
   if (!element) return;
