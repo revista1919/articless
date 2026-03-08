@@ -850,6 +850,38 @@ $('.article-container h2').each((index, el) => {
     order: index,
     icon: null  // los encabezados no llevan icono en tu diseño
   });
+  // PROCESAR VERSIÓN EN INGLÉS
+const $en = cheerio.load(processedHtmlEn);
+const headingsEn = [];
+$en('.article-container h2').each((index, el) => {
+  const $el = $en(el);
+  let id = $el.attr('id');
+  if (!id) {
+    id = `section-${index + 1}`;
+    $el.attr('id', id);
+  }
+  headingsEn.push({
+    type: 'heading',
+    id: id,
+    title: $el.text().trim(),
+    level: 2,
+    order: index,
+    icon: null
+  });
+});
+
+// Extraer elementos especiales de la versión en inglés
+const specialElementsEn = extractSpecialElements(processedHtmlEn);
+
+const allTocItems = [
+  ...headings.map(h => ({ ...h, type: 'heading' })),
+  ...specialElementsEs
+];
+
+const allTocItemsEn = [
+  ...headingsEn.map(h => ({ ...h, type: 'heading' })),
+  ...specialElementsEn
+];
 });
 
 // Obtener elementos especiales (ya existente)
@@ -935,7 +967,7 @@ const specialElementsEs = extractSpecialElements(processedHtmlEs);
     referencesHtml,
     htmlContent: processedHtmlEn,
     specialElements: specialElementsEn,
-    allTocItems: allTocItems,
+    allTocItems: allTocItemsEn,
     domain: DOMAIN,
     oaSvg,
     orcidSvg,
