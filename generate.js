@@ -579,11 +579,42 @@ function generateCSVFromTable($table) {
   return csv.join('\n');
 }
 
+// ========== FUNCIÓN PARA GENERAR CSV DESDE UNA TABLA (CORREGIDA) ==========
+function generateCSVFromTable($, $table) {
+  let csv = [];
+  
+  // Procesar filas
+  $table.find('tr').each((i, row) => {
+    let rowData = [];
+    
+    // Procesar celdas (th o td)
+    $(row).find('th, td').each((j, cell) => {
+      // Obtener texto de la celda y limpiarlo
+      let cellText = $(cell).text().trim();
+      
+      // Eliminar espacios extras y normalizar saltos de línea
+      cellText = cellText.replace(/\s+/g, ' ').replace(/\n/g, ' ');
+      
+      // Escapar comillas para CSV
+      cellText = cellText.replace(/"/g, '""');
+      
+      // Envolver en comillas dobles siempre (para evitar problemas con comas y caracteres especiales)
+      cellText = `"${cellText}"`;
+      
+      rowData.push(cellText);
+    });
+    
+    csv.push(rowData.join(','));
+  });
+  
+  return csv.join('\n');
+}
+
 // ========== FUNCIÓN PARA PROCESAR TABLAS CON BOTONES DE DESCARGA (CORREGIDA) ==========
-function processTablesWithDownload(html) {
+function processTablesWithDownload($, html) {
   if (!html) return html;
   
-  const $ = cheerio.load(html, { decodeEntities: false });
+  // Nota: No crear una nueva instancia de cheerio, usar la que ya existe
   let tableIndex = 0;
   
   $('table').each((i, el) => {
@@ -593,8 +624,8 @@ function processTablesWithDownload(html) {
     $el.attr('id', tableId);
     $el.addClass('article-table');
     
-    // Generar CSV de la tabla (AHORA PASAMOS $el DIRECTAMENTE)
-    const csvContent = generateCSVFromTable($el);
+    // Generar CSV de la tabla (AHORA PASAMOS $ Y $el)
+    const csvContent = generateCSVFromTable($, $el);
     
     // Generar HTML de la tabla con BOM para Excel (para caracteres especiales)
     const tableHtml = $.html($el);
@@ -644,7 +675,8 @@ function processTablesWithDownload(html) {
   
   return $.html();
 }
-// ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML ==========
+
+// ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML (CORREGIDA) ==========
 function processCodeBlocks(html) {
   if (!html) return html;
   
@@ -707,9 +739,9 @@ function processCodeBlocks(html) {
     $el.parent().replaceWith(codeHtml);
   });
   
-  // PROCESAR TABLAS CON BOTONES DE DESCARGA
+  // PROCESAR TABLAS CON BOTONES DE DESCARGA (AHORA PASAMOS $)
   let processedHtml = $.html();
-  processedHtml = processTablesWithDownload(processedHtml);
+  processedHtml = processTablesWithDownload($, processedHtml);
   
   // Volver a cargar el HTML procesado para continuar con imágenes y ecuaciones
   const $2 = cheerio.load(processedHtml, { decodeEntities: false });
@@ -740,7 +772,6 @@ function processCodeBlocks(html) {
     const figureId = `figure-${figureIndex}`;
     
     // Envolver la imagen en un enlace para abrir en nueva pestaña
-    // ¡Esto usa HTML nativo, sin JavaScript!
     if (src) {
       $el.wrap(`<a href="${src}" target="_blank" rel="noopener noreferrer" class="image-link"></a>`);
     }
@@ -753,7 +784,7 @@ function processCodeBlocks(html) {
     }
   });
   
-  // Procesar ecuaciones - AÑADIR IDs
+  // Procesar ecuaciones
   let equationIndex = 0;
   $2('.MathJax_Display, .math-container').each((i, el) => {
     const $el = $2(el);
@@ -764,6 +795,7 @@ function processCodeBlocks(html) {
   
   return $2.html();
 }
+
 // ========== FUNCIÓN PRINCIPAL ==========
 async function generateAll() {
   console.log('🚀 Iniciando generación de artículos estáticos...');
