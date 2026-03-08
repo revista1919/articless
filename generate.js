@@ -3500,8 +3500,6 @@ body {
 </div>
 
   <div class="main-wrapper">
-    <!-- Left Sidebar - Table of Contents -->
-// Dentro de generateHtmlTemplate, donde se construye la barra lateral izquierda:
 <nav class="toc-sidebar">
   <div class="toc-title">${t.contents}</div>
   <ul class="toc-list" id="toc-list">
