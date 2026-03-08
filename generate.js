@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const cheerio = require('cheerio');
 // ... al inicio del archivo, junto a los otros require
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+const fetch = (...args) => import('node-fetch').then(module => module.default(...args));
 // ========== CONFIGURACIÓN ==========
 const ARTICLES_JSON = path.join(__dirname, 'articles.json');
 const OUTPUT_HTML_DIR = path.join(__dirname, 'articles');
@@ -547,8 +547,7 @@ function processAuthorsWithIcons(authors, article = null, lang = 'es') {
 }
 
 // ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML ==========
-// ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML ==========
-// ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML (VERSIÓN MODIFICADA) ==========
+// ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML (VERSIÓN CORREGIDA) ==========
 function processCodeBlocks(html) {
   if (!html) return html;
   
@@ -574,47 +573,110 @@ function processCodeBlocks(html) {
       language = classAttr.split('lang-')[1].split(' ')[0];
     }
     
-    // Generar números de línea
-    let lineNumbersHtml = '';
-    for (let i = 1; i <= lineCount; i++) {
-      lineNumbersHtml += `<span class="code-line-number">${i}</span>`;
-    }
-    
-    // Escapar código y envolver cada línea
-    const escapedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const wrappedLines = lines.map(line => 
-      `<span class="line">${line || ' '}</span>`
-    ).join('\n');
-    
-    // Generar ID consistente
+    // CORRECCIÓN: No reemplazar con un nuevo elemento, sino modificar el existente
     codeIndex++;
     const codeId = `code-${codeIndex}`;
     
-    const codeHtml = `
-  <div class="code-block-wrapper" id="${codeId}">
-    <div class="code-header">
-      <span class="code-language">${language || 'código'}</span>
-      <button class="code-copy-btn" onclick="copyCode('${codeId}', this)" title="Copiar código (Ctrl+C)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-        </svg>
-        <span class="copy-text">Copiar</span>
-      </button>
-    </div>
-    <div class="code-block-container">
-      <div class="code-line-numbers" aria-hidden="true">
-        ${lineNumbersHtml}
-      </div>
-      <pre class="code-block ${language ? `language-${language}` : ''}"><code class="${language ? `language-${language}` : ''}">${wrappedLines}</code></pre>
-    </div>
-  </div>
-`;
-    
-    $el.parent().replaceWith(codeHtml);
+    // Si es un elemento <pre> directamente, necesitamos modificarlo adecuadamente
+    if ($el.is('pre')) {
+      // Es un <pre> directamente, necesitamos extraer el código
+      const $pre = $el;
+      $pre.attr('id', codeId);
+      $pre.addClass('code-block');
+      
+      // Envolver el contenido existente en una estructura adecuada
+      $pre.wrap('<div class="code-block-wrapper"></div>');
+      const $wrapper = $pre.parent('.code-block-wrapper');
+      
+      // Crear header
+      const header = `
+        <div class="code-header">
+          <span class="code-language">${language || 'código'}</span>
+          <button class="code-copy-btn" onclick="copyCode('${codeId}', this)" title="Copiar código (Ctrl+C)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span class="copy-text">Copiar</span>
+          </button>
+        </div>
+      `;
+      
+      // Crear contenedor para líneas de números
+      let lineNumbersHtml = '';
+      for (let i = 1; i <= lineCount; i++) {
+        lineNumbersHtml += `<span class="code-line-number">${i}</span>`;
+      }
+      
+      const lineNumbers = `
+        <div class="code-line-numbers" aria-hidden="true">
+          ${lineNumbersHtml}
+        </div>
+      `;
+      
+      // Envolver el contenido actual en la estructura correcta
+      $pre.wrap('<div class="code-block-container"></div>');
+      const $container = $pre.parent('.code-block-container');
+      
+      // Insertar header antes del container
+      $wrapper.prepend(header);
+      
+      // Insertar números de línea antes del pre
+      $container.prepend(lineNumbers);
+      
+    } else if ($el.is('code') && $el.parent().is('pre')) {
+      // Es <code> dentro de <pre>, esta es la estructura más común
+      const $code = $el;
+      const $pre = $code.parent('pre');
+      
+      $code.attr('id', codeId);
+      
+      // Envolver todo en la estructura correcta
+      $pre.wrap('<div class="code-block-wrapper"></div>');
+      const $wrapper = $pre.parent('.code-block-wrapper');
+      
+      // Crear header
+      const header = `
+        <div class="code-header">
+          <span class="code-language">${language || 'código'}</span>
+          <button class="code-copy-btn" onclick="copyCode('${codeId}', this)" title="Copiar código (Ctrl+C)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span class="copy-text">Copiar</span>
+          </button>
+        </div>
+      `;
+      
+      // Crear números de línea
+      let lineNumbersHtml = '';
+      for (let i = 1; i <= lineCount; i++) {
+        lineNumbersHtml += `<span class="code-line-number">${i}</span>`;
+      }
+      
+      // Envolver el pre en un container para los números de línea
+      $pre.wrap('<div class="code-block-container"></div>');
+      const $container = $pre.parent('.code-block-container');
+      
+      // Insertar header y números de línea
+      $wrapper.prepend(header);
+      $container.prepend(`
+        <div class="code-line-numbers" aria-hidden="true">
+          ${lineNumbersHtml}
+        </div>
+      `);
+      
+      // Procesar las líneas del código para envolver cada línea
+      const codeText = $code.html();
+      // No escapar doblemente, ya que el HTML ya está escapado
+      $code.html(lines.map(line => 
+        `<span class="line">${line || ' '}</span>`
+      ).join('\n'));
+    }
   });
   
-  // Procesar tablas
+  // Procesar tablas (igual que antes)
   $('table').each((i, el) => {
     const $el = $(el);
     tableIndex++;
@@ -624,7 +686,7 @@ function processCodeBlocks(html) {
     $el.wrap('<div class="table-wrapper"></div>');
   });
   
-  // Procesar imágenes
+  // Procesar imágenes (igual que antes)
   $('img').each((i, el) => {
     const $el = $(el);
     const alt = $el.attr('alt') || '';
@@ -656,7 +718,7 @@ function processCodeBlocks(html) {
     }
   });
   
-  // Procesar ecuaciones
+  // Procesar ecuaciones (igual que antes)
   $('.MathJax_Display, .math-container').each((i, el) => {
     const $el = $(el);
     equationIndex++;
