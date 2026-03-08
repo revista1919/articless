@@ -3122,62 +3122,7 @@ body {
   }
     }
   </style>
-  <script>
-  // Generar datos de elementos especiales basados en los IDs reales del HTML
-  window.__SPECIAL_ELEMENTS__ = (function() {
-    var elements = [];
-    
-    // Detectar figuras
-    var figures = document.querySelectorAll('figure.image-figure[id^="figure-"]');
-    for (var i = 0; i < figures.length; i++) {
-      var fig = figures[i];
-      var caption = fig.querySelector('.image-caption');
-      elements.push({
-        type: 'figure',
-        id: fig.id,
-        title: caption ? caption.textContent.trim() : 'Figura ' + (i + 1)
-      });
-    }
-    
-    // Detectar tablas
-    var tables = document.querySelectorAll('table.article-table[id^="table-"]');
-    for (var i = 0; i < tables.length; i++) {
-      var table = tables[i];
-      // Intentar encontrar caption si existe
-      var caption = table.querySelector('caption');
-      elements.push({
-        type: 'table',
-        id: table.id,
-        title: caption ? caption.textContent.trim() : 'Tabla ' + (i + 1)
-      });
-    }
-    
-    // Detectar código
-    var codeBlocks = document.querySelectorAll('.code-block-wrapper[id^="code-"]');
-    for (var i = 0; i < codeBlocks.length; i++) {
-      var code = codeBlocks[i];
-      var language = code.querySelector('.code-language');
-      elements.push({
-        type: 'code',
-        id: code.id,
-        title: language ? 'Código (' + language.textContent.trim() + ')' : 'Código ' + (i + 1)
-      });
-    }
-    
-    // Detectar ecuaciones
-    var equations = document.querySelectorAll('[id^="equation-"]');
-    for (var i = 0; i < equations.length; i++) {
-      var eq = equations[i];
-      elements.push({
-        type: 'equation',
-        id: eq.id,
-        title: 'Ecuación ' + (i + 1)
-      });
-    }
-    
-    return elements;
-  })();
-</script>
+ 
 </head>
 <body>
   <header class="sd-header">
@@ -4122,6 +4067,63 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 });
+</script>
+<script>
+// ========== DETECCIÓN DE ELEMENTOS ESPECIALES (AHORA DESPUÉS DE QUE EL DOM EXISTE) ==========
+window.__SPECIAL_ELEMENTS__ = (function() {
+  var elements = [];
+  
+  // Detectar figuras
+  var figures = document.querySelectorAll('figure.image-figure[id^="figure-"]');
+  for (var i = 0; i < figures.length; i++) {
+    var fig = figures[i];
+    var caption = fig.querySelector('.image-caption');
+    elements.push({
+      type: 'figure',
+      id: fig.id,
+      title: caption ? caption.textContent.trim() : 'Figura ' + (i + 1)
+    });
+  }
+  
+  // Detectar tablas
+  var tables = document.querySelectorAll('table.article-table[id^="table-"]');
+  for (var i = 0; i < tables.length; i++) {
+    var table = tables[i];
+    // Intentar encontrar caption si existe
+    var caption = table.querySelector('caption');
+    elements.push({
+      type: 'table',
+      id: table.id,
+      title: caption ? caption.textContent.trim() : 'Tabla ' + (i + 1)
+    });
+  }
+  
+  // Detectar código
+  var codeBlocks = document.querySelectorAll('.code-block-wrapper[id^="code-"]');
+  for (var i = 0; i < codeBlocks.length; i++) {
+    var code = codeBlocks[i];
+    var language = code.querySelector('.code-language');
+    elements.push({
+      type: 'code',
+      id: code.id,
+      title: language ? 'Código (' + language.textContent.trim() + ')' : 'Código ' + (i + 1)
+    });
+  }
+  
+  // Detectar ecuaciones
+  var equations = document.querySelectorAll('[id^="equation-"]');
+  for (var i = 0; i < equations.length; i++) {
+    var eq = equations[i];
+    elements.push({
+      type: 'equation',
+      id: eq.id,
+      title: 'Ecuación ' + (i + 1)
+    });
+  }
+  
+  console.log('Elementos especiales detectados:', elements); // Para debug
+  return elements;
+})();
 </script>
 </body>
 </html>`;
