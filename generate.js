@@ -3568,19 +3568,25 @@ body {
     max-width: 100%;
   }
     }
-  /* ===== BORDE DE SEGURIDAD PARA MÓVIL ===== */
-/* ===== VERSIÓN MÁS SUTIL ===== */
+
+/* ===== MARGEN DE SEGURIDAD PARA MÓVIL (SIN BORDE VISIBLE) ===== */
 @media (max-width: 768px) {
+  /* Añadir margen alrededor de todo el contenedor del artículo */
   .article-container {
-    border-left: 4px solid var(--nature-blue) !important;  /* Borde izquierdo más grueso */
-    border-right: 4px solid var(--nature-blue) !important; /* Borde derecho */
-    background-color: white !important;
-    padding: 15px 18px !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.03) !important;
-    margin: 10px 0 !important;
-    width: 100% !important;
+    margin: 0 15px !important;           /* Margen lateral de 15px */
+    width: calc(100% - 30px) !important; /* Ancho ajustado para compensar el margen */
+    max-width: 100% !important;
+    padding: 0 !important;                /* Sin padding extra */
+    background-color: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
   }
-}
+  
+  /* Asegurar que el contenido herede el margen */
+  .article-container > * {
+    max-width: 100% !important;
+  }
+  
   
   /* Para que el texto tenga más espacio interno */
   .article-content {
