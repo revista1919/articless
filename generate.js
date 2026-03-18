@@ -3568,6 +3568,32 @@ body {
     max-width: 100%;
   }
     }
+  /* ===== BORDE DE SEGURIDAD PARA MÓVIL ===== */
+/* ===== VERSIÓN MÁS SUTIL ===== */
+@media (max-width: 768px) {
+  .article-container {
+    border-left: 4px solid var(--nature-blue) !important;  /* Borde izquierdo más grueso */
+    border-right: 4px solid var(--nature-blue) !important; /* Borde derecho */
+    background-color: white !important;
+    padding: 15px 18px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03) !important;
+    margin: 10px 0 !important;
+    width: 100% !important;
+  }
+}
+  
+  /* Para que el texto tenga más espacio interno */
+  .article-content {
+    padding: 0 5px !important;
+  }
+  
+  /* Mejorar la legibilidad del texto */
+  .article-content p {
+    line-height: 1.8 !important;
+    margin-bottom: 1.2rem !important;
+    font-size: 1.05rem !important;
+  }
+}
   </style>
  
 </head>
