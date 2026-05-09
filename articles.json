@@ -866,7 +866,7 @@
     "autores": [
       {
         "name": "Amir Carbonell",
-        "authorId": null,
+        "authorId": "sVxFthpnosRlNBs17xfdLMO0EA23",
         "email": "amirobot2020@gmail.com",
         "institution": "Pontificia Universidad Católica de Chile",
         "orcid": null
@@ -888,7 +888,7 @@
     "tipo": "Artículo de Investigación",
     "type": "Research Article",
     "fecha": "2026-05-08",
-    "receivedDate": "2025-11-10",
+    "receivedDate": "2026-02-24",
     "acceptedDate": "2026-05-08",
     "volumen": "2",
     "numero": "1",
@@ -910,7 +910,7 @@
     "referencias": "<div class=\"references-list\">\n  <div class=\"reference-item\" id=\"ref-scipy\">\n    SciPy. «SciPy: Scientific Library for Python». Accedido 13 de diciembre de 2025. <a href=\"https://www.scipy.org/\" target=\"_blank\" rel=\"noopener\">https://www.scipy.org/</a>.\n  </div>\n  <div class=\"reference-item\" id=\"ref-matplotlib\">\n    Matplotlib. «Matplotlib: Visualization with Python». Accedido 13 de diciembre de 2025. <a href=\"https://matplotlib.org/\" target=\"_blank\" rel=\"noopener\">https://matplotlib.org/</a>.\n  </div>\n  <div class=\"reference-item\" id=\"ref-numpy\">\n    NumPy. «NumPy: The fundamental package for scientific computing with Python». Accedido 13 de diciembre de 2025. <a href=\"https://numpy.org/\" target=\"_blank\" rel=\"noopener\">https://numpy.org/</a>.\n  </div>\n</div>",
     "pdfUrl": "https://revista1919.github.io/articless/pdfs/Article-interacciones-gravitacionales-en-sistemas-galctico-14.pdf",
     "createdAt": "2026-05-09T02:40:47.597Z",
-    "updatedAt": "2026-05-09T02:56:23.811Z",
+    "updatedAt": "2026-05-09T02:57:41.565Z",
     "createdBy": "Wp9AbMocILX4UOy6il09qluhrL23",
     "status": "published",
     "publishedAt": "2026-05-09T02:40:47.597Z",
