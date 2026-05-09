@@ -870,28 +870,51 @@ function processTablesWithDownload($, html) {
   return $.html();
 }
 
-// ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML (CORREGIDA - PRESERVA LISTAS) ==========
+// ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML (CORREGIDA) ==========
 function processCodeBlocks(html) {
   if (!html) return html;
   
-  const $ = cheerio.load(html, { decodeEntities: false });
+  // Limpiar basura de documento
+  let cleanedHtml = html
+    .replace(/<!DOCTYPE[^>]*>/gi, '')
+    .replace(/<html[^>]*>/gi, '')
+    .replace(/<\/html>/gi, '')
+    .replace(/<head[^>]*>/gi, '')
+    .replace(/<\/head>/gi, '')
+    .replace(/<body[^>]*>/gi, '')
+    .replace(/<\/body>/gi, '');
+  
+  const $ = cheerio.load(cleanedHtml, { decodeEntities: false });
   let codeIndex = 0;
   
-  // Procesar bloques de código (esto no afecta listas)
-  $('pre code, pre').each((i, el) => {
+  // Procesar SOLO bloques de código, sin afectar listas
+  $('pre').each((i, el) => {
     const $el = $(el);
-    const code = $el.text();
+    
+    // Evitar reprocesar si ya tiene wrapper
+    if ($el.parent().hasClass('code-block-wrapper')) {
+      return;
+    }
+    
+    // Buscar el elemento code dentro
+    let $codeElement = $el.find('code').first();
+    let code;
+    let language = '';
+    
+    if ($codeElement.length > 0) {
+      code = $codeElement.text();
+      const classAttr = $codeElement.attr('class') || '';
+      if (classAttr.includes('language-')) {
+        language = classAttr.split('language-')[1].split(' ')[0];
+      } else if (classAttr.includes('lang-')) {
+        language = classAttr.split('lang-')[1].split(' ')[0];
+      }
+    } else {
+      code = $el.text();
+    }
+    
     const lines = code.split('\n');
     const lineCount = lines.length;
-    
-    // Detectar lenguaje
-    let language = '';
-    const classAttr = $el.attr('class') || '';
-    if (classAttr.includes('language-')) {
-      language = classAttr.split('language-')[1].split(' ')[0];
-    } else if (classAttr.includes('lang-')) {
-      language = classAttr.split('lang-')[1].split(' ')[0];
-    }
     
     // Generar números de línea
     let lineNumbersHtml = '';
@@ -899,54 +922,46 @@ function processCodeBlocks(html) {
       lineNumbersHtml += `<span class="code-line-number">${i}</span>`;
     }
     
+    codeIndex++;
+    const codeId = `code-${codeIndex}`;
+    
     // Escapar código y envolver cada línea
     const escapedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const wrappedLines = lines.map(line => 
       `<span class="line">${line || ' '}</span>`
     ).join('\n');
     
-    // Generar ID consistente
-    codeIndex++;
-    const codeId = `code-${codeIndex}`;
+    const copySvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
     
     const codeHtml = `
-  <div class="code-block-wrapper" id="${codeId}">
-    <div class="code-header">
-      <span class="code-language">${language || 'código'}</span>
-      <button class="code-copy-btn" onclick="copyCode('${codeId}', this)" title="Copiar código (Ctrl+C)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-        </svg>
-        <span class="copy-text">Copiar</span>
-      </button>
-    </div>
-    <div class="code-block-container">
-      <div class="code-line-numbers" aria-hidden="true">
-        ${lineNumbersHtml}
-      </div>
-      <pre class="code-block ${language ? `language-${language}` : ''}"><code class="${language ? `language-${language}` : ''}">${wrappedLines}</code></pre>
-    </div>
+<div class="code-block-wrapper" id="${codeId}">
+  <div class="code-header">
+    <span class="code-language">${language || 'código'}</span>
+    <button class="code-copy-btn" onclick="copyCode('${codeId}', this)" title="Copiar código (Ctrl+C)">
+      ${copySvg}
+      <span class="copy-text">Copiar</span>
+    </button>
   </div>
-`;
+  <div class="code-block-container">
+    <div class="code-line-numbers" aria-hidden="true">
+      ${lineNumbersHtml}
+    </div>
+    <pre class="code-block ${language ? `language-${language}` : ''}"><code class="${language ? `language-${language}` : ''}">${wrappedLines}</code></pre>
+  </div>
+</div>`;
     
-    $el.parent().replaceWith(codeHtml);
+    $el.replaceWith(codeHtml);
   });
   
-  // IMPORTANTE: Guardar el HTML después de procesar código
   let processedHtml = $.html();
   
-  // PROCESAR TABLAS CON BOTONES DE DESCARGA
-  resetTableCounter();
-  
-  // Volver a cargar el HTML para procesar tablas
+  // Procesar tablas DESPUÉS del código (no antes)
   const $2 = cheerio.load(processedHtml, { decodeEntities: false });
   processedHtml = processTablesWithDownload($2, processedHtml);
   
-  // Volver a cargar el HTML procesado para continuar con imágenes y ecuaciones
+  // Procesar imágenes y ecuaciones
   const $3 = cheerio.load(processedHtml, { decodeEntities: false });
   
-  // Procesar imágenes - CON target="_blank" para abrir en nueva pestaña
   let figureIndex = 0;
   $3('img').each((i, el) => {
     const $el = $3(el);
@@ -971,7 +986,6 @@ function processCodeBlocks(html) {
     figureIndex++;
     const figureId = `figure-${figureIndex}`;
     
-    // Envolver la imagen en un enlace para abrir en nueva pestaña
     if (src) {
       $el.wrap(`<a href="${src}" target="_blank" rel="noopener noreferrer" class="image-link"></a>`);
     }
@@ -984,7 +998,6 @@ function processCodeBlocks(html) {
     }
   });
   
-  // Procesar ecuaciones
   let equationIndex = 0;
   $3('.MathJax_Display, .math-container').each((i, el) => {
     const $el = $3(el);
