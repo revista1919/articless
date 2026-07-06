@@ -1388,7 +1388,135 @@ body {
   justify-content: space-between;
   gap: 2rem;
 }
+/* ===== DOI: ESTILO ACADÉMICO SOBRIO ===== */
 
+/* --- DOI en Action Bar --- */
+.doi-academic-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  text-decoration: none;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #4b5563;
+  transition: border-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+}
+
+.doi-academic-link:hover {
+  border-color: #0056b3;
+  color: #0056b3;
+  background-color: #f8f9fa;
+  text-decoration: none;
+}
+
+.doi-academic-link svg {
+  color: #6b7280;
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+.doi-academic-link:hover svg {
+  color: #0056b3;
+}
+
+.doi-prefix {
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: 0.3px;
+}
+
+.doi-number {
+  font-size: 0.85rem;
+  font-family: "JetBrains Mono", Consolas, "Courier New", monospace;
+  color: #4b5563;
+}
+
+.doi-academic-link:hover .doi-number {
+  color: #0056b3;
+}
+
+/* --- DOI en Meta Box (debajo del título) --- */
+.meta-doi-academic {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.85rem;
+  font-family: "JetBrains Mono", Consolas, "Courier New", monospace;
+  color: #6b7280;
+}
+
+.meta-doi-academic a {
+  color: #0056b3;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.meta-doi-academic a:hover {
+  color: #003d6b;
+  text-decoration: underline;
+}
+
+/* --- DOI en Sidebar --- */
+.sidebar-doi-link {
+  color: #0056b3;
+  text-decoration: none;
+  word-break: break-all;
+  font-size: 0.85rem;
+  font-family: "JetBrains Mono", Consolas, "Courier New", monospace;
+  transition: color 0.15s ease;
+}
+
+.sidebar-doi-link:hover {
+  color: #003d6b;
+  text-decoration: underline;
+}
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+  .doi-academic-link {
+    padding: 4px 10px;
+    gap: 6px;
+  }
+  
+  .doi-prefix, 
+  .doi-number {
+    font-size: 0.78rem;
+  }
+  
+  .meta-doi-academic {
+    font-size: 0.78rem;
+  }
+  
+  .sidebar-doi-link {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .doi-academic-link {
+    padding: 4px 8px;
+    gap: 4px;
+  }
+  
+  .doi-academic-link svg {
+    width: 14px;
+    height: 14px;
+  }
+  
+  .doi-prefix, 
+  .doi-number {
+    font-size: 0.72rem;
+  }
+  
+  .doi-number {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
 /* Brand / Logo Section */
 .sd-journal-logo {
   display: flex;
@@ -3774,10 +3902,18 @@ body {
           </div>
 
           <div class="meta-box">
-            <span>Vol. ${article.volumen}, ${isSpanish ? 'Núm.' : 'No.'} ${article.numero}</span>
-            <span>pp. ${article.primeraPagina}-${article.ultimaPagina}</span>
-            <span>${fecha}</span>
-          </div>
+  <span>Vol. ${article.volumen}, ${isSpanish ? 'Núm.' : 'No.'} ${article.numero}</span>
+  <span>pp. ${article.primeraPagina}-${article.ultimaPagina}</span>
+  <span>${fecha}</span>
+  
+  ${article.doi ? `
+  <span class="meta-doi-academic">
+    <a href="https://doi.org/${article.doi}" target="_blank" rel="noopener noreferrer">
+      https://doi.org/${article.doi}
+    </a>
+  </span>
+  ` : ''}
+</div>
 
           <!-- Action Bar -->
           <div class="action-bar">
@@ -3938,15 +4074,28 @@ body {
               <span class="metadata-value">${fecha}</span>
             </div>
             <div class="metadata-item">
-              <span class="metadata-label">${t.area}</span>
-              <span class="metadata-value">${article.area}</span>
-            </div>
-            ${funding && funding !== 'No declarada' && funding !== 'Not declared' ? `
-            <div class="metadata-item">
-              <span class="metadata-label">${t.fundingLabel}</span>
-              <span class="metadata-value">${funding}</span>
-            </div>
-            ` : ''}
+  <span class="metadata-label">${t.area}</span>
+  <span class="metadata-value">${article.area}</span>
+</div>
+
+${article.doi ? `
+<div class="metadata-item">
+  <span class="metadata-label">DOI</span>
+  <span class="metadata-value">
+    <a href="https://doi.org/${article.doi}" target="_blank" rel="noopener noreferrer" class="sidebar-doi-link">
+      ${article.doi}
+    </a>
+  </span>
+</div>
+` : ''}
+
+${funding && funding !== 'No declarada' && funding !== 'Not declared' ? `
+<div class="metadata-item">
+  <span class="metadata-label">${t.fundingLabel}</span>
+  <span class="metadata-value">${funding}</span>
+</div>
+` : ''}
+
           </div>
         </div>
       </div>
@@ -4010,15 +4159,27 @@ body {
             <span class="metadata-value">${fecha}</span>
           </div>
           <div class="metadata-item">
-            <span class="metadata-label">${t.area}</span>
-            <span class="metadata-value">${article.area}</span>
-          </div>
-          ${funding && funding !== 'No declarada' && funding !== 'Not declared' ? `
-          <div class="metadata-item">
-            <span class="metadata-label">${t.fundingLabel}</span>
-            <span class="metadata-value">${funding}</span>
-          </div>
-          ` : ''}
+  <span class="metadata-label">${t.area}</span>
+  <span class="metadata-value">${article.area}</span>
+</div>
+
+${article.doi ? `
+<div class="metadata-item">
+  <span class="metadata-label">DOI</span>
+  <span class="metadata-value">
+    <a href="https://doi.org/${article.doi}" target="_blank" rel="noopener noreferrer" class="sidebar-doi-link">
+      ${article.doi}
+    </a>
+  </span>
+</div>
+` : ''}
+
+${funding && funding !== 'No declarada' && funding !== 'Not declared' ? `
+<div class="metadata-item">
+  <span class="metadata-label">${t.fundingLabel}</span>
+  <span class="metadata-value">${funding}</span>
+</div>
+` : ''}
         </div>
       </div>
     </aside>
