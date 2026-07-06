@@ -3709,6 +3709,97 @@ body {
     max-width: 100%;
   }
     }
+    /* ===== CORRECCIONES PARA DOI ===== */
+/* 1. Estilo en la meta-box (debajo del título) */
+.meta-doi-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  color: var(--text-light);
+  background: var(--bg-soft);
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+}
+
+.meta-doi-label {
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+}
+
+.meta-doi-link {
+  color: var(--nature-blue);
+  text-decoration: none;
+  font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
+  font-size: 0.8rem;
+  transition: color 0.2s ease;
+  word-break: break-all;
+}
+
+.meta-doi-link:hover {
+  color: var(--nature-blue-dark);
+  text-decoration: underline;
+}
+
+/* 2. Estilo en el sidebar (metadata-item) */
+.metadata-doi-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.metadata-doi-item .metadata-label {
+  flex-shrink: 0;
+  min-width: 70px;
+}
+
+.metadata-doi-item .metadata-value {
+  flex: 1;
+  text-align: left;
+  word-break: break-all;
+}
+
+.sidebar-doi-link {
+  color: var(--nature-blue);
+  text-decoration: none;
+  font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
+  font-size: 0.8rem;
+  transition: color 0.2s ease;
+  display: inline-block;
+}
+
+.sidebar-doi-link:hover {
+  color: var(--nature-blue-dark);
+  text-decoration: underline;
+}
+
+/* 3. Ajustes responsive para móvil */
+@media (max-width: 600px) {
+  .meta-doi-wrapper {
+    font-size: 0.75rem;
+    padding: 3px 8px;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  
+  .meta-doi-link {
+    font-size: 0.7rem;
+  }
+  
+  .metadata-doi-item {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+  
+  .metadata-doi-item .metadata-label {
+    min-width: 60px;
+  }
+}
 
 /* ===== MARGEN DE SEGURIDAD PARA MÓVIL (SIN BORDE VISIBLE) ===== */
 @media (max-width: 768px) {
@@ -3901,19 +3992,20 @@ body {
             ${authorsDisplay}
           </div>
 
+          <!-- ===== META BOX CORREGIDA CON DOI ===== -->
           <div class="meta-box">
-  <span>Vol. ${article.volumen}, ${isSpanish ? 'Núm.' : 'No.'} ${article.numero}</span>
-  <span>pp. ${article.primeraPagina}-${article.ultimaPagina}</span>
-  <span>${fecha}</span>
-  
-  ${article.doi ? `
-  <span class="meta-doi-academic">
-    <a href="https://doi.org/${article.doi}" target="_blank" rel="noopener noreferrer">
-      https://doi.org/${article.doi}
-    </a>
-  </span>
-  ` : ''}
-</div>
+            <span>Vol. ${article.volumen}, ${isSpanish ? 'Núm.' : 'No.'} ${article.numero}</span>
+            <span>pp. ${article.primeraPagina}-${article.ultimaPagina}</span>
+            <span>${fecha}</span>
+            ${article.doi ? `
+            <span class="meta-doi-wrapper">
+              <span class="meta-doi-label">DOI:</span>
+              <a href="https://doi.org/${article.doi}" target="_blank" rel="noopener noreferrer" class="meta-doi-link">
+                https://doi.org/${article.doi}
+              </a>
+            </span>
+            ` : ''}
+          </div>
 
           <!-- Action Bar -->
           <div class="action-bar">
@@ -4031,17 +4123,17 @@ body {
               <div class="citation-item">
                 <strong>APA</strong>
                 <button class="copy-btn" onclick="copyRichText('apa-text-${lang}-mobile', event)">${t.copy}</button>
-                <div id="apa-text-${lang}-mobile" style="margin-top: 0.25rem;">${authorsAPA}. (${year}). ${title}. <em>Revista Nacional de las Ciencias para Estudiantes</em>, ${article.volumen}(${article.numero}), ${article.primeraPagina}-${article.ultimaPagina}.</div>
+                <div id="apa-text-${lang}-mobile" style="margin-top: 0.25rem;">${authorsAPA}. (${year}). ${title}. <em>Revista Nacional de las Ciencias para Estudiantes</em>, ${article.volumen}(${article.numero}), ${article.primeraPagina}-${article.ultimaPagina}. ${article.doi ? `https://doi.org/${article.doi}` : ''}</div>
               </div>
               <div class="citation-item">
                 <strong>MLA</strong>
                 <button class="copy-btn" onclick="copyRichText('mla-text-${lang}-mobile', event)">${t.copy}</button>
-                <div id="mla-text-${lang}-mobile" style="margin-top: 0.25rem;">${isSpanish ? authorsMLAEs : authorsMLAEn}. "${title}." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. ${article.volumen}, no. ${article.numero}, ${year}, pp. ${article.primeraPagina}-${article.ultimaPagina}.</div>
+                <div id="mla-text-${lang}-mobile" style="margin-top: 0.25rem;">${isSpanish ? authorsMLAEs : authorsMLAEn}. "${title}." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. ${article.volumen}, no. ${article.numero}, ${year}, pp. ${article.primeraPagina}-${article.ultimaPagina}. ${article.doi ? `https://doi.org/${article.doi}` : ''}</div>
               </div>
               <div class="citation-item">
                 <strong>Chicago</strong>
                 <button class="copy-btn" onclick="copyRichText('chi-text-${lang}-mobile', event)">${t.copy}</button>
-                <div id="chi-text-${lang}-mobile" style="margin-top: 0.25rem;">${isSpanish ? authorsChicagoEs : authorsChicagoEn}. "${title}." <em>Revista Nacional de las Ciencias para Estudiantes</em> ${article.volumen}, no. ${article.numero} (${year}): ${article.primeraPagina}-${article.ultimaPagina}.</div>
+                <div id="chi-text-${lang}-mobile" style="margin-top: 0.25rem;">${isSpanish ? authorsChicagoEs : authorsChicagoEn}. "${title}." <em>Revista Nacional de las Ciencias para Estudiantes</em> ${article.volumen}, no. ${article.numero} (${year}): ${article.primeraPagina}-${article.ultimaPagina}. ${article.doi ? `https://doi.org/${article.doi}` : ''}</div>
               </div>
               <a href="data:text/plain;charset=utf-8,${encodeURIComponent(bibtex)}" download="article-${article.numeroArticulo}.bib" class="bibtex-download">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -4074,28 +4166,27 @@ body {
               <span class="metadata-value">${fecha}</span>
             </div>
             <div class="metadata-item">
-  <span class="metadata-label">${t.area}</span>
-  <span class="metadata-value">${article.area}</span>
-</div>
+              <span class="metadata-label">${t.area}</span>
+              <span class="metadata-value">${article.area}</span>
+            </div>
 
-${article.doi ? `
-<div class="metadata-item">
-  <span class="metadata-label">DOI</span>
-  <span class="metadata-value">
-    <a href="https://doi.org/${article.doi}" target="_blank" rel="noopener noreferrer" class="sidebar-doi-link">
-      ${article.doi}
-    </a>
-  </span>
-</div>
-` : ''}
+            ${article.doi ? `
+            <div class="metadata-item metadata-doi-item">
+              <span class="metadata-label">DOI</span>
+              <span class="metadata-value">
+                <a href="https://doi.org/${article.doi}" target="_blank" rel="noopener noreferrer" class="sidebar-doi-link">
+                  ${article.doi}
+                </a>
+              </span>
+            </div>
+            ` : ''}
 
-${funding && funding !== 'No declarada' && funding !== 'Not declared' ? `
-<div class="metadata-item">
-  <span class="metadata-label">${t.fundingLabel}</span>
-  <span class="metadata-value">${funding}</span>
-</div>
-` : ''}
-
+            ${funding && funding !== 'No declarada' && funding !== 'Not declared' ? `
+            <div class="metadata-item">
+              <span class="metadata-label">${t.fundingLabel}</span>
+              <span class="metadata-value">${funding}</span>
+            </div>
+            ` : ''}
           </div>
         </div>
       </div>
@@ -4116,17 +4207,17 @@ ${funding && funding !== 'No declarada' && funding !== 'Not declared' ? `
             <div class="citation-item">
               <strong>APA</strong>
               <button class="copy-btn" onclick="copyRichText('apa-text-${lang}', event)">${t.copy}</button>
-              <div id="apa-text-${lang}" style="margin-top: 0.25rem;">${authorsAPA}. (${year}). ${title}. <em>Revista Nacional de las Ciencias para Estudiantes</em>, ${article.volumen}(${article.numero}), ${article.primeraPagina}-${article.ultimaPagina}.</div>
+              <div id="apa-text-${lang}" style="margin-top: 0.25rem;">${authorsAPA}. (${year}). ${title}. <em>Revista Nacional de las Ciencias para Estudiantes</em>, ${article.volumen}(${article.numero}), ${article.primeraPagina}-${article.ultimaPagina}. ${article.doi ? `https://doi.org/${article.doi}` : ''}</div>
             </div>
             <div class="citation-item">
               <strong>MLA</strong>
               <button class="copy-btn" onclick="copyRichText('mla-text-${lang}', event)">${t.copy}</button>
-              <div id="mla-text-${lang}" style="margin-top: 0.25rem;">${isSpanish ? authorsMLAEs : authorsMLAEn}. "${title}." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. ${article.volumen}, no. ${article.numero}, ${year}, pp. ${article.primeraPagina}-${article.ultimaPagina}.</div>
+              <div id="mla-text-${lang}" style="margin-top: 0.25rem;">${isSpanish ? authorsMLAEs : authorsMLAEn}. "${title}." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. ${article.volumen}, no. ${article.numero}, ${year}, pp. ${article.primeraPagina}-${article.ultimaPagina}. ${article.doi ? `https://doi.org/${article.doi}` : ''}</div>
             </div>
             <div class="citation-item">
               <strong>Chicago</strong>
               <button class="copy-btn" onclick="copyRichText('chi-text-${lang}', event)">${t.copy}</button>
-              <div id="chi-text-${lang}" style="margin-top: 0.25rem;">${isSpanish ? authorsChicagoEs : authorsChicagoEn}. "${title}." <em>Revista Nacional de las Ciencias para Estudiantes</em> ${article.volumen}, no. ${article.numero} (${year}): ${article.primeraPagina}-${article.ultimaPagina}.</div>
+              <div id="chi-text-${lang}" style="margin-top: 0.25rem;">${isSpanish ? authorsChicagoEs : authorsChicagoEn}. "${title}." <em>Revista Nacional de las Ciencias para Estudiantes</em> ${article.volumen}, no. ${article.numero} (${year}): ${article.primeraPagina}-${article.ultimaPagina}. ${article.doi ? `https://doi.org/${article.doi}` : ''}</div>
             </div>
             <a href="data:text/plain;charset=utf-8,${encodeURIComponent(bibtex)}" download="article-${article.numeroArticulo}.bib" class="bibtex-download">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -4159,27 +4250,27 @@ ${funding && funding !== 'No declarada' && funding !== 'Not declared' ? `
             <span class="metadata-value">${fecha}</span>
           </div>
           <div class="metadata-item">
-  <span class="metadata-label">${t.area}</span>
-  <span class="metadata-value">${article.area}</span>
-</div>
+            <span class="metadata-label">${t.area}</span>
+            <span class="metadata-value">${article.area}</span>
+          </div>
 
-${article.doi ? `
-<div class="metadata-item">
-  <span class="metadata-label">DOI</span>
-  <span class="metadata-value">
-    <a href="https://doi.org/${article.doi}" target="_blank" rel="noopener noreferrer" class="sidebar-doi-link">
-      ${article.doi}
-    </a>
-  </span>
-</div>
-` : ''}
+          ${article.doi ? `
+          <div class="metadata-item metadata-doi-item">
+            <span class="metadata-label">DOI</span>
+            <span class="metadata-value">
+              <a href="https://doi.org/${article.doi}" target="_blank" rel="noopener noreferrer" class="sidebar-doi-link">
+                ${article.doi}
+              </a>
+            </span>
+          </div>
+          ` : ''}
 
-${funding && funding !== 'No declarada' && funding !== 'Not declared' ? `
-<div class="metadata-item">
-  <span class="metadata-label">${t.fundingLabel}</span>
-  <span class="metadata-value">${funding}</span>
-</div>
-` : ''}
+          ${funding && funding !== 'No declarada' && funding !== 'Not declared' ? `
+          <div class="metadata-item">
+            <span class="metadata-label">${t.fundingLabel}</span>
+            <span class="metadata-value">${funding}</span>
+          </div>
+          ` : ''}
         </div>
       </div>
     </aside>
