@@ -795,9 +795,10 @@
         "orcid": null
       }
     ],
-    "updatedAt": "2026-07-06T03:00:17.636Z",
+    "updatedAt": "2026-07-06T05:08:03.193Z",
     "updatedBy": "Wp9AbMocILX4UOy6il09qluhrL23",
-    "status": "draft"
+    "status": "draft",
+    "doi": "10.5281/zenodo.21211920"
   },
   {
     "numeroArticulo": 13,
