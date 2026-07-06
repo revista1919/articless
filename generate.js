@@ -12,6 +12,7 @@ const JOURNAL_NAME_EN = 'The National Review of Sciences for Students';
 const LOGO_ES = 'https://www.revistacienciasestudiantes.com/assets/logo.png';
 const LOGO_EN = 'https://www.revistacienciasestudiantes.com/logoEN.png';
 // ========== MODELO INTERMEDIO DE TABLA (AST) ==========
+
 let tableCounter = 1;
 
 function parseTable($, $table) {
