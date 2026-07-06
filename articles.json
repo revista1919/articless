@@ -753,9 +753,10 @@
         "orcid": null
       }
     ],
-    "updatedAt": "2026-03-10T03:32:26.153Z",
+    "updatedAt": "2026-07-06T18:13:22.032Z",
     "updatedBy": "Wp9AbMocILX4UOy6il09qluhrL23",
-    "status": "draft"
+    "status": "draft",
+    "doi": "10.5281/zenodo.21224806"
   },
   {
     "titulo": "Análisis de experiencia comparada sobre programas de protección para hijos de personas privadas de libertad en relación al caso del Programa Abriendo Caminos de Chile",
