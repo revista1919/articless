@@ -545,9 +545,10 @@
         "orcid": null
       }
     ],
-    "updatedAt": "2026-07-06T03:01:08.291Z",
+    "updatedAt": "2026-07-06T05:14:07.974Z",
     "updatedBy": "Wp9AbMocILX4UOy6il09qluhrL23",
-    "status": "draft"
+    "status": "draft",
+    "doi": "10.5281/zenodo.21211785"
   },
   {
     "titulo": "Book Review “De animales a dioses: Breve historia de la humanidad”",
