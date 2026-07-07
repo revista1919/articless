@@ -2082,11 +2082,14 @@ body {
     }
 
     .citation-item {
-      position: relative;
-      padding: 0.75rem 0;
-      border-bottom: 1px solid var(--border-color);
-      font-size: 0.8rem;
-    }
+    position: relative;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.8rem;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-all;
+}
 
     .citation-item:last-child {
       border-bottom: none;
@@ -2407,6 +2410,48 @@ body {
     max-width: 100%;
   }
     }
+  /* ===== KEYWORDS: SOPORTE DUAL (LEGACY + CONTROLADO) ===== */
+.keyword-tag.keyword-controlled {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: white;
+    border: 1px solid #c0a86a;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-family: 'Inter', sans-serif;
+}
+
+.keyword-code {
+    font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #0A1929;
+    background: #f0f4f8;
+    padding: 1px 5px;
+    border-radius: 3px;
+    letter-spacing: 0.02em;
+}
+
+.keyword-term {
+    color: var(--text-light);
+    font-weight: 400;
+}
+
+/* Ajuste responsive para keywords controladas */
+@media (max-width: 600px) {
+    .keyword-tag.keyword-controlled {
+        font-size: 0.65rem;
+        padding: 3px 6px;
+        gap: 3px;
+    }
+    
+    .keyword-code {
+        font-size: 0.6rem;
+        padding: 1px 4px;
+    }
+}
     /* ===== CORRECCIONES PARA DOI ===== */
 /* 1. Estilo en la meta-box (debajo del título) */
 .meta-doi-wrapper {

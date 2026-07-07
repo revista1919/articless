@@ -2083,11 +2083,14 @@ body {
     }
 
     .citation-item {
-      position: relative;
-      padding: 0.75rem 0;
-      border-bottom: 1px solid var(--border-color);
-      font-size: 0.8rem;
-    }
+    position: relative;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.8rem;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-all;
+}
 
     .citation-item:last-child {
       border-bottom: none;
@@ -2408,6 +2411,48 @@ body {
     max-width: 100%;
   }
     }
+  /* ===== KEYWORDS: SOPORTE DUAL (LEGACY + CONTROLADO) ===== */
+.keyword-tag.keyword-controlled {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: white;
+    border: 1px solid #c0a86a;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-family: 'Inter', sans-serif;
+}
+
+.keyword-code {
+    font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #0A1929;
+    background: #f0f4f8;
+    padding: 1px 5px;
+    border-radius: 3px;
+    letter-spacing: 0.02em;
+}
+
+.keyword-term {
+    color: var(--text-light);
+    font-weight: 400;
+}
+
+/* Ajuste responsive para keywords controladas */
+@media (max-width: 600px) {
+    .keyword-tag.keyword-controlled {
+        font-size: 0.65rem;
+        padding: 3px 6px;
+        gap: 3px;
+    }
+    
+    .keyword-code {
+        font-size: 0.6rem;
+        padding: 1px 4px;
+    }
+}
     /* ===== CORRECCIONES PARA DOI ===== */
 /* 1. Estilo en la meta-box (debajo del título) */
 .meta-doi-wrapper {
@@ -2693,6 +2738,13 @@ body {
             <span>pp. 40-44</span>
             <span>29-11-2025</span>
             
+            <span class="meta-doi-wrapper">
+              <span class="meta-doi-label">DOI:</span>
+              <a href="https://doi.org/10.5281/zenodo.21213886" target="_blank" rel="noopener noreferrer" class="meta-doi-link">
+                https://doi.org/10.5281/zenodo.21213886
+              </a>
+            </span>
+            
           </div>
 
           <!-- Action Bar -->
@@ -2865,17 +2917,17 @@ Comandante Carlos es una canción dedicada a Carlos Fonseca, fundador del Frente
               <div class="citation-item">
                 <strong>APA</strong>
                 <button class="copy-btn" onclick="copyRichText('apa-text-es-mobile', event)">Copiar</button>
-                <div id="apa-text-es-mobile" style="margin-top: 0.25rem;">Jeon, J. H., & Flores, C.. (2025). La Música y el Cine como Métodos de Propaganda en la Guerra Fría. <em>Revista Nacional de las Ciencias para Estudiantes</em>, 1(1), 40-44. </div>
+                <div id="apa-text-es-mobile" style="margin-top: 0.25rem;">Jeon, J. H., & Flores, C.. (2025). La Música y el Cine como Métodos de Propaganda en la Guerra Fría. <em>Revista Nacional de las Ciencias para Estudiantes</em>, 1(1), 40-44. https://doi.org/10.5281/zenodo.21213886</div>
               </div>
               <div class="citation-item">
                 <strong>MLA</strong>
                 <button class="copy-btn" onclick="copyRichText('mla-text-es-mobile', event)">Copiar</button>
-                <div id="mla-text-es-mobile" style="margin-top: 0.25rem;">Jeon, Jun Ho, y Flores, Camilo. "La Música y el Cine como Métodos de Propaganda en la Guerra Fría." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. 1, no. 1, 2025, pp. 40-44. </div>
+                <div id="mla-text-es-mobile" style="margin-top: 0.25rem;">Jeon, Jun Ho, y Flores, Camilo. "La Música y el Cine como Métodos de Propaganda en la Guerra Fría." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. 1, no. 1, 2025, pp. 40-44. https://doi.org/10.5281/zenodo.21213886</div>
               </div>
               <div class="citation-item">
                 <strong>Chicago</strong>
                 <button class="copy-btn" onclick="copyRichText('chi-text-es-mobile', event)">Copiar</button>
-                <div id="chi-text-es-mobile" style="margin-top: 0.25rem;">Jeon, Jun Ho, y Flores, Camilo. "La Música y el Cine como Métodos de Propaganda en la Guerra Fría." <em>Revista Nacional de las Ciencias para Estudiantes</em> 1, no. 1 (2025): 40-44. </div>
+                <div id="chi-text-es-mobile" style="margin-top: 0.25rem;">Jeon, Jun Ho, y Flores, Camilo. "La Música y el Cine como Métodos de Propaganda en la Guerra Fría." <em>Revista Nacional de las Ciencias para Estudiantes</em> 1, no. 1 (2025): 40-44. https://doi.org/10.5281/zenodo.21213886</div>
               </div>
               <a href="data:text/plain;charset=utf-8,%40article%7Bjeon20256%2C%0A%20%20author%20%3D%20%7BJeon%5C%24%2C%20Jun%20Ho%5C%24%20and%20Flores%5C%24%2C%20Camilo%5C%24%7D%2C%0A%20%20title%20%3D%20%7BLa%20M%7B%5C'u%7Dsica%20y%20el%20Cine%20como%20M%7B%5C'e%7Dtodos%20de%20Propaganda%20en%20la%20Guerra%20Fr%7B%5C'i%7Da%5C%24%7D%2C%0A%20%20journal%20%3D%20%7BRevista%20Nacional%20de%20las%20Ciencias%20para%20Estudiantes%7D%2C%0A%20%20year%20%3D%20%7B2025%7D%2C%0A%20%20volume%20%3D%20%7B1%7D%2C%0A%20%20number%20%3D%20%7B1%7D%2C%0A%20%20pages%20%3D%20%7B40--44%7D%2C%0A%20%20issn%20%3D%20%7B3087-2839%7D%2C%0A%20%20url%20%3D%20%7Bhttps%3A%2F%2Fwww.revistacienciasestudiantes.com%2Farticles%2Farticle-la-musica-y-el-cine-como-metodos-de-propaganda-en-la-guerra-fria-6.html%7D%0A%7D" download="article-6.bib" class="bibtex-download">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -2913,6 +2965,15 @@ Comandante Carlos es una canción dedicada a Carlos Fonseca, fundador del Frente
             </div>
 
             
+            <div class="metadata-item metadata-doi-item">
+              <span class="metadata-label">DOI</span>
+              <span class="metadata-value">
+                <a href="https://doi.org/10.5281/zenodo.21213886" target="_blank" rel="noopener noreferrer" class="sidebar-doi-link">
+                  10.5281/zenodo.21213886
+                </a>
+              </span>
+            </div>
+            
 
             
           </div>
@@ -2935,17 +2996,17 @@ Comandante Carlos es una canción dedicada a Carlos Fonseca, fundador del Frente
             <div class="citation-item">
               <strong>APA</strong>
               <button class="copy-btn" onclick="copyRichText('apa-text-es', event)">Copiar</button>
-              <div id="apa-text-es" style="margin-top: 0.25rem;">Jeon, J. H., & Flores, C.. (2025). La Música y el Cine como Métodos de Propaganda en la Guerra Fría. <em>Revista Nacional de las Ciencias para Estudiantes</em>, 1(1), 40-44. </div>
+              <div id="apa-text-es" style="margin-top: 0.25rem;">Jeon, J. H., & Flores, C.. (2025). La Música y el Cine como Métodos de Propaganda en la Guerra Fría. <em>Revista Nacional de las Ciencias para Estudiantes</em>, 1(1), 40-44. https://doi.org/10.5281/zenodo.21213886</div>
             </div>
             <div class="citation-item">
               <strong>MLA</strong>
               <button class="copy-btn" onclick="copyRichText('mla-text-es', event)">Copiar</button>
-              <div id="mla-text-es" style="margin-top: 0.25rem;">Jeon, Jun Ho, y Flores, Camilo. "La Música y el Cine como Métodos de Propaganda en la Guerra Fría." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. 1, no. 1, 2025, pp. 40-44. </div>
+              <div id="mla-text-es" style="margin-top: 0.25rem;">Jeon, Jun Ho, y Flores, Camilo. "La Música y el Cine como Métodos de Propaganda en la Guerra Fría." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. 1, no. 1, 2025, pp. 40-44. https://doi.org/10.5281/zenodo.21213886</div>
             </div>
             <div class="citation-item">
               <strong>Chicago</strong>
               <button class="copy-btn" onclick="copyRichText('chi-text-es', event)">Copiar</button>
-              <div id="chi-text-es" style="margin-top: 0.25rem;">Jeon, Jun Ho, y Flores, Camilo. "La Música y el Cine como Métodos de Propaganda en la Guerra Fría." <em>Revista Nacional de las Ciencias para Estudiantes</em> 1, no. 1 (2025): 40-44. </div>
+              <div id="chi-text-es" style="margin-top: 0.25rem;">Jeon, Jun Ho, y Flores, Camilo. "La Música y el Cine como Métodos de Propaganda en la Guerra Fría." <em>Revista Nacional de las Ciencias para Estudiantes</em> 1, no. 1 (2025): 40-44. https://doi.org/10.5281/zenodo.21213886</div>
             </div>
             <a href="data:text/plain;charset=utf-8,%40article%7Bjeon20256%2C%0A%20%20author%20%3D%20%7BJeon%5C%24%2C%20Jun%20Ho%5C%24%20and%20Flores%5C%24%2C%20Camilo%5C%24%7D%2C%0A%20%20title%20%3D%20%7BLa%20M%7B%5C'u%7Dsica%20y%20el%20Cine%20como%20M%7B%5C'e%7Dtodos%20de%20Propaganda%20en%20la%20Guerra%20Fr%7B%5C'i%7Da%5C%24%7D%2C%0A%20%20journal%20%3D%20%7BRevista%20Nacional%20de%20las%20Ciencias%20para%20Estudiantes%7D%2C%0A%20%20year%20%3D%20%7B2025%7D%2C%0A%20%20volume%20%3D%20%7B1%7D%2C%0A%20%20number%20%3D%20%7B1%7D%2C%0A%20%20pages%20%3D%20%7B40--44%7D%2C%0A%20%20issn%20%3D%20%7B3087-2839%7D%2C%0A%20%20url%20%3D%20%7Bhttps%3A%2F%2Fwww.revistacienciasestudiantes.com%2Farticles%2Farticle-la-musica-y-el-cine-como-metodos-de-propaganda-en-la-guerra-fria-6.html%7D%0A%7D" download="article-6.bib" class="bibtex-download">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -2982,6 +3043,15 @@ Comandante Carlos es una canción dedicada a Carlos Fonseca, fundador del Frente
             <span class="metadata-value">Historia de Latinoamérica en la Guerra Fría</span>
           </div>
 
+          
+          <div class="metadata-item metadata-doi-item">
+            <span class="metadata-label">DOI</span>
+            <span class="metadata-value">
+              <a href="https://doi.org/10.5281/zenodo.21213886" target="_blank" rel="noopener noreferrer" class="sidebar-doi-link">
+                10.5281/zenodo.21213886
+              </a>
+            </span>
+          </div>
           
 
           

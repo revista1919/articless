@@ -2082,11 +2082,14 @@ body {
     }
 
     .citation-item {
-      position: relative;
-      padding: 0.75rem 0;
-      border-bottom: 1px solid var(--border-color);
-      font-size: 0.8rem;
-    }
+    position: relative;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.8rem;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-all;
+}
 
     .citation-item:last-child {
       border-bottom: none;
@@ -2407,6 +2410,48 @@ body {
     max-width: 100%;
   }
     }
+  /* ===== KEYWORDS: SOPORTE DUAL (LEGACY + CONTROLADO) ===== */
+.keyword-tag.keyword-controlled {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: white;
+    border: 1px solid #c0a86a;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-family: 'Inter', sans-serif;
+}
+
+.keyword-code {
+    font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #0A1929;
+    background: #f0f4f8;
+    padding: 1px 5px;
+    border-radius: 3px;
+    letter-spacing: 0.02em;
+}
+
+.keyword-term {
+    color: var(--text-light);
+    font-weight: 400;
+}
+
+/* Ajuste responsive para keywords controladas */
+@media (max-width: 600px) {
+    .keyword-tag.keyword-controlled {
+        font-size: 0.65rem;
+        padding: 3px 6px;
+        gap: 3px;
+    }
+    
+    .keyword-code {
+        font-size: 0.6rem;
+        padding: 1px 4px;
+    }
+}
     /* ===== CORRECCIONES PARA DOI ===== */
 /* 1. Estilo en la meta-box (debajo del título) */
 .meta-doi-wrapper {
@@ -2692,6 +2737,13 @@ body {
             <span>pp. 21-24</span>
             <span>04/13/2026</span>
             
+            <span class="meta-doi-wrapper">
+              <span class="meta-doi-label">DOI:</span>
+              <a href="https://doi.org/10.5281/zenodo.21214208" target="_blank" rel="noopener noreferrer" class="meta-doi-link">
+                https://doi.org/10.5281/zenodo.21214208
+              </a>
+            </span>
+            
           </div>
 
           <!-- Action Bar -->
@@ -2874,17 +2926,17 @@ body {
               <div class="citation-item">
                 <strong>APA</strong>
                 <button class="copy-btn" onclick="copyRichText('apa-text-en-mobile', event)">Copy</button>
-                <div id="apa-text-en-mobile" style="margin-top: 0.25rem;">Ribadeneira, A.. (2026). Las medias rojas: símbolo de libertad femenina frente al patriarcado. <em>Revista Nacional de las Ciencias para Estudiantes</em>, 2(1), 21-24. </div>
+                <div id="apa-text-en-mobile" style="margin-top: 0.25rem;">Ribadeneira, A.. (2026). Las medias rojas: símbolo de libertad femenina frente al patriarcado. <em>Revista Nacional de las Ciencias para Estudiantes</em>, 2(1), 21-24. https://doi.org/10.5281/zenodo.21214208</div>
               </div>
               <div class="citation-item">
                 <strong>MLA</strong>
                 <button class="copy-btn" onclick="copyRichText('mla-text-en-mobile', event)">Copy</button>
-                <div id="mla-text-en-mobile" style="margin-top: 0.25rem;">Ribadeneira, Amelia. "Las medias rojas: símbolo de libertad femenina frente al patriarcado." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. 2, no. 1, 2026, pp. 21-24. </div>
+                <div id="mla-text-en-mobile" style="margin-top: 0.25rem;">Ribadeneira, Amelia. "Las medias rojas: símbolo de libertad femenina frente al patriarcado." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. 2, no. 1, 2026, pp. 21-24. https://doi.org/10.5281/zenodo.21214208</div>
               </div>
               <div class="citation-item">
                 <strong>Chicago</strong>
                 <button class="copy-btn" onclick="copyRichText('chi-text-en-mobile', event)">Copy</button>
-                <div id="chi-text-en-mobile" style="margin-top: 0.25rem;">Ribadeneira, Amelia. "Las medias rojas: símbolo de libertad femenina frente al patriarcado." <em>Revista Nacional de las Ciencias para Estudiantes</em> 2, no. 1 (2026): 21-24. </div>
+                <div id="chi-text-en-mobile" style="margin-top: 0.25rem;">Ribadeneira, Amelia. "Las medias rojas: símbolo de libertad femenina frente al patriarcado." <em>Revista Nacional de las Ciencias para Estudiantes</em> 2, no. 1 (2026): 21-24. https://doi.org/10.5281/zenodo.21214208</div>
               </div>
               <a href="data:text/plain;charset=utf-8,%40article%7Bribadeneira202613%2C%0A%20%20author%20%3D%20%7BRibadeneira%5C%24%2C%20Amelia%5C%24%7D%2C%0A%20%20title%20%3D%20%7BLas%20medias%20rojas%3A%20s%7B%5C'i%7Dmbolo%20de%20libertad%20femenina%20frente%20al%20patriarcado%5C%24%7D%2C%0A%20%20journal%20%3D%20%7BRevista%20Nacional%20de%20las%20Ciencias%20para%20Estudiantes%7D%2C%0A%20%20year%20%3D%20%7B2026%7D%2C%0A%20%20volume%20%3D%20%7B2%7D%2C%0A%20%20number%20%3D%20%7B1%7D%2C%0A%20%20pages%20%3D%20%7B21--24%7D%2C%0A%20%20issn%20%3D%20%7B3087-2839%7D%2C%0A%20%20url%20%3D%20%7Bhttps%3A%2F%2Fwww.revistacienciasestudiantes.com%2Farticles%2Farticle-las-medias-rojas-simbolo-de-libertad-femenina-frente-al-patriarcado-13.html%7D%0A%7D" download="article-13.bib" class="bibtex-download">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -2922,6 +2974,15 @@ body {
             </div>
 
             
+            <div class="metadata-item metadata-doi-item">
+              <span class="metadata-label">DOI</span>
+              <span class="metadata-value">
+                <a href="https://doi.org/10.5281/zenodo.21214208" target="_blank" rel="noopener noreferrer" class="sidebar-doi-link">
+                  10.5281/zenodo.21214208
+                </a>
+              </span>
+            </div>
+            
 
             
           </div>
@@ -2944,17 +3005,17 @@ body {
             <div class="citation-item">
               <strong>APA</strong>
               <button class="copy-btn" onclick="copyRichText('apa-text-en', event)">Copy</button>
-              <div id="apa-text-en" style="margin-top: 0.25rem;">Ribadeneira, A.. (2026). Las medias rojas: símbolo de libertad femenina frente al patriarcado. <em>Revista Nacional de las Ciencias para Estudiantes</em>, 2(1), 21-24. </div>
+              <div id="apa-text-en" style="margin-top: 0.25rem;">Ribadeneira, A.. (2026). Las medias rojas: símbolo de libertad femenina frente al patriarcado. <em>Revista Nacional de las Ciencias para Estudiantes</em>, 2(1), 21-24. https://doi.org/10.5281/zenodo.21214208</div>
             </div>
             <div class="citation-item">
               <strong>MLA</strong>
               <button class="copy-btn" onclick="copyRichText('mla-text-en', event)">Copy</button>
-              <div id="mla-text-en" style="margin-top: 0.25rem;">Ribadeneira, Amelia. "Las medias rojas: símbolo de libertad femenina frente al patriarcado." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. 2, no. 1, 2026, pp. 21-24. </div>
+              <div id="mla-text-en" style="margin-top: 0.25rem;">Ribadeneira, Amelia. "Las medias rojas: símbolo de libertad femenina frente al patriarcado." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. 2, no. 1, 2026, pp. 21-24. https://doi.org/10.5281/zenodo.21214208</div>
             </div>
             <div class="citation-item">
               <strong>Chicago</strong>
               <button class="copy-btn" onclick="copyRichText('chi-text-en', event)">Copy</button>
-              <div id="chi-text-en" style="margin-top: 0.25rem;">Ribadeneira, Amelia. "Las medias rojas: símbolo de libertad femenina frente al patriarcado." <em>Revista Nacional de las Ciencias para Estudiantes</em> 2, no. 1 (2026): 21-24. </div>
+              <div id="chi-text-en" style="margin-top: 0.25rem;">Ribadeneira, Amelia. "Las medias rojas: símbolo de libertad femenina frente al patriarcado." <em>Revista Nacional de las Ciencias para Estudiantes</em> 2, no. 1 (2026): 21-24. https://doi.org/10.5281/zenodo.21214208</div>
             </div>
             <a href="data:text/plain;charset=utf-8,%40article%7Bribadeneira202613%2C%0A%20%20author%20%3D%20%7BRibadeneira%5C%24%2C%20Amelia%5C%24%7D%2C%0A%20%20title%20%3D%20%7BLas%20medias%20rojas%3A%20s%7B%5C'i%7Dmbolo%20de%20libertad%20femenina%20frente%20al%20patriarcado%5C%24%7D%2C%0A%20%20journal%20%3D%20%7BRevista%20Nacional%20de%20las%20Ciencias%20para%20Estudiantes%7D%2C%0A%20%20year%20%3D%20%7B2026%7D%2C%0A%20%20volume%20%3D%20%7B2%7D%2C%0A%20%20number%20%3D%20%7B1%7D%2C%0A%20%20pages%20%3D%20%7B21--24%7D%2C%0A%20%20issn%20%3D%20%7B3087-2839%7D%2C%0A%20%20url%20%3D%20%7Bhttps%3A%2F%2Fwww.revistacienciasestudiantes.com%2Farticles%2Farticle-las-medias-rojas-simbolo-de-libertad-femenina-frente-al-patriarcado-13.html%7D%0A%7D" download="article-13.bib" class="bibtex-download">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -2991,6 +3052,15 @@ body {
             <span class="metadata-value">Lengua y Literatura</span>
           </div>
 
+          
+          <div class="metadata-item metadata-doi-item">
+            <span class="metadata-label">DOI</span>
+            <span class="metadata-value">
+              <a href="https://doi.org/10.5281/zenodo.21214208" target="_blank" rel="noopener noreferrer" class="sidebar-doi-link">
+                10.5281/zenodo.21214208
+              </a>
+            </span>
+          </div>
           
 
           

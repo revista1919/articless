@@ -2083,11 +2083,14 @@ body {
     }
 
     .citation-item {
-      position: relative;
-      padding: 0.75rem 0;
-      border-bottom: 1px solid var(--border-color);
-      font-size: 0.8rem;
-    }
+    position: relative;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.8rem;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-all;
+}
 
     .citation-item:last-child {
       border-bottom: none;
@@ -2408,6 +2411,48 @@ body {
     max-width: 100%;
   }
     }
+  /* ===== KEYWORDS: SOPORTE DUAL (LEGACY + CONTROLADO) ===== */
+.keyword-tag.keyword-controlled {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: white;
+    border: 1px solid #c0a86a;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-family: 'Inter', sans-serif;
+}
+
+.keyword-code {
+    font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #0A1929;
+    background: #f0f4f8;
+    padding: 1px 5px;
+    border-radius: 3px;
+    letter-spacing: 0.02em;
+}
+
+.keyword-term {
+    color: var(--text-light);
+    font-weight: 400;
+}
+
+/* Ajuste responsive para keywords controladas */
+@media (max-width: 600px) {
+    .keyword-tag.keyword-controlled {
+        font-size: 0.65rem;
+        padding: 3px 6px;
+        gap: 3px;
+    }
+    
+    .keyword-code {
+        font-size: 0.6rem;
+        padding: 1px 4px;
+    }
+}
     /* ===== CORRECCIONES PARA DOI ===== */
 /* 1. Estilo en la meta-box (debajo del título) */
 .meta-doi-wrapper {
@@ -2693,6 +2738,13 @@ body {
             <span>pp. 25-30</span>
             <span>29-11-2025</span>
             
+            <span class="meta-doi-wrapper">
+              <span class="meta-doi-label">DOI:</span>
+              <a href="https://doi.org/10.5281/zenodo.21225212" target="_blank" rel="noopener noreferrer" class="meta-doi-link">
+                https://doi.org/10.5281/zenodo.21225212
+              </a>
+            </span>
+            
           </div>
 
           <!-- Action Bar -->
@@ -2860,17 +2912,17 @@ body {
               <div class="citation-item">
                 <strong>APA</strong>
                 <button class="copy-btn" onclick="copyRichText('apa-text-es-mobile', event)">Copiar</button>
-                <div id="apa-text-es-mobile" style="margin-top: 0.25rem;">Rojas, C., & Flores, S.. (2025). Panamá en la Guerra Fría: Comparativa del Antes y Durante de su Utilización Estratégica de EE.UU. <em>Revista Nacional de las Ciencias para Estudiantes</em>, 1(1), 25-30. </div>
+                <div id="apa-text-es-mobile" style="margin-top: 0.25rem;">Rojas, C., & Flores, S.. (2025). Panamá en la Guerra Fría: Comparativa del Antes y Durante de su Utilización Estratégica de EE.UU. <em>Revista Nacional de las Ciencias para Estudiantes</em>, 1(1), 25-30. https://doi.org/10.5281/zenodo.21225212</div>
               </div>
               <div class="citation-item">
                 <strong>MLA</strong>
                 <button class="copy-btn" onclick="copyRichText('mla-text-es-mobile', event)">Copiar</button>
-                <div id="mla-text-es-mobile" style="margin-top: 0.25rem;">Rojas, Cristóbal, y Flores, Sofía. "Panamá en la Guerra Fría: Comparativa del Antes y Durante de su Utilización Estratégica de EE.UU." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. 1, no. 1, 2025, pp. 25-30. </div>
+                <div id="mla-text-es-mobile" style="margin-top: 0.25rem;">Rojas, Cristóbal, y Flores, Sofía. "Panamá en la Guerra Fría: Comparativa del Antes y Durante de su Utilización Estratégica de EE.UU." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. 1, no. 1, 2025, pp. 25-30. https://doi.org/10.5281/zenodo.21225212</div>
               </div>
               <div class="citation-item">
                 <strong>Chicago</strong>
                 <button class="copy-btn" onclick="copyRichText('chi-text-es-mobile', event)">Copiar</button>
-                <div id="chi-text-es-mobile" style="margin-top: 0.25rem;">Rojas, Cristóbal, y Flores, Sofía. "Panamá en la Guerra Fría: Comparativa del Antes y Durante de su Utilización Estratégica de EE.UU." <em>Revista Nacional de las Ciencias para Estudiantes</em> 1, no. 1 (2025): 25-30. </div>
+                <div id="chi-text-es-mobile" style="margin-top: 0.25rem;">Rojas, Cristóbal, y Flores, Sofía. "Panamá en la Guerra Fría: Comparativa del Antes y Durante de su Utilización Estratégica de EE.UU." <em>Revista Nacional de las Ciencias para Estudiantes</em> 1, no. 1 (2025): 25-30. https://doi.org/10.5281/zenodo.21225212</div>
               </div>
               <a href="data:text/plain;charset=utf-8,%40article%7Brojas20254%2C%0A%20%20author%20%3D%20%7BRojas%5C%24%2C%20Crist%7B%5C'o%7Dbal%5C%24%20and%20Flores%5C%24%2C%20Sof%7B%5C'i%7Da%5C%24%7D%2C%0A%20%20title%20%3D%20%7BPanam%7B%5C'a%7D%20en%20la%20Guerra%20Fr%7B%5C'i%7Da%3A%20Comparativa%20del%20Antes%20y%20Durante%20de%20su%20Utilizaci%7B%5C'o%7Dn%20Estrat%7B%5C'e%7Dgica%20de%20EE.UU%5C%24%7D%2C%0A%20%20journal%20%3D%20%7BRevista%20Nacional%20de%20las%20Ciencias%20para%20Estudiantes%7D%2C%0A%20%20year%20%3D%20%7B2025%7D%2C%0A%20%20volume%20%3D%20%7B1%7D%2C%0A%20%20number%20%3D%20%7B1%7D%2C%0A%20%20pages%20%3D%20%7B25--30%7D%2C%0A%20%20issn%20%3D%20%7B3087-2839%7D%2C%0A%20%20url%20%3D%20%7Bhttps%3A%2F%2Fwww.revistacienciasestudiantes.com%2Farticles%2Farticle-panama-en-la-guerra-fria-comparativa-del-antes-y-durante-de-su-utilizacion-estrategica-de-ee-uu-4.html%7D%0A%7D" download="article-4.bib" class="bibtex-download">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -2908,6 +2960,15 @@ body {
             </div>
 
             
+            <div class="metadata-item metadata-doi-item">
+              <span class="metadata-label">DOI</span>
+              <span class="metadata-value">
+                <a href="https://doi.org/10.5281/zenodo.21225212" target="_blank" rel="noopener noreferrer" class="sidebar-doi-link">
+                  10.5281/zenodo.21225212
+                </a>
+              </span>
+            </div>
+            
 
             
           </div>
@@ -2930,17 +2991,17 @@ body {
             <div class="citation-item">
               <strong>APA</strong>
               <button class="copy-btn" onclick="copyRichText('apa-text-es', event)">Copiar</button>
-              <div id="apa-text-es" style="margin-top: 0.25rem;">Rojas, C., & Flores, S.. (2025). Panamá en la Guerra Fría: Comparativa del Antes y Durante de su Utilización Estratégica de EE.UU. <em>Revista Nacional de las Ciencias para Estudiantes</em>, 1(1), 25-30. </div>
+              <div id="apa-text-es" style="margin-top: 0.25rem;">Rojas, C., & Flores, S.. (2025). Panamá en la Guerra Fría: Comparativa del Antes y Durante de su Utilización Estratégica de EE.UU. <em>Revista Nacional de las Ciencias para Estudiantes</em>, 1(1), 25-30. https://doi.org/10.5281/zenodo.21225212</div>
             </div>
             <div class="citation-item">
               <strong>MLA</strong>
               <button class="copy-btn" onclick="copyRichText('mla-text-es', event)">Copiar</button>
-              <div id="mla-text-es" style="margin-top: 0.25rem;">Rojas, Cristóbal, y Flores, Sofía. "Panamá en la Guerra Fría: Comparativa del Antes y Durante de su Utilización Estratégica de EE.UU." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. 1, no. 1, 2025, pp. 25-30. </div>
+              <div id="mla-text-es" style="margin-top: 0.25rem;">Rojas, Cristóbal, y Flores, Sofía. "Panamá en la Guerra Fría: Comparativa del Antes y Durante de su Utilización Estratégica de EE.UU." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. 1, no. 1, 2025, pp. 25-30. https://doi.org/10.5281/zenodo.21225212</div>
             </div>
             <div class="citation-item">
               <strong>Chicago</strong>
               <button class="copy-btn" onclick="copyRichText('chi-text-es', event)">Copiar</button>
-              <div id="chi-text-es" style="margin-top: 0.25rem;">Rojas, Cristóbal, y Flores, Sofía. "Panamá en la Guerra Fría: Comparativa del Antes y Durante de su Utilización Estratégica de EE.UU." <em>Revista Nacional de las Ciencias para Estudiantes</em> 1, no. 1 (2025): 25-30. </div>
+              <div id="chi-text-es" style="margin-top: 0.25rem;">Rojas, Cristóbal, y Flores, Sofía. "Panamá en la Guerra Fría: Comparativa del Antes y Durante de su Utilización Estratégica de EE.UU." <em>Revista Nacional de las Ciencias para Estudiantes</em> 1, no. 1 (2025): 25-30. https://doi.org/10.5281/zenodo.21225212</div>
             </div>
             <a href="data:text/plain;charset=utf-8,%40article%7Brojas20254%2C%0A%20%20author%20%3D%20%7BRojas%5C%24%2C%20Crist%7B%5C'o%7Dbal%5C%24%20and%20Flores%5C%24%2C%20Sof%7B%5C'i%7Da%5C%24%7D%2C%0A%20%20title%20%3D%20%7BPanam%7B%5C'a%7D%20en%20la%20Guerra%20Fr%7B%5C'i%7Da%3A%20Comparativa%20del%20Antes%20y%20Durante%20de%20su%20Utilizaci%7B%5C'o%7Dn%20Estrat%7B%5C'e%7Dgica%20de%20EE.UU%5C%24%7D%2C%0A%20%20journal%20%3D%20%7BRevista%20Nacional%20de%20las%20Ciencias%20para%20Estudiantes%7D%2C%0A%20%20year%20%3D%20%7B2025%7D%2C%0A%20%20volume%20%3D%20%7B1%7D%2C%0A%20%20number%20%3D%20%7B1%7D%2C%0A%20%20pages%20%3D%20%7B25--30%7D%2C%0A%20%20issn%20%3D%20%7B3087-2839%7D%2C%0A%20%20url%20%3D%20%7Bhttps%3A%2F%2Fwww.revistacienciasestudiantes.com%2Farticles%2Farticle-panama-en-la-guerra-fria-comparativa-del-antes-y-durante-de-su-utilizacion-estrategica-de-ee-uu-4.html%7D%0A%7D" download="article-4.bib" class="bibtex-download">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -2977,6 +3038,15 @@ body {
             <span class="metadata-value">Historia de América Latina durante la Guerra Fría</span>
           </div>
 
+          
+          <div class="metadata-item metadata-doi-item">
+            <span class="metadata-label">DOI</span>
+            <span class="metadata-value">
+              <a href="https://doi.org/10.5281/zenodo.21225212" target="_blank" rel="noopener noreferrer" class="sidebar-doi-link">
+                10.5281/zenodo.21225212
+              </a>
+            </span>
+          </div>
           
 
           
