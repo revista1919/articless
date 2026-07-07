@@ -1,1328 +1,26 @@
-const fs = require('fs');
-const path = require('path');
-const cheerio = require('cheerio');
-// ... al inicio del archivo, junto a los otros require
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
-// ========== CONFIGURACIÓN ==========
-const ARTICLES_JSON = path.join(__dirname, 'articles.json');
-const OUTPUT_HTML_DIR = path.join(__dirname, 'articles');
-const DOMAIN = 'https://www.revistacienciasestudiantes.com';
-const JOURNAL_NAME_ES = 'Revista Nacional de las Ciencias para Estudiantes';
-const JOURNAL_NAME_EN = 'The National Review of Sciences for Students';
-const LOGO_ES = 'https://www.revistacienciasestudiantes.com/assets/logo.png';
-const LOGO_EN = 'https://www.revistacienciasestudiantes.com/logoEN.png';
-// ========== MODELO INTERMEDIO DE TABLA (AST) ==========
-
-let tableCounter = 1;
-
-function parseTable($, $table) {
-  const table = {
-    id: $table.attr('id') || `table-${tableCounter}`,
-    number: tableCounter++,
-    caption: $table.find('caption').text().trim() || null,
-    class: $table.attr('class') || null,
-    style: $table.attr('style') || null,
-    headers: [],
-    rows: [],
-    columns: 0,
-    footnotes: []
-  };
-
-  const rows = $table.find('tr');
-  let headerProcessed = false;
-
-  rows.each((i, row) => {
-    const rowData = [];
-    
-    $(row).find('th, td').each((j, cell) => {
-      const $cell = $(cell);
-      
-      rowData.push({
-        text: $cell.text().trim().replace(/\s+/g, ' '),
-        html: $cell.html(),
-        colspan: parseInt($cell.attr('colspan')) || 1,
-        rowspan: parseInt($cell.attr('rowspan')) || 1,
-        class: $cell.attr('class') || null,
-        style: $cell.attr('style') || null,
-        align: $cell.attr('align') || null,
-        type: cell.tagName.toLowerCase()
-      });
-    });
-
-    if (!headerProcessed && ($(row).find('th').length > 0 || i === 0)) {
-      table.headers = rowData;
-      headerProcessed = true;
-    } else {
-      table.rows.push(rowData);
-    }
-  });
-
-  table.columns = Math.max(
-    table.headers.length,
-    ...table.rows.map(r => r.reduce((sum, cell) => sum + (cell.colspan || 1), 0))
-  );
-
-  return table;
-}
-
-function formatCSVCell(text) {
-  let cleanText = text.replace(/"/g, '""');
-  return `"${cleanText}"`;
-}
-
-function tableToCSV(table) {
-  const rows = [];
-  if (table.headers.length) {
-    rows.push(table.headers.map(h => formatCSVCell(h.text)).join(','));
-  }
-  table.rows.forEach(row => {
-    rows.push(row.map(cell => formatCSVCell(cell.text)).join(','));
-  });
-  return rows.join('\n');
-}
-
-function tableToJSON(table) {
-  const simpleTable = {
-    number: table.number,
-    caption: table.caption,
-    headers: table.headers.map(h => h.text),
-    rows: table.rows.map(row => row.map(cell => cell.text)),
-    data: []
-  };
-
-  if (table.headers.length) {
-    simpleTable.data = table.rows.map(row => {
-      const obj = {};
-      table.headers.forEach((header, idx) => {
-        const key = header.text
-          .toLowerCase()
-          .replace(/\s+/g, '_')
-          .replace(/[^\w]/g, '');
-        obj[key] = row[idx]?.text || '';
-      });
-      return obj;
-    });
-  }
-
-  return JSON.stringify(simpleTable, null, 2);
-}
-
-function escapeLaTeX(text) {
-  return text
-    .replace(/\\/g, '\\textbackslash ')
-    .replace(/_/g, '\\_')
-    .replace(/&/g, '\\&')
-    .replace(/%/g, '\\%')
-    .replace(/\$/g, '\\$')
-    .replace(/#/g, '\\#')
-    .replace(/{/g, '\\{')
-    .replace(/}/g, '\\}')
-    .replace(/~/g, '\\textasciitilde ')
-    .replace(/\^/g, '\\textasciicircum ');
-}
-
-function tableToLaTeX(table) {
-  if (!table.rows.length && !table.headers.length) return '';
-
-  const alignment = 'l'.repeat(table.columns);
-  let latex = [];
-
-  latex.push('\\begin{table}[h]');
-  latex.push('\\centering');
-  
-  if (table.caption) {
-    latex.push(`\\caption{${escapeLaTeX(table.caption)}}`);
-  }
-  
-  latex.push(`\\label{tab:${table.number}}`);
-  latex.push(`\\begin{tabular}{|${alignment.split('').join('|')}|}`);
-  latex.push('\\hline');
-
-  if (table.headers.length) {
-    const headerLine = table.headers
-      .map(h => escapeLaTeX(h.text))
-      .join(' & ');
-    latex.push(headerLine + ' \\\\');
-    latex.push('\\hline');
-  }
-
-  table.rows.forEach(row => {
-    const rowLine = row
-      .map(cell => escapeLaTeX(cell.text))
-      .join(' & ');
-    latex.push(rowLine + ' \\\\');
-    latex.push('\\hline');
-  });
-
-  latex.push('\\end{tabular}');
-  latex.push('\\end{table}');
-
-  return latex.join('\n');
-}
-
-function escapeXML(text) {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
-
-function tableToXML(table) {
-  let xml = [];
-  
-  xml.push('<?xml version="1.0" encoding="UTF-8"?>');
-  xml.push(`<table id="${table.id}" number="${table.number}" xmlns="http://www.w3.org/1999/xhtml">`);
-
-  if (table.caption) {
-    xml.push(`  <caption>${escapeXML(table.caption)}</caption>`);
-  }
-
-  if (table.headers.length) {
-    xml.push('  <thead>');
-    xml.push('    <tr>');
-    table.headers.forEach(header => {
-      xml.push(`      <th>${escapeXML(header.text)}</th>`);
-    });
-    xml.push('    </tr>');
-    xml.push('  </thead>');
-  }
-
-  xml.push('  <tbody>');
-  table.rows.forEach(row => {
-    xml.push('    <tr>');
-    row.forEach(cell => {
-      xml.push(`      <td>${escapeXML(cell.text)}</td>`);
-    });
-    xml.push('    </tr>');
-  });
-  xml.push('  </tbody>');
-  
-  xml.push('</table>');
-
-  return xml.join('\n');
-}
-
-function resetTableCounter() {
-  tableCounter = 1;
-}
-// Asegurar que existe el directorio de salida
-if (!fs.existsSync(OUTPUT_HTML_DIR)) {
-  fs.mkdirSync(OUTPUT_HTML_DIR, { recursive: true });
-}
-
-// ========== UTILIDADES ==========
-function generateSlug(text) {
-  if (!text) return '';
-  return text.toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
-
-function formatDateEs(dateStr) {
-  if (!dateStr) return 'N/A';
-  return new Date(dateStr).toLocaleDateString('es-CL', { 
-    day: '2-digit', 
-    month: '2-digit', 
-    year: 'numeric' 
-  });
-}
-
-function formatDateEn(dateStr) {
-  if (!dateStr) return 'N/A';
-  return new Date(dateStr).toLocaleDateString('en-US', { 
-    month: '2-digit', 
-    day: '2-digit', 
-    year: 'numeric' 
-  });
-}
-
-function formatAuthorForCitation(author) {
-  // author puede ser string u objeto
-  let authorName = '';
-  if (typeof author === 'string') {
-    authorName = author;
-  } else if (author && author.name) {
-    authorName = author.name;
-  } else if (author && (author.firstName || author.lastName)) {
-    authorName = `${author.firstName || ''} ${author.lastName || ''}`.trim();
-  } else {
-    return '';
-  }
-  
-  const parts = authorName.trim().split(' ');
-  if (parts.length >= 2) {
-    const apellido = parts.pop();
-    const nombre = parts.join(' ');
-    return `${apellido}, ${nombre}`;
-  }
-  return authorName;
-}
-
-function getAPAAuthor(author) {
-  let authorName = '';
-  if (typeof author === 'string') {
-    authorName = author;
-  } else if (author && author.name) {
-    authorName = author.name;
-  } else if (author && (author.firstName || author.lastName)) {
-    authorName = `${author.firstName || ''} ${author.lastName || ''}`.trim();
-  } else {
-    return '';
-  }
-  
-  const parts = authorName.trim().split(/\s+/);
-  if (parts.length < 2) return authorName;
-  const last = parts.pop();
-  const initials = parts.map(n => n[0].toUpperCase() + '.').join(' ');
-  return `${last}, ${initials}`;
-}
-
-function formatAuthorsAPA(authors) {
-  // authors puede ser string o array
-  let authorsArray = [];
-  if (typeof authors === 'string') {
-    authorsArray = authors.split(';').map(a => a.trim()).filter(Boolean);
-  } else if (Array.isArray(authors)) {
-    authorsArray = authors;
-  }
-  
-  if (!authorsArray.length) return '';
-  const formatted = authorsArray.map(getAPAAuthor);
-  if (formatted.length === 1) {
-    return formatted[0];
-  } else if (formatted.length === 2) {
-    return formatted[0] + ', & ' + formatted[1];
-  } else {
-    return formatted.slice(0, -1).join(', ') + ', & ' + formatted[formatted.length - 1];
-  }
-}
-
-function formatAuthorsChicagoOrMLA(authors, language = 'es') {
-  let authorsArray = [];
-  if (typeof authors === 'string') {
-    authorsArray = authors.split(';').map(a => a.trim()).filter(Boolean);
-  } else if (Array.isArray(authors)) {
-    authorsArray = authors;
-  }
-  
-  if (!authorsArray.length) return '';
-  const formatted = authorsArray.map(formatAuthorForCitation);
-  const connector = language === 'es' ? 'y' : 'and';
-  const etal = 'et al.';
-  if (formatted.length === 1) {
-    return formatted[0];
-  } else if (formatted.length === 2) {
-    return `${formatted[0]}, ${connector} ${formatted[1]}`;
-  } else {
-    return `${formatted[0]}, ${etal}`;
-  }
-}
-
-function formatAuthorsDisplay(authors, language = 'es') {
-  let authorsArray = [];
-  if (typeof authors === 'string') {
-    authorsArray = authors.split(';').map(a => a.trim()).filter(Boolean);
-  } else if (Array.isArray(authors)) {
-    authorsArray = authors.map(a => {
-      if (typeof a === 'string') return a;
-      if (a.name) return a.name;
-      if (a.firstName || a.lastName) return `${a.firstName || ''} ${a.lastName || ''}`.trim();
-      return '';
-    }).filter(Boolean);
-  }
-  
-  if (!authorsArray.length) return 'Autor desconocido';
-  const connector = language === 'es' ? 'y' : 'and';
-  if (authorsArray.length === 1) {
-    return authorsArray[0];
-  } else if (authorsArray.length === 2) {
-    return `${authorsArray[0]} ${connector} ${authorsArray[1]}`;
-  } else {
-    return authorsArray.slice(0, -1).join(', ') + `, ${connector} ` + authorsArray[authorsArray.length - 1];
-  }
-}
-
-function generateBibTeX(article) {
-  const year = new Date(article.fecha).getFullYear();
-
-  function escapeBibTeX(text) {
-    if (!text) return '';
-
-    const charMap = {
-      'á': "{\\'a}", 'é': "{\\'e}", 'í': "{\\'i}", 'ó': "{\\'o}", 'ú': "{\\'u}",
-      'Á': "{\\'A}", 'É': "{\\'E}", 'Í': "{\\'I}", 'Ó': "{\\'O}", 'Ú': "{\\'U}",
-      'ä': "{\\\"a}", 'ë': "{\\\"e}", 'ï': "{\\\"i}", 'ö': "{\\\"o}", 'ü': "{\\\"u}",
-      'Ä': "{\\\"A}", 'Ë': "{\\\"E}", 'Ï': "{\\\"I}", 'Ö': "{\\\"O}", 'Ü': "{\\\"U}",
-      'ñ': "{\\~n}", 'Ñ': "{\\~N}",
-      'ç': "{\\c{c}}", 'Ç': "{\\c{C}}",
-      '&': "\\&", '%': "\\%", '$': "\\$", '#': "\\#", '_': "\\_"
-    };
-
-    let escaped = text;
-    for (const [char, latex] of Object.entries(charMap)) {
-      escaped = escaped.replace(new RegExp(char, 'g'), latex);
-    }
-
-    return escaped;
-  }
-
-  function formatAuthor(name) {
-    if (!name) return '';
-
-    const parts = name.trim().split(/\s+/);
-
-    if (parts.length === 1) {
-      return escapeBibTeX(parts[0]);
-    }
-
-    const lastName = parts.pop();
-    const firstNames = parts.join(' ');
-
-    return `${escapeBibTeX(lastName)}, ${escapeBibTeX(firstNames)}`;
-  }
-
-  let authors = [];
-
-  if (typeof article.autores === 'string') {
-    authors = article.autores.split(';').map(a => formatAuthor(a.trim()));
-  } else if (Array.isArray(article.autores)) {
-    authors = article.autores.map(a => {
-      if (typeof a === 'string') return formatAuthor(a);
-      if (a.name) return formatAuthor(a.name);
-      if (a.firstName || a.lastName) {
-        return formatAuthor(`${a.firstName || ''} ${a.lastName || ''}`.trim());
-      }
-      return '';
-    });
-  }
-
-  const authorsForBib = authors.filter(Boolean).join(' and ');
-
-  const firstAuthorLast = authors.length
-    ? authors[0].split(',')[0].toLowerCase().replace(/[^a-z]/g, '')
-    : 'article';
-
-  const key = `${firstAuthorLast}${year}${article.numeroArticulo}`;
-
-  const escapedTitle = escapeBibTeX(article.titulo);
-  const journalName = "Revista Nacional de las Ciencias para Estudiantes";
-
-  return `@article{${key},
-  author = {${authorsForBib}},
-  title = {${escapedTitle}},
-  journal = {${journalName}},
-  year = {${year}},
-  volume = {${article.volumen}},
-  number = {${article.numero}},
-  pages = {${article.primeraPagina}--${article.ultimaPagina}},
-  issn = {3087-2839},
-  url = {${DOMAIN}/articles/article-${generateSlug(article.titulo)}-${article.numeroArticulo}.html}
-}`.trim();
-}
-// ========== ICONOS SVG ==========
-const oaSvg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="72" height="72" viewBox="90 50 500 260" style="vertical-align: middle;">
-  <g transform="matrix(1.25 0 0 -1.25 0 360)">
-    <defs>
-      <path id="a" d="M-90-36h900v360H-90z"/>
-    </defs>
-    <clipPath id="b">
-      <use xlink:href="#a" overflow="visible"/>
-    </clipPath>
-    <g clip-path="url(#b)">
-      <path d="M720-3H0v294.285h720V-3z" fill="#fff"/>
-      <path d="M262.883 200.896v-8.846h25.938v8.846c0 21.412 17.421 38.831 38.831 38.831 21.409 0 38.829-17.419 38.829-38.831v-63.985h25.939v63.985c0 35.713-29.056 64.769-64.768 64.769-35.711 0-64.769-29.056-64.769-64.769M349.153 99.568c0-11.816-9.58-21.396-21.399-21.396-11.818 0-21.398 9.58-21.398 21.396 0 11.823 9.58 21.404 21.398 21.404 11.819 0 21.399-9.581 21.399-21.404" fill="#f68212"/>
-      <path d="M277.068 99.799c0 27.811 22.627 50.436 50.438 50.436 27.809 0 50.433-22.625 50.433-50.436 0-27.809-22.624-50.438-50.433-50.438-27.811.001-50.438 22.63-50.438 50.438m-25.938 0c0-42.109 34.265-76.373 76.375-76.373 42.111 0 76.373 34.265 76.373 76.373 0 42.113-34.262 76.375-76.373 76.375-42.11 0-76.375-34.262-76.375-76.375" fill="#f68212"/>
-    </g>
-  </g>
-</svg>`;
-const orcidSvg = `<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" width="16" height="16"> <circle cx="128" cy="128" r="120" fill="#A6CE39"/> <g fill="#FFFFFF"> <rect x="71" y="78" width="17" height="102"/> <circle cx="79.5" cy="56" r="11"/> <path d="M103 78 v102 h41.5 c28.2 0 51-22.8 51-51 s-22.8-51-51-51 H103 zm17 17 h24.5 c18.8 0 34 15.2 34 34 s-15.2 34-34 34 H120 V95 z" fill-rule="evenodd"/> </g> </svg>`;
-
-const emailSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; color: #005a7d;">
-  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-  <polyline points="22,6 12,13 2,6"></polyline>
-</svg>`;
-
-const ccLogoSvg = `<img src="https://bibliotecas.ucn.cl/wp-content/uploads/2025/04/by1.png" alt="CC BY 4.0" style="height: 1.2em; width: auto; vertical-align: middle;">`;
-// ========== SVG ICONS PARA REDES SOCIALES ==========
-const socialIcons = {
-  instagram: `<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>`,
-  youtube: `<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>`,
-  tiktok: `<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12.53.02C13.84 0 15.14.01 16.44 0c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>`,
-  spotify: `<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.508 17.308c-.221.362-.689.473-1.05.252-2.983-1.823-6.738-2.237-11.162-1.226-.411.094-.823-.162-.917-.573-.094-.412.162-.823.573-.917 4.847-1.108 8.995-.635 12.305 1.386.36.221.472.69.251 1.05zm1.47-3.255c-.278.452-.865.594-1.317.316-3.414-2.098-8.62-2.706-12.657-1.479-.508.154-1.04-.136-1.194-.644-.154-.508.136-1.04.644-1.194 4.613-1.399 10.366-.719 14.256 1.67.452.278.594.865.316 1.317zm.126-3.374C14.653 7.64 7.29 7.394 3.05 8.681c-.604.183-1.246-.166-1.429-.77-.183-.604.166-1.246.77-1.429 4.883-1.482 13.014-1.201 18.238 1.902.544.323.72 1.034.397 1.578-.323.544-1.034.72-1.578.397z"/></svg>`
-};
-
-// ========== SOCIAL LINKS ==========
-const socialLinks = {
-  instagram: 'https://www.instagram.com/revistanacionalcienciae',
-  youtube: 'https://www.youtube.com/@RevistaNacionaldelasCienciaspa',
-  tiktok: 'https://www.tiktok.com/@revistacienciaestudiante',
-  spotify: 'https://open.spotify.com/show/6amsgUkNXgUTD219XpuqOe?si=LPzCNpusQjSLGBq_pPrVTw'
-};
-// ========== CARGA DE TEAM.JSON CON MATCHING ROBUSTO ==========
-let authorMap = {}; // Mapa por uid
-let authorByNameMap = {}; // Mapa por nombre normalizado
-let authorBySlugMap = {}; // Mapa por slug
-
-async function loadTeamData() {
-  try {
-    const TEAM_JSON_URL = 'https://www.revistacienciasestudiantes.com/team/Team.json';
-    console.log(`🌐 Cargando equipo desde: ${TEAM_JSON_URL}`);
-
-    const response = await fetch(TEAM_JSON_URL);
-    if (!response.ok) {
-      throw new Error(`Error HTTP ${response.status} al cargar Team.json`);
-    }
-
-    const team = await response.json();
-
-    if (Array.isArray(team)) {
-      team.forEach(member => {
-        // Guardar por UID (para matching exacto)
-        if (member.uid) {
-          authorMap[member.uid] = {
-            uid: member.uid,
-            displayName: member.displayName,
-            slug: member.slug,
-            orcid: member.orcid,
-            email: member.publicEmail,
-            firstName: member.firstName,
-            lastName: member.lastName,
-            institution: member.institution,
-            imageUrl: member.imageUrl
-          };
-        }
-        
-        // Guardar por slug
-        if (member.slug) {
-          authorBySlugMap[member.slug] = {
-            ...authorMap[member.uid],
-            uid: member.uid,
-            displayName: member.displayName,
-            slug: member.slug,
-            orcid: member.orcid,
-            email: member.publicEmail
-          };
-        }
-        
-        // Guardar por displayName (nombre exacto)
-        if (member.displayName) {
-          authorByNameMap[member.displayName] = {
-            ...authorMap[member.uid],
-            uid: member.uid,
-            displayName: member.displayName,
-            slug: member.slug,
-            orcid: member.orcid,
-            email: member.publicEmail
-          };
-        }
-        
-        // También guardar versiones normalizadas del nombre para matching fuzzy
-        // (sin tildes, minúsculas, etc.)
-        const normalizedName = member.displayName ? 
-          member.displayName.toLowerCase()
-            .normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
-        
-        if (normalizedName && !authorByNameMap[normalizedName]) {
-          authorByNameMap[normalizedName] = {
-            ...authorMap[member.uid],
-            uid: member.uid,
-            displayName: member.displayName,
-            slug: member.slug,
-            orcid: member.orcid,
-            email: member.publicEmail,
-            normalizedName
-          };
-        }
-        
-        // Guardar por combinación de nombre y apellido
-        if (member.firstName || member.lastName) {
-          const fullName = `${member.firstName || ''} ${member.lastName || ''}`.trim();
-          if (fullName && !authorByNameMap[fullName]) {
-            authorByNameMap[fullName] = {
-              ...authorMap[member.uid],
-              uid: member.uid,
-              displayName: member.displayName,
-              slug: member.slug,
-              orcid: member.orcid,
-              email: member.publicEmail
-            };
-          }
-        }
-      });
-      
-      console.log(`📚 ${Object.keys(authorMap).length} autores cargados por UID`);
-      console.log(`📚 ${Object.keys(authorByNameMap).length} variantes de nombres indexadas`);
-    } else {
-      console.log('⚠️ El JSON cargado no es un array.');
-    }
-
-  } catch (e) {
-    console.log('⚠️ No se pudo cargar Team.json desde la URL, los autores no tendrán enlaces. Error:', e.message);
-  }
-}
-
-// ========== FUNCIÓN DE MATCHING DE AUTORES ==========
-function findAuthorInfo(author, articleAuthorId = null) {
-  if (!author) return null;
-  
-  // Obtener el nombre para mostrar
-  let displayName = '';
-  if (typeof author === 'string') {
-    displayName = author;
-  } else if (author.name) {
-    displayName = author.name;
-  } else if (author.firstName || author.lastName) {
-    displayName = `${author.firstName || ''} ${author.lastName || ''}`.trim();
-  } else {
-    return null;
-  }
-  
-  // 1. INTENTAR POR UID (matching más exacto)
-  if (articleAuthorId && authorMap[articleAuthorId]) {
-    console.log(`✅ Match por UID: ${articleAuthorId} -> ${authorMap[articleAuthorId].displayName}`);
-    return authorMap[articleAuthorId];
-  }
-  
-  // 2. INTENTAR POR NOMBRE EXACTO
-  if (authorByNameMap[displayName]) {
-    console.log(`✅ Match por nombre exacto: ${displayName}`);
-    return authorByNameMap[displayName];
-  }
-  
-  // 3. INTENTAR POR SLUG (si el autor tiene slug en el artículo)
-  if (author.slug && authorBySlugMap[author.slug]) {
-    console.log(`✅ Match por slug: ${author.slug}`);
-    return authorBySlugMap[author.slug];
-  }
-  
-  // 4. INTENTAR MATCHING INTELIGENTE PARA NOMBRES CON NÚMEROS (ej: "nombre-apellido2")
-  // Esto maneja casos donde hay duplicados como "Juan Pérez" y "Juan Pérez2"
-  const baseNameMatch = displayName.replace(/\d+$/, '').trim(); // Quita números al final
-  if (baseNameMatch !== displayName) {
-    // Buscar el nombre base en el mapa
-    for (const [key, value] of Object.entries(authorByNameMap)) {
-      if (key.startsWith(baseNameMatch) || baseNameMatch.startsWith(key)) {
-        console.log(`✅ Match por nombre base: ${displayName} -> ${key}`);
-        return value;
-      }
-    }
-  }
-  
-  // 5. INTENTAR NORMALIZACIÓN AVANZADA
-  const normalized = displayName.toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]/g, '');
-  
-  const normalizedWithoutNumbers = normalized.replace(/\d+/g, '');
-  
-  for (const [key, value] of Object.entries(authorByNameMap)) {
-    const keyNormalized = key.toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]/g, '');
-    
-    const keyWithoutNumbers = keyNormalized.replace(/\d+/g, '');
-    
-    // Comparar versiones normalizadas
-    if (keyNormalized === normalized || 
-        keyWithoutNumbers === normalizedWithoutNumbers ||
-        keyNormalized.includes(normalized) || 
-        normalized.includes(keyNormalized)) {
-      console.log(`✅ Match por normalización: ${displayName} -> ${key}`);
-      return value;
-    }
-  }
-  
-  // 6. ÚLTIMO RECURSO: Intentar por apellido si es que tenemos firstName/lastName
-  if (typeof author !== 'string' && (author.firstName || author.lastName)) {
-    const lastName = author.lastName || '';
-    const firstName = author.firstName || '';
-    
-    for (const [key, value] of Object.entries(authorMap)) {
-      if (value.lastName && value.lastName.toLowerCase() === lastName.toLowerCase()) {
-        // Coincidencia por apellido
-        if (value.firstName && value.firstName.toLowerCase().startsWith(firstName.toLowerCase().charAt(0))) {
-          console.log(`✅ Match por apellido + inicial: ${displayName}`);
-          return value;
-        }
-      }
-    }
-  }
-  
-  console.log(`❌ No se encontró match para: ${displayName}`);
-  return null;
-}
-
-// ========== FUNCIÓN PARA PROCESAR AUTORES CON ICONOS (MEJORADA) ==========
-// ========== FUNCIÓN PARA PROCESAR AUTORES CON ICONOS (MEJORADA CON IDIOMA) ==========
-function processAuthorsWithIcons(authors, article = null, lang = 'es') {
-  if (!authors) return 'Autor desconocido';
-  
-  let authorsArray = [];
-  if (typeof authors === 'string') {
-    authorsArray = authors.split(';').map(name => ({ name: name.trim() }));
-  } else if (Array.isArray(authors)) {
-    authorsArray = authors.map(a => {
-      if (typeof a === 'string') return { name: a };
-      return a; // ya es objeto
-    });
-  }
-  
-  const isSpanish = lang === 'es';
-  
-  const authorElements = authorsArray.map((author, index) => {
-    // Obtener nombre para mostrar
-    let displayName = '';
-    if (typeof author === 'string') {
-      displayName = author;
-    } else if (author.name) {
-      displayName = author.name;
-    } else if (author.firstName || author.lastName) {
-      displayName = `${author.firstName || ''} ${author.lastName || ''}`.trim();
-    } else {
-      displayName = 'Autor';
-    }
-    
-    // Obtener el authorId del artículo si existe
-    const articleAuthorId = article && article.authorIds ? article.authorIds[index] : null;
-    
-    // Buscar información del autor usando nuestra función de matching
-    const authorInfo = findAuthorInfo(author, articleAuthorId);
-    
-    // Construir HTML del autor
-    let authorHtml = '';
-    
-    if (authorInfo && authorInfo.slug) {
-      // Tiene slug, crear enlace - ¡VERSIÓN CORREGIDA PARA IDIOMA!
-      const authorFile = isSpanish ? `${authorInfo.slug}.html` : `${authorInfo.slug}.EN.html`;
-      authorHtml += `<a href="/team/${authorFile}" class="author-link"`;
-      
-      // Añadir atributos de datos para metadata
-      if (authorInfo.uid) {
-        authorHtml += ` data-author-uid="${authorInfo.uid}"`;
-      }
-      if (authorInfo.orcid) {
-        authorHtml += ` data-author-orcid="${authorInfo.orcid}"`;
-      }
-      
-      authorHtml += `>${displayName}</a>`;
-    } else {
-      // No tiene slug, solo texto
-      authorHtml += `<span class="author-name"`;
-      if (authorInfo && authorInfo.uid) {
-        authorHtml += ` data-author-uid="${authorInfo.uid}"`;
-      }
-      authorHtml += `>${displayName}</span>`;
-    }
-    
-    // Añadir iconos
-    const icons = [];
-    
-    // ORCID (verde) - Priorizar información del team.json
-    const orcid = (authorInfo && authorInfo.orcid) || author.orcid;
-    if (orcid && orcid.trim() !== '') {
-      icons.push(`<a href="https://orcid.org/${orcid}" target="_blank" rel="noopener noreferrer" class="author-icon orcid-icon" title="ORCID">${orcidSvg}</a>`);
-    }
-    
-    // Email (azul)
-    const email = (authorInfo && authorInfo.email) || author.email || author.publicEmail;
-    if (email && email.trim() !== '') {
-      icons.push(`<a href="mailto:${email}" class="author-icon email-icon" title="Email">${emailSvg}</a>`);
-    }
-    
-    if (icons.length > 0) {
-      authorHtml += `<span class="author-icons">${icons.join('')}</span>`;
-    }
-    
-    return authorHtml;
-  });
-  
-  return authorElements.join('<span class="author-separator">, </span>');
-}
-
-
-
-// ========== FUNCIÓN PARA PROCESAR TABLAS CON BOTONES DE DESCARGA (ACTUALIZADA CON MODELO) ==========
-function processTablesWithDownload($, html) {
-  if (!html) return html;
-  
-  // Resetear contador de tablas para cada artículo
-  resetTableCounter();
-  
-  let tableIndex = 0;
-  
-  $('table').each((i, el) => {
-    const $el = $(el);
-    tableIndex++;
-    const tableId = `table-${tableIndex}`;
-    $el.attr('id', tableId);
-    $el.addClass('article-table');
-    
-    // USAR EL MODELO INTERMEDIO - Parsear la tabla UNA vez
-    const tableModel = parseTable($, $el);
-    
-    // Generar todos los formatos usando el modelo
-    const csvContent = tableToCSV(tableModel);
-    const jsonContent = tableToJSON(tableModel);
-    const latexContent = tableToLaTeX(tableModel);
-    const xmlContent = tableToXML(tableModel);
-    
-    // Generar HTML de la tabla
-    const tableHtml = $.html($el);
-    
-    // Añadir BOM (Byte Order Mark) para UTF-8 en Excel
-    const BOM = '\uFEFF';
-    
-    // Crear el wrapper con botones
-    const tableWrapper = `
-    <div class="table-download-wrapper">
-      <div class="table-header">
-        <span class="table-label">Tabla ${tableIndex}</span>
-
-        <div class="table-download-buttons">
-          <!-- CSV -->
-          <a href="data:text/csv;charset=utf-8,${encodeURIComponent(BOM + csvContent)}"
-             download="tabla-${tableIndex}.csv"
-             class="table-download-btn"
-             title="Descargar como CSV">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="2"
-                 stroke-linecap="round" stroke-linejoin="round">
-              <path d="M9 12h6"/>
-              <path d="M9 16h6"/>
-              <path d="M9 8h3"/>
-              <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>
-              <path d="M14 2v6h6"/>
-            </svg>
-            <span>CSV</span>
-          </a>
-
-          <!-- Excel -->
-          <a href="data:application/vnd.ms-excel;charset=utf-8,${encodeURIComponent(BOM + tableHtml)}"
-             download="tabla-${tableIndex}.xls"
-             class="table-download-btn"
-             title="Descargar como Excel">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="2"
-                 stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <line x1="3" y1="9" x2="21" y2="9"/>
-              <line x1="3" y1="15" x2="21" y2="15"/>
-              <line x1="9" y1="3" x2="9" y2="21"/>
-              <line x1="15" y1="3" x2="15" y2="21"/>
-            </svg>
-            <span>Excel</span>
-          </a>
-
-          <!-- JSON -->
-          <a href="data:application/json;charset=utf-8,${encodeURIComponent(jsonContent)}"
-             download="tabla-${tableIndex}.json"
-             class="table-download-btn"
-             title="Descargar como JSON">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="2"
-                 stroke-linecap="round" stroke-linejoin="round">
-              <path d="M10 20c-1.5 0-2.5-1-2.5-2.5v-3.5c0-1-1-1.5-2-1.5s-2-.5-2-1.5v-1c0-1 1-1.5 2-1.5s2-.5 2-1.5v-3.5c0-1.5 1-2.5 2.5-2.5"/>
-              <path d="M14 4c1.5 0 2.5 1 2.5 2.5v3.5c0 1 1 1.5 2 1.5s2 .5 2 1.5v1c0 1-1 1.5-2 1.5s-2 .5-2 1.5v3.5c0 1.5-1 2.5-2.5 2.5"/>
-            </svg>
-            <span>JSON</span>
-          </a>
-
-          <!-- LaTeX -->
-          <a href="data:text/plain;charset=utf-8,${encodeURIComponent(latexContent)}"
-             download="tabla-${tableIndex}.tex"
-             class="table-download-btn"
-             title="Descargar como LaTeX">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="2"
-                 stroke-linecap="round" stroke-linejoin="round">
-              <path d="M19 4h-12l7 8-7 8h12"/>
-            </svg>
-            <span>LaTeX</span>
-          </a>
-
-          <!-- XML -->
-          <a href="data:application/xml;charset=utf-8,${encodeURIComponent(xmlContent)}"
-             download="tabla-${tableIndex}.xml"
-             class="table-download-btn"
-             title="Descargar como XML">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="2"
-                 stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="16 18 22 12 16 6"/>
-              <polyline points="8 6 2 12 8 18"/>
-            </svg>
-            <span>XML</span>
-          </a>
-        </div>
-      </div>
-
-      <div class="table-wrapper">
-        ${$.html($el)}
-      </div>
-    </div>
-    `;
-    
-    $el.replaceWith(tableWrapper);
-  });
-  
-  return $.html();
-}
-
-// ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML (CORREGIDA) ==========
-function processCodeBlocks(html) {
-  if (!html) return html;
-  
-  // Limpiar basura de documento
-  let cleanedHtml = html
-    .replace(/<!DOCTYPE[^>]*>/gi, '')
-    .replace(/<html[^>]*>/gi, '')
-    .replace(/<\/html>/gi, '')
-    .replace(/<head[^>]*>/gi, '')
-    .replace(/<\/head>/gi, '')
-    .replace(/<body[^>]*>/gi, '')
-    .replace(/<\/body>/gi, '');
-  
-  const $ = cheerio.load(cleanedHtml, { decodeEntities: false });
-  let codeIndex = 0;
-  
-  // Procesar SOLO bloques de código, sin afectar listas
-  $('pre').each((i, el) => {
-    const $el = $(el);
-    
-    // Evitar reprocesar si ya tiene wrapper
-    if ($el.parent().hasClass('code-block-wrapper')) {
-      return;
-    }
-    
-    // Buscar el elemento code dentro
-    let $codeElement = $el.find('code').first();
-    let code;
-    let language = '';
-    
-    if ($codeElement.length > 0) {
-      code = $codeElement.text();
-      const classAttr = $codeElement.attr('class') || '';
-      if (classAttr.includes('language-')) {
-        language = classAttr.split('language-')[1].split(' ')[0];
-      } else if (classAttr.includes('lang-')) {
-        language = classAttr.split('lang-')[1].split(' ')[0];
-      }
-    } else {
-      code = $el.text();
-    }
-    
-    const lines = code.split('\n');
-    const lineCount = lines.length;
-    
-    // Generar números de línea
-    let lineNumbersHtml = '';
-    for (let i = 1; i <= lineCount; i++) {
-      lineNumbersHtml += `<span class="code-line-number">${i}</span>`;
-    }
-    
-    codeIndex++;
-    const codeId = `code-${codeIndex}`;
-    
-    // Escapar código y envolver cada línea
-    const escapedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const wrappedLines = lines.map(line => 
-      `<span class="line">${line || ' '}</span>`
-    ).join('\n');
-    
-    const copySvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
-    
-    const codeHtml = `
-<div class="code-block-wrapper" id="${codeId}">
-  <div class="code-header">
-    <span class="code-language">${language || 'código'}</span>
-    <button class="code-copy-btn" onclick="copyCode('${codeId}', this)" title="Copiar código (Ctrl+C)">
-      ${copySvg}
-      <span class="copy-text">Copiar</span>
-    </button>
-  </div>
-  <div class="code-block-container">
-    <div class="code-line-numbers" aria-hidden="true">
-      ${lineNumbersHtml}
-    </div>
-    <pre class="code-block ${language ? `language-${language}` : ''}"><code class="${language ? `language-${language}` : ''}">${wrappedLines}</code></pre>
-  </div>
-</div>`;
-    
-    $el.replaceWith(codeHtml);
-  });
-  
-  let processedHtml = $.html();
-  
-  // Procesar tablas DESPUÉS del código (no antes)
-  const $2 = cheerio.load(processedHtml, { decodeEntities: false });
-  processedHtml = processTablesWithDownload($2, processedHtml);
-  
-  // Procesar imágenes y ecuaciones
-  const $3 = cheerio.load(processedHtml, { decodeEntities: false });
-  
-  let figureIndex = 0;
-  $3('img').each((i, el) => {
-    const $el = $3(el);
-    const alt = $el.attr('alt') || '';
-    const src = $el.attr('src') || '';
-    const style = $el.attr('style') || '';
-    const align = $el.attr('align') || '';
-    
-    if (src && !src.startsWith('http') && !src.startsWith('data:')) {
-      $el.attr('src', src);
-    }
-    
-    $el.addClass('article-image');
-    
-    let floatClass = '';
-    if (style.includes('float: left') || align === 'left') {
-      floatClass = ' float-left';
-    } else if (style.includes('float: right') || align === 'right') {
-      floatClass = ' float-right';
-    }
-    
-    figureIndex++;
-    const figureId = `figure-${figureIndex}`;
-    
-    if (src) {
-      $el.wrap(`<a href="${src}" target="_blank" rel="noopener noreferrer" class="image-link"></a>`);
-    }
-    
-    if (alt) {
-      $el.parent().wrap(`<figure class="image-figure${floatClass}" id="${figureId}"></figure>`);
-      $el.parent().after(`<figcaption class="image-caption">${alt}</figcaption>`);
-    } else {
-      $el.parent().wrap(`<figure class="image-figure${floatClass}" id="${figureId}"></figure>`);
-    }
-  });
-  
-  let equationIndex = 0;
-  $3('.MathJax_Display, .math-container').each((i, el) => {
-    const $el = $3(el);
-    equationIndex++;
-    const equationId = `equation-${equationIndex}`;
-    $el.attr('id', equationId);
-  });
-  
-  return $3.html();
-}
-// ========== FUNCIÓN PRINCIPAL ==========
-async function generateAll() {
-  console.log('🚀 Iniciando generación de artículos estáticos...');
-  
-  try {
-    // 1. Leer articles.json
-    if (!fs.existsSync(ARTICLES_JSON)) {
-      throw new Error(`No se encuentra ${ARTICLES_JSON}`);
-    }
-    
-    const articles = JSON.parse(fs.readFileSync(ARTICLES_JSON, 'utf8'));
-    console.log(`📄 ${articles.length} artículos cargados`);
-
-    // 2. Cargar team.json desde la URL para slugs de autores
-    await loadTeamData();
-
-    // 3. Generar HTML para cada artículo
-    for (const article of articles) {
-      await generateArticleHtml(article);
-    }
-
-    // 4. Generar índices
-    generateIndexes(articles);
-
-    console.log('🎉 ¡Proceso completado con éxito!');
-    
-  } catch (err) {
-    console.error('❌ Error:', err);
-    process.exit(1);
-  }
-}
-
-async function generateArticleHtml(article) {
-  // Procesar autores para meta tags de citación
-  let authorsList = [];
-  if (typeof article.autores === 'string') {
-    authorsList = article.autores.split(';').map(a => formatAuthorForCitation(a));
-  } else if (Array.isArray(article.autores)) {
-    authorsList = article.autores.map(a => formatAuthorForCitation(a));
-  }
-  const authorMetaTags = authorsList.map(author => `<meta name="citation_author" content="${author}">`).join('\n');
-  
-  const articleSlug = article.permalink || `${generateSlug(article.titulo)}-${article.numeroArticulo}`;
-
-  // Construir autores con iconos - AHORA PASAMOS EL ARTÍCULO COMPLETO
-  const authorsDisplayEs = processAuthorsWithIcons(article.autores, article, 'es');
-  const authorsDisplayEn = processAuthorsWithIcons(article.autores, article, 'en');
-  const finalAuthorsDisplay = formatAuthorsDisplay(article.autores, 'es');
-  const authorsAPA = formatAuthorsAPA(article.autores);
-  const authorsChicagoEs = formatAuthorsChicagoOrMLA(article.autores, 'es');
-  const authorsMLAEs = formatAuthorsChicagoOrMLA(article.autores, 'es');
-  const authorsChicagoEn = formatAuthorsChicagoOrMLA(article.autores, 'en');
-  const authorsMLAEn = formatAuthorsChicagoOrMLA(article.autores, 'en');
-  const year = new Date(article.fecha).getFullYear();
-  const tipoEs = article.tipo || 'Artículo de Investigación';
-  const typeEn = article.type || 'Research Article';
-  const bibtex = generateBibTeX(article);
-  
-  // Procesar abstracts con párrafos
-  const resumenParagraphs = (article.resumen || '').split('\n\n').map(p => `<p class="abstract-text">${p}</p>`).join('');
-  const abstractParagraphs = (article.abstract || '').split('\n\n').map(p => `<p class="abstract-text">${p}</p>`).join('');
-
-  // Procesar HTML del artículo (con bloques de código, tablas, etc.)
-  const processedHtmlEs = processCodeBlocks(article.html_es || '');
-  const processedHtmlEn = processCodeBlocks(article.html_en || '');
-
-  // Procesar referencias
-  const referencesHtml = (() => {
-    if (!article.referencias) return '<p>No hay referencias disponibles.</p>';
-    
-    if (article.referencias.includes('<div class="references-list">')) {
-      return article.referencias;
-    }
-    
-    const refItems = article.referencias.split('\n').filter(line => line.trim());
-    if (refItems.length) {
-      const items = refItems.map(ref => {
-        const idMatch = ref.match(/id="([^"]+)"/);
-        const id = idMatch ? idMatch[1] : '';
-        return `<div class="reference-item"${id ? ` id="${id}"` : ''}>${ref}</div>`;
-      }).join('');
-      return `<div class="references-list">${items}</div>`;
-    }
-    
-    return '<p>No hay referencias disponibles.</p>';
-  })();
-
-  // ========== HTML ESPAÑOL ==========
-  const htmlContentEs = generateHtmlTemplate({
-    lang: 'es',
-    article,
-    articleSlug,
-    authorMetaTags,
-    authorsDisplay: authorsDisplayEs,
-    finalAuthorsDisplay,
-    authorsAPA,
-    authorsChicagoEs,
-    authorsMLAEs,
-    authorsChicagoEn,
-    authorsMLAEn,
-    year,
-    tipoEs,
-    typeEn,
-    bibtex,
-    resumenParagraphs,
-    abstractParagraphs,
-    referencesHtml,
-    htmlContent: processedHtmlEs,
-    domain: DOMAIN,
-    oaSvg,
-    orcidSvg,
-    emailSvg,
-    ccLogoSvg
-  });
-
-  const filePathEs = path.join(OUTPUT_HTML_DIR, `article-${articleSlug}.html`);
-  fs.writeFileSync(filePathEs, htmlContentEs, 'utf8');
-  console.log(`✅ Generado: ${filePathEs}`);
-
-  // ========== HTML INGLÉS ==========
-  const htmlContentEn = generateHtmlTemplate({
-    lang: 'en',
-    article,
-    articleSlug,
-    authorMetaTags,
-    authorsDisplay: authorsDisplayEn,
-    finalAuthorsDisplay,
-    authorsAPA,
-    authorsChicagoEs,
-    authorsMLAEs,
-    authorsChicagoEn,
-    authorsMLAEn,
-    year,
-    tipoEs,
-    typeEn,
-    bibtex,
-    resumenParagraphs,
-    abstractParagraphs,
-    referencesHtml,
-    htmlContent: processedHtmlEn,
-    domain: DOMAIN,
-    oaSvg,
-    orcidSvg,
-    emailSvg,
-    ccLogoSvg
-  });
-
-  const filePathEn = path.join(OUTPUT_HTML_DIR, `article-${articleSlug}EN.html`);
-  fs.writeFileSync(filePathEn, htmlContentEn, 'utf8');
-  console.log(`✅ Generado: ${filePathEn}`);
-}
-
-function generateHtmlTemplate({
-  lang,
-  article,
-  articleSlug,
-  authorMetaTags,
-  authorsDisplay,
-  finalAuthorsDisplay,
-  authorsAPA,
-  authorsChicagoEs,
-  authorsMLAEs,
-  authorsChicagoEn,
-  authorsMLAEn,
-  year,
-  tipoEs,
-  typeEn,
-  bibtex,
-  resumenParagraphs,
-  abstractParagraphs,
-  referencesHtml,
-  htmlContent,
-  domain,
-  oaSvg,
-  orcidSvg,
-  emailSvg,
-  ccLogoSvg
-}) {
-  const isSpanish = lang === 'es';
-  
-  // Título y metadatos según idioma - LÓGICA MEJORADA PARA TÍTULOS BILINGÜES
-  // Determinar títulos disponibles
-  const hasSpanishTitle = article.titulo && article.titulo.trim() !== '';
-  const hasEnglishTitle = article.tituloEnglish && article.tituloEnglish.trim() !== '';
-  
-  // Título principal según idioma actual
-  let title = '';
-  let altTitle = '';
-  
-  if (isSpanish) {
-    // Versión en español
-    title = hasSpanishTitle ? article.titulo : (hasEnglishTitle ? article.tituloEnglish : '');
-    
-    // Título alternativo (solo si hay título en inglés)
-    if (hasEnglishTitle && hasSpanishTitle) {
-      altTitle = article.tituloEnglish;
-    }
-  } else {
-    // Versión en inglés
-    title = hasEnglishTitle ? article.tituloEnglish : (hasSpanishTitle ? article.titulo : '');
-    
-    // Título alternativo (solo si hay título en español)
-    if (hasSpanishTitle && hasEnglishTitle) {
-      altTitle = article.titulo;
-    }
-  }
-  
-  const articleType = isSpanish ? tipoEs : typeEn;
-  const abstractContent = isSpanish ? resumenParagraphs : abstractParagraphs;
-  const altAbstract = isSpanish ? abstractParagraphs : resumenParagraphs;
-  const keywords = isSpanish ? (article.palabras_clave || []) : (article.keywords_english || []);
-  const funding = isSpanish ? article.funding : article.fundingEnglish;
-  const conflicts = isSpanish ? article.conflicts : article.conflictsEnglish;
-  const acknowledgments = isSpanish ? article.acknowledgments : article.acknowledgmentsEnglish;
-  const authorCredits = isSpanish ? article.authorCredits : article.authorCreditsEnglish;
-  const dataAvailability = isSpanish ? article.dataAvailability : article.dataAvailabilityEnglish;
-  const fecha = isSpanish ? formatDateEs(article.fecha) : formatDateEn(article.fecha);
-  const receivedDate = isSpanish ? formatDateEs(article.receivedDate) : formatDateEn(article.receivedDate);
-  const acceptedDate = isSpanish ? formatDateEs(article.acceptedDate) : formatDateEn(article.acceptedDate);
-
-  // Textos según idioma
-  const texts = {
-    es: {
-      backToCatalog: 'Volver al catálogo',
-      backToHome: 'Volver al inicio',
-      viewOtherLang: 'View in English',
-      abstract: 'Resumen',
-      viewAbstract: 'Ver abstract en inglés / View English abstract',
-      references: 'Referencias',
-      acknowledgments: 'Agradecimientos',
-      funding: 'Financiamiento',
-      dataAvailability: 'Disponibilidad de datos',
-      authorContributions: 'Contribución de autores',
-      conflictOfInterest: 'Conflicto de intereses',
-      pdfPreview: 'Visualización del PDF',
-      viewFullScreen: 'Ver en pantalla completa',
-      downloadPDF: 'Descargar PDF',
-      howToCite: 'Cómo citar',
-      information: 'Información',
-      keywords: 'Palabras clave',
-      articleInfo: 'Información del artículo',
-      received: 'Recibido',
-      accepted: 'Aceptado',
-      published: 'Publicado',
-      area: 'Área',
-      fundingLabel: 'Financiación',
-      copy: 'Copiar',
-      copied: '✓ Copiado con formato',
-      downloadBibTeX: 'Descargar BibTeX',
-      contents: 'CONTENIDO',
-      copyCode: 'Copiar código',
-      codeCopied: '✓ Copiado',
-      license: 'Licencia',
-      contact: 'Contacto'
-    },
-    en: {
-      backToCatalog: 'Back to catalog',
-      backToHome: 'Back to home',
-      viewOtherLang: 'Ver en español',
-      abstract: 'Abstract',
-      viewAbstract: 'Ver resumen en español / View Spanish abstract',
-      references: 'References',
-      acknowledgments: 'Acknowledgments',
-      funding: 'Funding',
-      dataAvailability: 'Data availability',
-      authorContributions: 'Author contributions',
-      conflictOfInterest: 'Conflict of interest',
-      pdfPreview: 'PDF Preview',
-      viewFullScreen: 'View Full Screen',
-      downloadPDF: 'Download PDF',
-      howToCite: 'How to cite',
-      information: 'Information',
-      keywords: 'Keywords',
-      articleInfo: 'Article Information',
-      received: 'Received',
-      accepted: 'Accepted',
-      published: 'Published',
-      area: 'Area',
-      fundingLabel: 'Funding',
-      copy: 'Copy',
-      copied: '✓ Copied!',
-      downloadBibTeX: 'Download BibTeX',
-      contents: 'CONTENTS',
-      copyCode: 'Copy code',
-      codeCopied: '✓ Copied',
-      license: 'License',
-      contact: 'Contact'
-    }
-  };
-
-  const t = texts[lang];
-
-  return `<!DOCTYPE html>
-<html lang="${lang}">
+<!DOCTYPE html>
+<html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-  <meta name="citation_title" content="${title.replace(/"/g, '&quot;')}">
-  ${authorMetaTags}
-  <meta name="citation_publication_date" content="${article.fecha}">
+  <meta name="citation_title" content="La Música y el Cine como Métodos de Propaganda en la Guerra Fría">
+  <meta name="citation_author" content="Jeon, Jun Ho">
+<meta name="citation_author" content="Flores, Camilo">
+  <meta name="citation_publication_date" content="2025-11-29">
   <meta name="citation_journal_title" content="Revista Nacional de las Ciencias para Estudiantes">
   <meta name="citation_issn" content="3087-2839">
-  <meta name="citation_volume" content="${article.volumen}">
-  <meta name="citation_issue" content="${article.numero}">
-  <meta name="citation_firstpage" content="${article.primeraPagina}">
-  <meta name="citation_lastpage" content="${article.ultimaPagina}">
-  <meta name="citation_pdf_url" content="${article.pdfUrl}">
-  <meta name="citation_abstract_html_url" content="${domain}/articles/article-${articleSlug}${isSpanish ? '' : 'EN'}.html">
-  <meta name="citation_abstract" content="${(isSpanish ? article.resumen : article.abstract).replace(/"/g, '&quot;').substring(0, 500)}">
-  <meta name="citation_keywords" content="${keywords.join('; ')}">
-  <meta name="citation_language" content="${lang}">
-  <meta name="description" content="${(isSpanish ? article.resumen : article.abstract).replace(/"/g, '&quot;').substring(0, 160)}...">
-  <meta name="keywords" content="${keywords.join(', ')}">
-  <title>${title.replace(/"/g, '&quot;')} - Revista Nacional de las Ciencias para Estudiantes</title>
+  <meta name="citation_volume" content="1">
+  <meta name="citation_issue" content="1">
+  <meta name="citation_firstpage" content="40">
+  <meta name="citation_lastpage" content="44">
+  <meta name="citation_pdf_url" content="https://www.revistacienciasestudiantes.com/Articles/Article-la-musica-y-el-cine-como-metodos-de-propaganda-en-la-guerra-fria-6.pdf">
+  <meta name="citation_abstract_html_url" content="https://www.revistacienciasestudiantes.com/articles/article-la-musica-y-el-cine-como-metodos-de-propaganda-en-la-guerra-fria-6.html">
+  <meta name="citation_abstract" content="En este trabajo, hemos decidido enfocar nuestra investigación en las películas y canciones, como una forma de observar la influencia que ejercían las potencias en duelo durante la Guerra Fría, esto debido a que no solo muestran la información que la sociedad consume, sino que también reflejan las creencias comunes de la sociedad o de un grupo específico al que pertenece el autor de determinada obra. El objetivo de esta investigación es analizar cómo esta información se reflejó en Cuba, Chile y N">
+  <meta name="citation_keywords" content="Guerra Fría; Propaganda; Cine; Música; Cuba; Chile; Nicaragua; Ideologías">
+  <meta name="citation_language" content="es">
+  <meta name="description" content="En este trabajo, hemos decidido enfocar nuestra investigación en las películas y canciones, como una forma de observar la influencia que ejercían las potencias ...">
+  <meta name="keywords" content="Guerra Fría, Propaganda, Cine, Música, Cuba, Chile, Nicaragua, Ideologías">
+  <title>La Música y el Cine como Métodos de Propaganda en la Guerra Fría - Revista Nacional de las Ciencias para Estudiantes</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,700;1,700&family=JetBrains+Mono&family=Lora:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
@@ -3385,14 +2083,11 @@ body {
     }
 
     .citation-item {
-    position: relative;
-    padding: 0.75rem 0;
-    border-bottom: 1px solid var(--border-color);
-    font-size: 0.8rem;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    word-break: break-all;
-}
+      position: relative;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.8rem;
+    }
 
     .citation-item:last-child {
       border-bottom: none;
@@ -3713,48 +2408,6 @@ body {
     max-width: 100%;
   }
     }
-  /* ===== KEYWORDS: SOPORTE DUAL (LEGACY + CONTROLADO) ===== */
-.keyword-tag.keyword-controlled {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 8px;
-    background: white;
-    border: 1px solid #c0a86a;
-    border-radius: 4px;
-    font-size: 0.7rem;
-    font-family: 'Inter', sans-serif;
-}
-
-.keyword-code {
-    font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
-    font-size: 0.65rem;
-    font-weight: 700;
-    color: #0A1929;
-    background: #f0f4f8;
-    padding: 1px 5px;
-    border-radius: 3px;
-    letter-spacing: 0.02em;
-}
-
-.keyword-term {
-    color: var(--text-light);
-    font-weight: 400;
-}
-
-/* Ajuste responsive para keywords controladas */
-@media (max-width: 600px) {
-    .keyword-tag.keyword-controlled {
-        font-size: 0.65rem;
-        padding: 3px 6px;
-        gap: 3px;
-    }
-    
-    .keyword-code {
-        font-size: 0.6rem;
-        padding: 1px 4px;
-    }
-}
     /* ===== CORRECCIONES PARA DOI ===== */
 /* 1. Estilo en la meta-box (debajo del título) */
 .meta-doi-wrapper {
@@ -3886,9 +2539,9 @@ body {
   <div class="sd-header-top">
     <div class="sd-brand-container">
       <a href="/" class="sd-journal-logo">
-        <img src="${isSpanish ? LOGO_ES : LOGO_EN}" alt="Logo ${isSpanish ? 'RNCE' : 'TNRSFS'}" class="sd-logo-img">
+        <img src="https://www.revistacienciasestudiantes.com/assets/logo.png" alt="Logo RNCE" class="sd-logo-img">
         <div class="sd-journal-titles">
-          <span class="sd-journal-name">${isSpanish ? JOURNAL_NAME_ES : JOURNAL_NAME_EN}</span>
+          <span class="sd-journal-name">Revista Nacional de las Ciencias para Estudiantes</span>
           <span class="sd-issn">ISSN: 3087-2839</span>
         </div>
       </a>
@@ -3900,19 +2553,19 @@ body {
         <svg class="sd-search-icon" viewBox="0 0 24 24" width="18" height="18">
           <path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
         </svg>
-        <input type="text" id="search-input" placeholder="${isSpanish ? 'Buscar artículos, autores...' : 'Search articles, authors...'}" aria-label="Buscar">
+        <input type="text" id="search-input" placeholder="Buscar artículos, autores..." aria-label="Buscar">
       </form>
     </div>
     
     <!-- User Nav - Solo visible en desktop -->
     <div class="sd-user-nav">
-      <a href="${isSpanish ? '/submit' : '/en/submit'}" class="sd-nav-link">${isSpanish ? 'Envíos' : 'Submissions'}</a>
-      <a href="${isSpanish ? '/faq' : '/en/faq'}" class="sd-nav-link">${isSpanish ? 'Ayuda' : 'Help'}</a>
-      <a href="${isSpanish ? '/login' : '/en/login'}" class="sd-nav-link sd-account">
+      <a href="/submit" class="sd-nav-link">Envíos</a>
+      <a href="/faq" class="sd-nav-link">Ayuda</a>
+      <a href="/login" class="sd-nav-link sd-account">
         <svg viewBox="0 0 24 24" width="18" height="18">
           <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
         </svg>
-        ${isSpanish ? 'Mi cuenta' : 'My account'}
+        Mi cuenta
       </a>
     </div>
     
@@ -3938,7 +2591,7 @@ body {
 <!-- Menú móvil -->
 <div class="sd-mobile-menu" id="mobileMenu">
   <div class="sd-mobile-menu-header">
-    <span class="sd-mobile-menu-title">${isSpanish ? 'MENÚ DEL ARTÍCULO' : 'ARTICLE MENU'}</span>
+    <span class="sd-mobile-menu-title">MENÚ DEL ARTÍCULO</span>
     <button class="sd-mobile-close-btn" onclick="closeMobileMenu()">
       <svg viewBox="0 0 24 24">
         <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
@@ -3952,13 +2605,13 @@ body {
       <svg width="16" height="16" viewBox="0 0 24 24">
         <path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
       </svg>
-      <input type="text" id="mobile-search-input" placeholder="${isSpanish ? 'Buscar artículos...' : 'Search articles...'}" aria-label="Buscar" value="${isSpanish ? 'busca autores, artículos, etc...' : 'search authors, articles, etc...'}">
+      <input type="text" id="mobile-search-input" placeholder="Buscar artículos..." aria-label="Buscar" value="busca autores, artículos, etc...">
     </form>
   </div>
   
   <!-- Sección 1: CONTENIDO DEL ARTÍCULO (Tabla de contenidos) -->
   <div class="sd-mobile-nav-section">
-    <div class="sd-mobile-nav-section-title">${t.contents}</div>
+    <div class="sd-mobile-nav-section-title">CONTENIDO</div>
     <ul class="sd-mobile-nav-items" id="mobile-toc-list">
       <!-- Los elementos se generarán dinámicamente con JavaScript -->
       <li class="sd-mobile-nav-item">
@@ -3966,7 +2619,7 @@ body {
           <svg viewBox="0 0 24 24" width="20" height="20">
             <path d="M4 6H20v2H4zM4 12H20v2H4zM4 18H20v2H4z"/>
           </svg>
-          ${t.abstract}
+          Resumen
         </a>
       </li>
       <!-- Más elementos se añadirán vía JS -->
@@ -3975,30 +2628,30 @@ body {
   
   <!-- Sección 2: ENLACES DE USUARIO (Solo Envíos, Ayuda, Mi cuenta) -->
   <div class="sd-mobile-nav-section">
-    <div class="sd-mobile-nav-section-title">${isSpanish ? 'MI CUENTA' : 'MY ACCOUNT'}</div>
+    <div class="sd-mobile-nav-section-title">MI CUENTA</div>
     <ul class="sd-mobile-nav-items">
       <li class="sd-mobile-nav-item">
-        <a href="${isSpanish ? '/submit' : '/en/submit'}" class="sd-mobile-nav-link">
+        <a href="/submit" class="sd-mobile-nav-link">
           <svg viewBox="0 0 24 24" width="20" height="20">
             <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
           </svg>
-          ${isSpanish ? 'Envíos' : 'Submissions'}
+          Envíos
         </a>
       </li>
       <li class="sd-mobile-nav-item">
-        <a href="${isSpanish ? '/faq' : '/en/faq'}" class="sd-mobile-nav-link">
+        <a href="/faq" class="sd-mobile-nav-link">
           <svg viewBox="0 0 24 24" width="20" height="20">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2-7h-2v-2h2v2zm-4 0h-2v-2h2v2zm0-4h-2V6h2v2z"/>
           </svg>
-          ${isSpanish ? 'Ayuda' : 'Help'}
+          Ayuda
         </a>
       </li>
       <li class="sd-mobile-nav-item">
-        <a href="${isSpanish ? '/login' : '/en/login'}" class="sd-mobile-nav-link">
+        <a href="/login" class="sd-mobile-nav-link">
           <svg viewBox="0 0 24 24" width="20" height="20">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
           </svg>
-          ${isSpanish ? 'Mi cuenta' : 'My account'}
+          Mi cuenta
         </a>
       </li>
     </ul>
@@ -4008,7 +2661,7 @@ body {
   <div class="sd-mobile-menu-footer">
     <div>ISSN: 3087-2839</div>
     <div style="margin-top: 0.5rem; font-size: 0.7rem;">
-      &copy; ${new Date().getFullYear()} ${isSpanish ? 'RNCE' : 'TNRSFS'}
+      &copy; 2026 RNCE
     </div>
   </div>
 </div>
@@ -4016,7 +2669,7 @@ body {
   <div class="main-wrapper">
     <!-- Left Sidebar - Table of Contents -->
     <nav class="toc-sidebar">
-      <div class="toc-title">${t.contents}</div>
+      <div class="toc-title">CONTENIDO</div>
       <ul class="toc-list" id="toc-list"></ul>
     </nav>
 
@@ -4024,46 +2677,49 @@ body {
     <main class="article-container">
       <article>
         <header class="article-header">
-          <div class="article-type">${articleType}</div>
+          <div class="article-type">Artículo de Investigación</div>
           
           <!-- Título bilingüe - LÓGICA MEJORADA -->
-          <h1 id="main-title">${title}</h1>
-          ${altTitle ? `
-          <div class="alt-title-container">
-            <span class="alt-title" title="${isSpanish ? 'Título en inglés / English title' : 'Título en español / Spanish title'}">${altTitle}</span>
-          </div>
-          ` : ''}
+          <h1 id="main-title">La Música y el Cine como Métodos de Propaganda en la Guerra Fría</h1>
+          
 
           <div class="authors">
-            ${authorsDisplay}
+            <a href="/team/jun-ho-jeon.html" class="author-link" data-author-uid="KKS3uXKY5vQnVHXuUoaQk2F1HZo1">Jun Ho Jeon</a><span class="author-separator">, </span><a href="/team/camilo-flores.html" class="author-link" data-author-uid="6c811b77-3e34-40a2-8d6a-f8cd71a07cf2">Camilo Flores</a>
           </div>
 
           <!-- ===== META BOX CORREGIDA CON DOI ===== -->
           <div class="meta-box">
-            <span>Vol. ${article.volumen}, ${isSpanish ? 'Núm.' : 'No.'} ${article.numero}</span>
-            <span>pp. ${article.primeraPagina}-${article.ultimaPagina}</span>
-            <span>${fecha}</span>
-            ${article.doi ? `
-            <span class="meta-doi-wrapper">
-              <span class="meta-doi-label">DOI:</span>
-              <a href="https://doi.org/${article.doi}" target="_blank" rel="noopener noreferrer" class="meta-doi-link">
-                https://doi.org/${article.doi}
-              </a>
-            </span>
-            ` : ''}
+            <span>Vol. 1, Núm. 1</span>
+            <span>pp. 40-44</span>
+            <span>29-11-2025</span>
+            
           </div>
 
           <!-- Action Bar -->
           <div class="action-bar">
-            <a href="${article.pdfUrl}" target="_blank" rel="noopener noreferrer" class="btn-pdf">
+            <a href="https://www.revistacienciasestudiantes.com/Articles/Article-la-musica-y-el-cine-como-metodos-de-propaganda-en-la-guerra-fria-6.pdf" target="_blank" rel="noopener noreferrer" class="btn-pdf">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
                 <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
               </svg>
-              ${isSpanish ? 'Abrir PDF' : 'Open PDF'}
+              Abrir PDF
             </a>
             <span class="oa-label">
-              ${oaSvg}
+              <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="72" height="72" viewBox="90 50 500 260" style="vertical-align: middle;">
+  <g transform="matrix(1.25 0 0 -1.25 0 360)">
+    <defs>
+      <path id="a" d="M-90-36h900v360H-90z"/>
+    </defs>
+    <clipPath id="b">
+      <use xlink:href="#a" overflow="visible"/>
+    </clipPath>
+    <g clip-path="url(#b)">
+      <path d="M720-3H0v294.285h720V-3z" fill="#fff"/>
+      <path d="M262.883 200.896v-8.846h25.938v8.846c0 21.412 17.421 38.831 38.831 38.831 21.409 0 38.829-17.419 38.829-38.831v-63.985h25.939v63.985c0 35.713-29.056 64.769-64.768 64.769-35.711 0-64.769-29.056-64.769-64.769M349.153 99.568c0-11.816-9.58-21.396-21.399-21.396-11.818 0-21.398 9.58-21.398 21.396 0 11.823 9.58 21.404 21.398 21.404 11.819 0 21.399-9.581 21.399-21.404" fill="#f68212"/>
+      <path d="M277.068 99.799c0 27.811 22.627 50.436 50.438 50.436 27.809 0 50.433-22.625 50.433-50.436 0-27.809-22.624-50.438-50.433-50.438-27.811.001-50.438 22.63-50.438 50.438m-25.938 0c0-42.109 34.265-76.373 76.375-76.373 42.111 0 76.373 34.265 76.373 76.373 0 42.113-34.262 76.375-76.373 76.375-42.11 0-76.375-34.262-76.375-76.375" fill="#f68212"/>
+    </g>
+  </g>
+</svg>
               Open Access
             </span>
           </div>
@@ -4071,79 +2727,119 @@ body {
 
         <!-- Abstract Section -->
         <section id="abstract">
-          <h2>${t.abstract}</h2>
+          <h2>Resumen</h2>
           <div class="abstract-container">
             <div class="abstract-text">
-              ${abstractContent}
+              <p class="abstract-text">En este trabajo, hemos decidido enfocar nuestra investigación en las películas y canciones, como una forma de observar la influencia que ejercían las potencias en duelo durante la Guerra Fría, esto debido a que no solo muestran la información que la sociedad consume, sino que también reflejan las creencias comunes de la sociedad o de un grupo específico al que pertenece el autor de determinada obra. El objetivo de esta investigación es analizar cómo esta información se reflejó en Cuba, Chile y Nicaragua, de modo que nos permita comprender cómo esta influencia moldeó el pensamiento socio-político y la cultura popular en América Latina.</p>
             </div>
             
-            ${altAbstract ? `
+            
             <details class="abstract-toggle">
-              <summary>${t.viewAbstract}</summary>
+              <summary>Ver abstract en inglés / View English abstract</summary>
               <div class="abstract-toggle-content">
-                ${altAbstract}
+                <p class="abstract-text">In this work, we have decided to focus our research on films and songs as a way to observe the influence exerted by the dueling powers during the Cold War, because they not only show the information that society consumes, but also reflect the common beliefs of society or of a specific group to which the author of a certain work belongs. The objective of this research is to analyze how this information was reflected in Cuba, Chile and Nicaragua, in such a way that it allows us to understand how this influence shaped socio-political thought and popular culture in Latin America.</p>
               </div>
             </details>
-            ` : ''}
+            
           </div>
         </section>
 
         <!-- Full Article Content -->
         <section id="full-text" class="article-content">
-          ${htmlContent || '<p>El texto completo estará disponible próximamente.</p>'}
+          <html><head></head><body><h2>Nota editorial</h2>
+<p>Este trabajo es parte del dossier "Una historia mundial de la Guerra Fría", especial del primer volumen, número 1, dirigido por el Profesor de la Pontificia Universidad Católica de Chile, Juan Ignacio Radic.</p>
+<h2>Introducción</h2>
+<p>En este trabajo, hemos decidido enfocar nuestra investigación en las películas y canciones, como una forma de observar la influencia que ejercían las potencias en duelo durante la Guerra Fría, esto debido a que no solo muestran la información que la sociedad consume, sino que también reflejan las creencias comunes de la sociedad o de un grupo específico al que pertenece el autor de determinada obra.</p>
+<p>El objetivo de esta investigación es analizar cómo esta información se reflejó en Cuba, Chile y Nicaragua, de modo que nos permita comprender cómo esta influencia moldeó el pensamiento socio-político y la cultura popular en América Latina.</p>
+<p>Para ejemplificar brevemente el análisis que haremos, una canción escrita durante la dictadura chilena podría mostrar alguna vivencia acerca de los detenidos y desaparecidos. Del mismo modo podría mostrar una inclinación política que represente a cierto grupo. O, alternativamente, también puede estar creada expresamente para algún sector de la población de la época, dejando algún mensaje. Si se sabe analizar la fuente, se puede obtener información del autor, la época, el mensaje que quiere transmitir y el sector que representa.</p>
+<h2>Contexto Histórico</h2>
+<p>La Guerra Fría fue un conflicto ideológico entre Estados Unidos y la Unión Soviética. En su segunda etapa (desde fines de los 60 hasta los 80) la competencia se intensificó, y América Latina se volvió un espacio clave para la expansión y difusión de sus ideologías.</p>
+<p>Estados Unidos buscaba frenar la expansión del comunismo, lo que se puede ver plasmado por George Kennan en el “Policy Planning Staff, Vol. 1”, donde expresa que Estados Unidos debe buscar mantener su posición privilegiada en relación al resto de países, misión que podría verse perjudicada por la Unión Soviética, que, dadas sus raíces leninistas, debería haberlos incitado a llevar la revolución a todo el mundo <a href="#ref-kennan1948" class="citation-link">(Kennan 1948)</a>. Mientras que la Unión Soviética buscó durante esa época ponerse a la par con Estados Unidos, irrumpiendo en su esfera de influencia <a href="#ref-solis2012" class="citation-link">(Solis Rodriguez 2012)</a>, motivo por el cual influyó en algunos movimientos revolucionarios y gobiernos socialistas, de este modo tratándolos como agentes para controlar o sacar provecho de la asociación en cuestión. En ese contexto, la cultura se transformó en una forma de influencia directa: el arte, el cine y la música se convirtieron en herramientas políticas para difundir ideas, moldear identidades, pensamientos y ganar apoyo popular.</p>
+<h2>El Caso Cubano</h2>
+<p>Cuba es un caso particular de Latinoamérica, esto debido a la imposición de un gobierno, parte de un grupo revolucionario, que eventualmente se relaciona con la URSS <a href="#ref-levesque1977" class="citation-link">(Lévesque 1977)</a>. Este grupo revolucionario buscó imponer su autoridad en el país con el objetivo de desplazar el autoritarismo hegemónico en el periodo.</p>
+<p>Durante este gobierno, la sección de cine de la dirección de cultura del ejército rebelde inició la producción de “Esta tierra nuestra”, un documental que busca mostrar la vida del campesino cubano antes de la revolución. Este finaliza su producción a manos del Instituto Cubano del Arte e Industria Cinematográfica (ICAIC) <a href="#ref-esta1959" class="citation-link">(Esta tierra nuestra 1959)</a>.</p>
+<p>El documental, debido a su contexto de producción, sirve claramente como un elemento de propaganda que emplea ciertas características interesantes. Por ejemplo, el uso de las vallas que delimitan el terreno de los fundos como elemento visual que excluye a los campesinos que no son dueños de tierras, el uso de palabras con connotaciones similares para enfatizar la virtud o los vicios de ciertas situaciones, la detención que se pone a los niños campesinos para enfatizar la gravedad de la situación y, me gustaría destacar, la escena final en que un guerrillero y un campesino caminan juntos hacia el horizonte, un deseo de cooperación mutua entre el pueblo y el gobierno de militares.</p>
+<p>Este documento es una declaración de intenciones que plasma los ideales y visiones del mundo del movimiento revolucionario cubano, y que ilustra como ellos auto percibían su lucha y sus motivos.</p>
+<h2>El Caso Chileno</h2>
+<p>Chile fue un país que atravesó una dictadura a partir del año 1973, instaurada con un golpe de estado, causado por el descontento de las fuerzas armadas con el entonces presidente Salvador Allende. Al momento del golpe, sin embargo, el país se vio envuelto en una tensión política que habitualmente llevaba a conflictos violentos entre ambas partes. Bajo ese contexto es que surge el documental “La batalla de Chile”, filmado para documentar la situación en el país, permitiendo ver entrevistas de ambos bandos y narrando la historia para mostrar el sabotaje al gobierno de Salvador Allende <a href="#ref-batalla1975" class="citation-link">(La batalla de Chile 1975/1979)</a>.</p>
+<p>Este documental tuvo la cualidad de ser censurado en Chile durante la dictadura por contar con un relato que defiende al gobierno de Salvador Allende como víctima del boicot de la oposición, pero nos parece importante porque muestra entrevistas a personas comunes en la calle y que representan un elemento fundamental en la Guerra Fría a nivel local en Chile como a nivel internacional, y es el enfrentamiento entre ideales. Sí teniendo gente que cuenta experiencias personales de cómo han levantado su vida gracias al gobierno de bienestar, otras que dan acusaciones de la deplorable situación del mercado con un desabastecimiento total. Del mismo modo, algunos muestran descontento con la inclinación política del presidente, y muchas entrevistas más que permiten ver la polaridad del conflicto, en que cada uno acusa al otro y se enfrentan de manera constante para defender lo que, desde su propia cosmovisión, es la forma correcta de manejar una sociedad.</p>
+<p>En definitiva una fuente primaria valiosa, y que va acompañada de una narración que contextualiza cómo se fue construyendo el ambiente que concluyó en el golpe de estado.</p>
+<h2>El Caso de Nicaragua</h2>
+<p>La Unidad Sandinista fue un movimiento impulsado por el Frente Sandinista de Liberación Nacional (FSLN), que surgió en Nicaragua entre los años 60 y 70 con la idea de terminar con la dictadura de los Somoza. Los sandinistas se caracterizaban por su lucha contra el abuso de poder, su postura antiimperialista y su búsqueda de más justicia social para el país. Este contexto marcó mucho la música de la época, porque muchas canciones se usaban para motivar, unir y expresar las ideas del movimiento.</p>
+<p>Canciones como las siguientes:</p>
+<ol>
+<li>Análisis de Himno a la Unidad Sandinista
+El Himno a la Unidad Sandinista es una canción creada para fortalecer la identidad del Frente Sandinista durante los años más intensos de la Guerra Fría. Su ritmo y letra buscan transmitir disciplina, unión y compromiso político, lo que refleja la influencia del estilo soviético, especialmente del realismo socialista. La canción exalta valores como la lucha y el sacrificio colectivo, mostrando cómo la música fue usada como propaganda para unir a los simpatizantes y presentar al sandinismo como un proyecto legítimo y heroico. En general, funciona como un instrumento político que busca motivar y formar ideológicamente a la población <a href="#ref-himno1980" class="citation-link">(Mejía Godoy 1980)</a>.</li>
+<li>Análisis de Comandante Carlos – Grupo Pancasán
+Comandante Carlos es una canción dedicada a Carlos Fonseca, fundador del Frente Sandinista. Su letra transforma a Fonseca en un símbolo moral y revolucionario, lo cual coincide con la forma en que los movimientos socialistas enaltecen a sus líderes. La canción mezcla elementos folclóricos con un mensaje claramente político, algo típico de la influencia cultural proveniente de Cuba y la URSS. Presenta la lucha revolucionaria como un deber colectivo y convierte la figura del líder en un ejemplo a seguir. Esto la vuelve una herramienta de propaganda que refuerza la identidad sandinista y el discurso antiimperialista <a href="#ref-comandante1978" class="citation-link">(Grupo Pancasán 1978)</a>.</li>
+</ol>
+<h3>Comparación entre las 2 canciones:</h3>
+<p>Ambas canciones cumplen la misma función política: reforzar la identidad del sandinismo y transmitir un mensaje de unidad y lucha durante la Guerra Fría. El Himno a la Unidad Sandinista se centra más en movilizar colectivamente, con una letra diseñada para crear disciplina y cohesión dentro del movimiento. En cambio, Comandante Carlos personaliza la lucha al exaltar la figura de Carlos Fonseca como héroe revolucionario. Aunque una apela a lo colectivo y la otra a un líder específico, ambas muestran la influencia soviética y cubana en el uso del arte como herramienta de propaganda política, combinando elementos culturales nicaragüenses con mensajes ideológicos claros.</p>
+<h2>Conclusión</h2>
+<p>Estas 2 canciones y películas nos parecen interesantes porque demuestran distintas formas en que el arte se comunica con el receptor. “Esta tierra nuestra” trata de comunicar una visión pasada crítica y una visión futura optimista, para transmitir las intenciones y justificaciones gubernamentales; “La batalla de Chile” muestra una representación primaria de la situación nacional y que fue censurada en su país de origen, pero por lo mismo provocó que, a través de testimonios de los dos bandos, los demás países pudiesen moldear su visión de la situación nacional; y, por último, las canciones “Comandante Carlos” y “El Himno a la Unidad Sandinista” muestran cómo es que se busca inspirar a un grupo de revolucionarios a seguir ciertos ideales a través del uso de símbolos e ideales en busca de reforzar un espíritu de unión y revolución.</p></body></html>
         </section>
 
         <!-- References Section -->
         <section id="references">
-          <h2>${t.references}</h2>
-          ${referencesHtml}
+          <h2>Referencias</h2>
+          <div class="references-list">
+  <div class="reference-item" id="ref-batalla1975">
+    La batalla de Chile. 1975/1979. Dirigido por Patricio Guzmán. Chile.
+  </div>
+  <div class="reference-item" id="ref-comandante1978">
+    Grupo Pancasán. 1978. «Comandante Carlos». Song from self-titled album. <a href="https://www.youtube.com/watch?v=jmMbgLKMUGA" target="_blank" rel="noopener">https://www.youtube.com/watch?v=jmMbgLKMUGA</a>.
+  </div>
+  <div class="reference-item" id="ref-esta1959">
+    Esta tierra nuestra. 1959. Dirigido por Tomás Gutiérrez Alea y Julio García Espinosa. Cuba: Instituto Cubano del Arte e Industria Cinematográficos (ICAIC).
+  </div>
+  <div class="reference-item" id="ref-himno1980">
+    Mejía Godoy, Carlos. 1980. «Himno a la Unidad Sandinista». Song. <a href="https://www.youtube.com/watch?v=X8iH_snApKw" target="_blank" rel="noopener">https://www.youtube.com/watch?v=X8iH_snApKw</a>.
+  </div>
+  <div class="reference-item" id="ref-kennan1948">
+    Kennan, George. 1948. «Policy Planning Staff Memorandum». Vol. 1.
+  </div>
+  <div class="reference-item" id="ref-levesque1977">
+    Lévesque, J. 1977. «La unión soviética y Cuba: una relación especial». <em>Foro Internacional</em> 18 (2): 219-242.
+  </div>
+  <div class="reference-item" id="ref-solis2012">
+    Solis Rodriguez, Cristian Uriel. 2012. «Un imperio fallido: La Unión Soviética durante la guerra fría». <em>Región y sociedad</em> 24 (54): 313-319. <a href="http://www.scielo.org.mx/scielo.php?script=sci_arttext&pid=S1870-39252012000200012&lng=es&nrm=iso" target="_blank" rel="noopener">http://www.scielo.org.mx/scielo.php?script=sci_arttext&pid=S1870-39252012000200012&lng=es&nrm=iso</a>.
+  </div>
+</div>
         </section>
 
         <!-- Additional Info Section -->
         <section id="additional-info">
-          ${acknowledgments ? `
-          <h2>${t.acknowledgments}</h2>
-          <p>${acknowledgments}</p>
-          ` : ''}
           
-          ${funding && funding.trim() !== '' && funding !== 'No declarada' && funding !== 'Not declared' ? `
-          <h2>${t.funding}</h2>
-          <p>${funding}</p>
-          ` : ''}
           
-          ${dataAvailability && dataAvailability.trim() !== '' ? `
-          <h2>${t.dataAvailability}</h2>
-          <p>${dataAvailability}</p>
-          ` : ''}
           
-          ${authorCredits && authorCredits.trim() !== '' ? `
-          <h2>${t.authorContributions}</h2>
-          <p>${authorCredits}</p>
-          ` : ''}
           
-          <h2>${t.conflictOfInterest}</h2>
-          <p>${conflicts}</p>
+          
+          
+          
+          
+          <h2>Conflicto de intereses</h2>
+          <p>Los autores declaran no tener conflictos de interés.</p>
         </section>
 
         <!-- PDF Preview Section -->
-        ${article.pdfUrl ? `
+        
         <section id="pdf-preview">
-          <h2>${t.pdfPreview}</h2>
-          <embed src="${article.pdfUrl}" type="application/pdf" class="pdf-preview" />
+          <h2>Visualización del PDF</h2>
+          <embed src="https://www.revistacienciasestudiantes.com/Articles/Article-la-musica-y-el-cine-como-metodos-de-propaganda-en-la-guerra-fria-6.pdf" type="application/pdf" class="pdf-preview" />
           <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-            <a href="${article.pdfUrl}" target="_blank" class="btn-pdf">${t.viewFullScreen}</a>
-            <a href="${article.pdfUrl}" download class="btn-pdf" style="background: var(--text-light);">${t.downloadPDF}</a>
+            <a href="https://www.revistacienciasestudiantes.com/Articles/Article-la-musica-y-el-cine-como-metodos-de-propaganda-en-la-guerra-fria-6.pdf" target="_blank" class="btn-pdf">Ver en pantalla completa</a>
+            <a href="https://www.revistacienciasestudiantes.com/Articles/Article-la-musica-y-el-cine-como-metodos-de-propaganda-en-la-guerra-fria-6.pdf" download class="btn-pdf" style="background: var(--text-light);">Descargar PDF</a>
           </div>
         </section>
-        ` : ''}
+        
 
         <!-- License Section -->
         <section id="license" class="license-section">
           <p>
-            <strong>${t.license}:</strong> 
+            <strong>Licencia:</strong> 
             Este artículo se publica bajo la licencia 
-            <a href="https://creativecommons.org/licenses/by/4.0/deed.${isSpanish ? 'es' : 'en'}" target="_blank" rel="license noopener noreferrer">
-              ${ccLogoSvg} CC BY 4.0
+            <a href="https://creativecommons.org/licenses/by/4.0/deed.es" target="_blank" rel="license noopener noreferrer">
+              <img src="https://bibliotecas.ucn.cl/wp-content/uploads/2025/04/by1.png" alt="CC BY 4.0" style="height: 1.2em; width: auto; vertical-align: middle;"> CC BY 4.0
             </a>
           </p>
           <p style="margin-top: 0.5rem; font-size: 0.8rem;">
@@ -4158,92 +2854,67 @@ body {
       <div class="mobile-info">
         <div class="info-tabs">
           <div class="tab-buttons">
-            <button class="tab-button active" onclick="switchTab('mobile', 'citations')">${t.howToCite}</button>
-            <button class="tab-button" onclick="switchTab('mobile', 'metadata')">${t.information}</button>
+            <button class="tab-button active" onclick="switchTab('mobile', 'citations')">Cómo citar</button>
+            <button class="tab-button" onclick="switchTab('mobile', 'metadata')">Información</button>
           </div>
           
           <!-- Citations Tab -->
           <div id="mobile-citations" class="tab-panel active">
-            <h4>${t.howToCite}</h4>
+            <h4>Cómo citar</h4>
             <div class="citation-box">
               <div class="citation-item">
                 <strong>APA</strong>
-                <button class="copy-btn" onclick="copyRichText('apa-text-${lang}-mobile', event)">${t.copy}</button>
-                <div id="apa-text-${lang}-mobile" style="margin-top: 0.25rem;">${authorsAPA}. (${year}). ${title}. <em>Revista Nacional de las Ciencias para Estudiantes</em>, ${article.volumen}(${article.numero}), ${article.primeraPagina}-${article.ultimaPagina}. ${article.doi ? `https://doi.org/${article.doi}` : ''}</div>
+                <button class="copy-btn" onclick="copyRichText('apa-text-es-mobile', event)">Copiar</button>
+                <div id="apa-text-es-mobile" style="margin-top: 0.25rem;">Jeon, J. H., & Flores, C.. (2025). La Música y el Cine como Métodos de Propaganda en la Guerra Fría. <em>Revista Nacional de las Ciencias para Estudiantes</em>, 1(1), 40-44. </div>
               </div>
               <div class="citation-item">
                 <strong>MLA</strong>
-                <button class="copy-btn" onclick="copyRichText('mla-text-${lang}-mobile', event)">${t.copy}</button>
-                <div id="mla-text-${lang}-mobile" style="margin-top: 0.25rem;">${isSpanish ? authorsMLAEs : authorsMLAEn}. "${title}." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. ${article.volumen}, no. ${article.numero}, ${year}, pp. ${article.primeraPagina}-${article.ultimaPagina}. ${article.doi ? `https://doi.org/${article.doi}` : ''}</div>
+                <button class="copy-btn" onclick="copyRichText('mla-text-es-mobile', event)">Copiar</button>
+                <div id="mla-text-es-mobile" style="margin-top: 0.25rem;">Jeon, Jun Ho, y Flores, Camilo. "La Música y el Cine como Métodos de Propaganda en la Guerra Fría." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. 1, no. 1, 2025, pp. 40-44. </div>
               </div>
               <div class="citation-item">
                 <strong>Chicago</strong>
-                <button class="copy-btn" onclick="copyRichText('chi-text-${lang}-mobile', event)">${t.copy}</button>
-                <div id="chi-text-${lang}-mobile" style="margin-top: 0.25rem;">${isSpanish ? authorsChicagoEs : authorsChicagoEn}. "${title}." <em>Revista Nacional de las Ciencias para Estudiantes</em> ${article.volumen}, no. ${article.numero} (${year}): ${article.primeraPagina}-${article.ultimaPagina}. ${article.doi ? `https://doi.org/${article.doi}` : ''}</div>
+                <button class="copy-btn" onclick="copyRichText('chi-text-es-mobile', event)">Copiar</button>
+                <div id="chi-text-es-mobile" style="margin-top: 0.25rem;">Jeon, Jun Ho, y Flores, Camilo. "La Música y el Cine como Métodos de Propaganda en la Guerra Fría." <em>Revista Nacional de las Ciencias para Estudiantes</em> 1, no. 1 (2025): 40-44. </div>
               </div>
-              <a href="data:text/plain;charset=utf-8,${encodeURIComponent(bibtex)}" download="article-${article.numeroArticulo}.bib" class="bibtex-download">
+              <a href="data:text/plain;charset=utf-8,%40article%7Bjeon20256%2C%0A%20%20author%20%3D%20%7BJeon%5C%24%2C%20Jun%20Ho%5C%24%20and%20Flores%5C%24%2C%20Camilo%5C%24%7D%2C%0A%20%20title%20%3D%20%7BLa%20M%7B%5C'u%7Dsica%20y%20el%20Cine%20como%20M%7B%5C'e%7Dtodos%20de%20Propaganda%20en%20la%20Guerra%20Fr%7B%5C'i%7Da%5C%24%7D%2C%0A%20%20journal%20%3D%20%7BRevista%20Nacional%20de%20las%20Ciencias%20para%20Estudiantes%7D%2C%0A%20%20year%20%3D%20%7B2025%7D%2C%0A%20%20volume%20%3D%20%7B1%7D%2C%0A%20%20number%20%3D%20%7B1%7D%2C%0A%20%20pages%20%3D%20%7B40--44%7D%2C%0A%20%20issn%20%3D%20%7B3087-2839%7D%2C%0A%20%20url%20%3D%20%7Bhttps%3A%2F%2Fwww.revistacienciasestudiantes.com%2Farticles%2Farticle-la-musica-y-el-cine-como-metodos-de-propaganda-en-la-guerra-fria-6.html%7D%0A%7D" download="article-6.bib" class="bibtex-download">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                   <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
                   <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
                 </svg>
-                ${t.downloadBibTeX}
+                Descargar BibTeX
               </a>
             </div>
           </div>
           
           <!-- Metadata Tab -->
           <div id="mobile-metadata" class="tab-panel">
-            <h4>${t.keywords}</h4>
+            <h4>Palabras clave</h4>
             <div class="keywords" style="margin-bottom: 1.5rem;">
-              ${keywords.map(kw => {
-    // Detectar si es formato controlado: "CÓDIGO: Término"
-    const match = typeof kw === 'string' ? kw.match(/^([A-Za-z0-9.]+):\s*(.+)/) : null;
-    if (match) {
-        return `<span class="keyword-tag keyword-controlled">
-            <code class="keyword-code">${match[1]}</code>
-            <span class="keyword-term">${match[2]}</span>
-        </span>`;
-    }
-    // Formato legacy: término simple
-    return `<span class="keyword-tag">${kw}</span>`;
-}).join('')}
+              <span class="keyword-tag">Guerra Fría</span><span class="keyword-tag">Propaganda</span><span class="keyword-tag">Cine</span><span class="keyword-tag">Música</span><span class="keyword-tag">Cuba</span><span class="keyword-tag">Chile</span><span class="keyword-tag">Nicaragua</span><span class="keyword-tag">Ideologías</span>
             </div>
             
-            <h4>${t.articleInfo}</h4>
+            <h4>Información del artículo</h4>
             <div class="metadata-item">
-              <span class="metadata-label">${t.received}</span>
-              <span class="metadata-value">${receivedDate}</span>
+              <span class="metadata-label">Recibido</span>
+              <span class="metadata-value">21-11-2025</span>
             </div>
             <div class="metadata-item">
-              <span class="metadata-label">${t.accepted}</span>
-              <span class="metadata-value">${acceptedDate}</span>
+              <span class="metadata-label">Aceptado</span>
+              <span class="metadata-value">28-11-2025</span>
             </div>
             <div class="metadata-item">
-              <span class="metadata-label">${t.published}</span>
-              <span class="metadata-value">${fecha}</span>
+              <span class="metadata-label">Publicado</span>
+              <span class="metadata-value">29-11-2025</span>
             </div>
             <div class="metadata-item">
-              <span class="metadata-label">${t.area}</span>
-              <span class="metadata-value">${article.area}</span>
+              <span class="metadata-label">Área</span>
+              <span class="metadata-value">Historia de Latinoamérica en la Guerra Fría</span>
             </div>
 
-            ${article.doi ? `
-            <div class="metadata-item metadata-doi-item">
-              <span class="metadata-label">DOI</span>
-              <span class="metadata-value">
-                <a href="https://doi.org/${article.doi}" target="_blank" rel="noopener noreferrer" class="sidebar-doi-link">
-                  ${article.doi}
-                </a>
-              </span>
-            </div>
-            ` : ''}
+            
 
-            ${funding && funding !== 'No declarada' && funding !== 'Not declared' ? `
-            <div class="metadata-item">
-              <span class="metadata-label">${t.fundingLabel}</span>
-              <span class="metadata-value">${funding}</span>
-            </div>
-            ` : ''}
+            
           </div>
         </div>
       </div>
@@ -4253,92 +2924,67 @@ body {
     <aside class="right-sidebar">
       <div class="info-tabs">
         <div class="tab-buttons">
-          <button class="tab-button active" onclick="switchTab('desktop', 'citations')">${t.howToCite}</button>
-          <button class="tab-button" onclick="switchTab('desktop', 'metadata')">${t.information}</button>
+          <button class="tab-button active" onclick="switchTab('desktop', 'citations')">Cómo citar</button>
+          <button class="tab-button" onclick="switchTab('desktop', 'metadata')">Información</button>
         </div>
         
         <!-- Citations Tab -->
         <div id="desktop-citations" class="tab-panel active">
-          <h4>${t.howToCite}</h4>
+          <h4>Cómo citar</h4>
           <div class="citation-box">
             <div class="citation-item">
               <strong>APA</strong>
-              <button class="copy-btn" onclick="copyRichText('apa-text-${lang}', event)">${t.copy}</button>
-              <div id="apa-text-${lang}" style="margin-top: 0.25rem;">${authorsAPA}. (${year}). ${title}. <em>Revista Nacional de las Ciencias para Estudiantes</em>, ${article.volumen}(${article.numero}), ${article.primeraPagina}-${article.ultimaPagina}. ${article.doi ? `https://doi.org/${article.doi}` : ''}</div>
+              <button class="copy-btn" onclick="copyRichText('apa-text-es', event)">Copiar</button>
+              <div id="apa-text-es" style="margin-top: 0.25rem;">Jeon, J. H., & Flores, C.. (2025). La Música y el Cine como Métodos de Propaganda en la Guerra Fría. <em>Revista Nacional de las Ciencias para Estudiantes</em>, 1(1), 40-44. </div>
             </div>
             <div class="citation-item">
               <strong>MLA</strong>
-              <button class="copy-btn" onclick="copyRichText('mla-text-${lang}', event)">${t.copy}</button>
-              <div id="mla-text-${lang}" style="margin-top: 0.25rem;">${isSpanish ? authorsMLAEs : authorsMLAEn}. "${title}." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. ${article.volumen}, no. ${article.numero}, ${year}, pp. ${article.primeraPagina}-${article.ultimaPagina}. ${article.doi ? `https://doi.org/${article.doi}` : ''}</div>
+              <button class="copy-btn" onclick="copyRichText('mla-text-es', event)">Copiar</button>
+              <div id="mla-text-es" style="margin-top: 0.25rem;">Jeon, Jun Ho, y Flores, Camilo. "La Música y el Cine como Métodos de Propaganda en la Guerra Fría." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. 1, no. 1, 2025, pp. 40-44. </div>
             </div>
             <div class="citation-item">
               <strong>Chicago</strong>
-              <button class="copy-btn" onclick="copyRichText('chi-text-${lang}', event)">${t.copy}</button>
-              <div id="chi-text-${lang}" style="margin-top: 0.25rem;">${isSpanish ? authorsChicagoEs : authorsChicagoEn}. "${title}." <em>Revista Nacional de las Ciencias para Estudiantes</em> ${article.volumen}, no. ${article.numero} (${year}): ${article.primeraPagina}-${article.ultimaPagina}. ${article.doi ? `https://doi.org/${article.doi}` : ''}</div>
+              <button class="copy-btn" onclick="copyRichText('chi-text-es', event)">Copiar</button>
+              <div id="chi-text-es" style="margin-top: 0.25rem;">Jeon, Jun Ho, y Flores, Camilo. "La Música y el Cine como Métodos de Propaganda en la Guerra Fría." <em>Revista Nacional de las Ciencias para Estudiantes</em> 1, no. 1 (2025): 40-44. </div>
             </div>
-            <a href="data:text/plain;charset=utf-8,${encodeURIComponent(bibtex)}" download="article-${article.numeroArticulo}.bib" class="bibtex-download">
+            <a href="data:text/plain;charset=utf-8,%40article%7Bjeon20256%2C%0A%20%20author%20%3D%20%7BJeon%5C%24%2C%20Jun%20Ho%5C%24%20and%20Flores%5C%24%2C%20Camilo%5C%24%7D%2C%0A%20%20title%20%3D%20%7BLa%20M%7B%5C'u%7Dsica%20y%20el%20Cine%20como%20M%7B%5C'e%7Dtodos%20de%20Propaganda%20en%20la%20Guerra%20Fr%7B%5C'i%7Da%5C%24%7D%2C%0A%20%20journal%20%3D%20%7BRevista%20Nacional%20de%20las%20Ciencias%20para%20Estudiantes%7D%2C%0A%20%20year%20%3D%20%7B2025%7D%2C%0A%20%20volume%20%3D%20%7B1%7D%2C%0A%20%20number%20%3D%20%7B1%7D%2C%0A%20%20pages%20%3D%20%7B40--44%7D%2C%0A%20%20issn%20%3D%20%7B3087-2839%7D%2C%0A%20%20url%20%3D%20%7Bhttps%3A%2F%2Fwww.revistacienciasestudiantes.com%2Farticles%2Farticle-la-musica-y-el-cine-como-metodos-de-propaganda-en-la-guerra-fria-6.html%7D%0A%7D" download="article-6.bib" class="bibtex-download">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                 <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
                 <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
               </svg>
-              ${t.downloadBibTeX}
+              Descargar BibTeX
             </a>
           </div>
         </div>
         
         <!-- Metadata Tab -->
         <div id="desktop-metadata" class="tab-panel">
-          <h4>${t.keywords}</h4>
+          <h4>Palabras clave</h4>
           <div class="keywords" style="margin-bottom: 1.5rem;">
-            ${keywords.map(kw => {
-    // Detectar si es formato controlado: "CÓDIGO: Término"
-    const match = typeof kw === 'string' ? kw.match(/^([A-Za-z0-9.]+):\s*(.+)/) : null;
-    if (match) {
-        return `<span class="keyword-tag keyword-controlled">
-            <code class="keyword-code">${match[1]}</code>
-            <span class="keyword-term">${match[2]}</span>
-        </span>`;
-    }
-    // Formato legacy: término simple
-    return `<span class="keyword-tag">${kw}</span>`;
-}).join('')}
+            <span class="keyword-tag">Guerra Fría</span><span class="keyword-tag">Propaganda</span><span class="keyword-tag">Cine</span><span class="keyword-tag">Música</span><span class="keyword-tag">Cuba</span><span class="keyword-tag">Chile</span><span class="keyword-tag">Nicaragua</span><span class="keyword-tag">Ideologías</span>
           </div>
           
-          <h4>${t.articleInfo}</h4>
+          <h4>Información del artículo</h4>
           <div class="metadata-item">
-            <span class="metadata-label">${t.received}</span>
-            <span class="metadata-value">${receivedDate}</span>
+            <span class="metadata-label">Recibido</span>
+            <span class="metadata-value">21-11-2025</span>
           </div>
           <div class="metadata-item">
-            <span class="metadata-label">${t.accepted}</span>
-            <span class="metadata-value">${acceptedDate}</span>
+            <span class="metadata-label">Aceptado</span>
+            <span class="metadata-value">28-11-2025</span>
           </div>
           <div class="metadata-item">
-            <span class="metadata-label">${t.published}</span>
-            <span class="metadata-value">${fecha}</span>
+            <span class="metadata-label">Publicado</span>
+            <span class="metadata-value">29-11-2025</span>
           </div>
           <div class="metadata-item">
-            <span class="metadata-label">${t.area}</span>
-            <span class="metadata-value">${article.area}</span>
+            <span class="metadata-label">Área</span>
+            <span class="metadata-value">Historia de Latinoamérica en la Guerra Fría</span>
           </div>
 
-          ${article.doi ? `
-          <div class="metadata-item metadata-doi-item">
-            <span class="metadata-label">DOI</span>
-            <span class="metadata-value">
-              <a href="https://doi.org/${article.doi}" target="_blank" rel="noopener noreferrer" class="sidebar-doi-link">
-                ${article.doi}
-              </a>
-            </span>
-          </div>
-          ` : ''}
+          
 
-          ${funding && funding !== 'No declarada' && funding !== 'Not declared' ? `
-          <div class="metadata-item">
-            <span class="metadata-label">${t.fundingLabel}</span>
-            <span class="metadata-value">${funding}</span>
-          </div>
-          ` : ''}
+          
         </div>
       </div>
     </aside>
@@ -4349,27 +2995,27 @@ body {
     <div class="footer-container">
       <!-- Redes Sociales -->
       <div class="footer-social">
-        <a href="${socialLinks.instagram}" target="_blank" rel="noopener" class="social-icon">
-          ${socialIcons.instagram}
+        <a href="https://www.instagram.com/revistanacionalcienciae" target="_blank" rel="noopener" class="social-icon">
+          <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
           <span class="social-label">Instagram</span>
         </a>
-        <a href="${socialLinks.youtube}" target="_blank" rel="noopener" class="social-icon">
-          ${socialIcons.youtube}
+        <a href="https://www.youtube.com/@RevistaNacionaldelasCienciaspa" target="_blank" rel="noopener" class="social-icon">
+          <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
           <span class="social-label">YouTube</span>
         </a>
-        <a href="${socialLinks.tiktok}" target="_blank" rel="noopener" class="social-icon">
-          ${socialIcons.tiktok}
+        <a href="https://www.tiktok.com/@revistacienciaestudiante" target="_blank" rel="noopener" class="social-icon">
+          <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12.53.02C13.84 0 15.14.01 16.44 0c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>
           <span class="social-label">TikTok</span>
         </a>
-        <a href="${socialLinks.spotify}" target="_blank" rel="noopener" class="social-icon">
-          ${socialIcons.spotify}
+        <a href="https://open.spotify.com/show/6amsgUkNXgUTD219XpuqOe?si=LPzCNpusQjSLGBq_pPrVTw" target="_blank" rel="noopener" class="social-icon">
+          <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.508 17.308c-.221.362-.689.473-1.05.252-2.983-1.823-6.738-2.237-11.162-1.226-.411.094-.823-.162-.917-.573-.094-.412.162-.823.573-.917 4.847-1.108 8.995-.635 12.305 1.386.36.221.472.69.251 1.05zm1.47-3.255c-.278.452-.865.594-1.317.316-3.414-2.098-8.62-2.706-12.657-1.479-.508.154-1.04-.136-1.194-.644-.154-.508.136-1.04.644-1.194 4.613-1.399 10.366-.719 14.256 1.67.452.278.594.865.316 1.317zm.126-3.374C14.653 7.64 7.29 7.394 3.05 8.681c-.604.183-1.246-.166-1.429-.77-.183-.604.166-1.246.77-1.429 4.883-1.482 13.014-1.201 18.238 1.902.544.323.72 1.034.397 1.578-.323.544-1.034.72-1.578.397z"/></svg>
           <span class="social-label">Spotify</span>
         </a>
       </div>
 
       <!-- Contacto - Versión ultra simple sin JavaScript -->
       <div class="footer-contact">
-        <span class="contact-label">${t.contact}</span>
+        <span class="contact-label">Contacto</span>
         
         <!-- Versión para escritorio (Gmail) - visible solo en pantallas grandes -->
         <a href="https://mail.google.com/mail/?view=cm&fs=1&to=contact@revistacienciasestudiantes.com" 
@@ -4389,36 +3035,36 @@ body {
 
       <!-- Navegación adicional: Volver al catálogo, Volver al home, Ver en otro idioma -->
       <div class="footer-nav-links">
-        <a href="${isSpanish ? '/articles/index.html' : '/articles/index.EN.html'}" class="footer-nav-link">
+        <a href="/articles/index.html" class="footer-nav-link">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
           </svg>
-          ${t.backToCatalog}
+          Volver al catálogo
         </a>
         <a href="/" class="footer-nav-link">
-          ${t.backToHome}
+          Volver al inicio
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
           </svg>
         </a>
-        <a href="/articles/article-${articleSlug}${isSpanish ? 'EN' : ''}.html" class="footer-nav-link">
+        <a href="/articles/article-la-musica-y-el-cine-como-metodos-de-propaganda-en-la-guerra-fria-6EN.html" class="footer-nav-link">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12.87 15.07l-2.54-2.51.03-.03c1.68-1.68 2.77-3.85 2.96-6.03h3.68V3h-8V1h-2v2H3v2h11.17C13.93 6.69 12.69 8.45 11 10.22c-.74-.74-1.36-1.59-1.86-2.52h-2c.59 1.43 1.46 2.78 2.55 3.88L3 20.59 4.41 22 12 14.41l3.29 3.29L17 15.06l-4.13-3.99z"/>
           </svg>
-          ${t.viewOtherLang}
+          View in English
         </a>
       </div>
 
       <!-- Copyright y enlaces legales -->
       <div class="footer-bottom">
         <div class="footer-links">
-          <a href="/privacy${isSpanish ? '' : 'EN'}.html">Privacidad</a>
+          <a href="/privacy.html">Privacidad</a>
           <span>|</span>
-          <a href="/terms${isSpanish ? '' : 'EN'}.html">Términos</a>
+          <a href="/terms.html">Términos</a>
           <span>|</span>
-          <a href="/credits${isSpanish ? '' : 'EN'}.html">Créditos</a>
+          <a href="/credits.html">Créditos</a>
         </div>
-        <p>© ${new Date().getFullYear()} ${isSpanish ? JOURNAL_NAME_ES : JOURNAL_NAME_EN} · ISSN 3087-2839</p>
+        <p>© 2026 Revista Nacional de las Ciencias para Estudiantes · ISSN 3087-2839</p>
       </div>
     </div>
   </footer>
@@ -4938,344 +3584,4 @@ window.__SPECIAL_ELEMENTS__ = (function() {
 })();
 </script>
 </body>
-</html>`;
-}
-
-function generateIndexes(articles) {
-  // Agrupar por año
-  const articlesByYear = articles.reduce((acc, article) => {
-    const year = new Date(article.fecha).getFullYear() || 'Sin fecha';
-    if (!acc[year]) acc[year] = [];
-    acc[year].push(article);
-    return acc;
-  }, {});
-
-  // Índice español
-  const indexContent = `<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Índice de Artículos - Revista Nacional de las Ciencias para Estudiantes</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:wght@400;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --primary-blue: #007398;
-      --text-dark: #333333;
-      --text-grey: #666666;
-      --border: #e4e4e4;
-      --bg-light: #f8f9fa;
-    }
-    body {
-      font-family: 'Inter', sans-serif;
-      line-height: 1.6;
-      color: var(--text-dark);
-      background-color: #f0f0f0;
-      margin: 0;
-      padding: 0;
-    }
-    .top-bar {
-      background: white;
-      border-bottom: 1px solid var(--border);
-      padding: 1rem 2rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-    .journal-name {
-      font-weight: 700;
-      color: var(--primary-blue);
-      text-decoration: none;
-      font-size: 0.9rem;
-      letter-spacing: 0.5px;
-    }
-    .main-wrapper {
-      max-width: 1200px;
-      margin: 2rem auto;
-      padding: 0 2rem;
-    }
-    .article-container {
-      background: white;
-      padding: 3rem;
-      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-      border-radius: 8px;
-    }
-    h1 {
-      font-family: 'Lora', serif;
-      font-size: 2.5rem;
-      margin: 0 0 1rem;
-      line-height: 1.2;
-      color: #000;
-    }
-    .description {
-      color: var(--text-grey);
-      margin-bottom: 3rem;
-      font-size: 1.1rem;
-    }
-    h2 {
-      font-family: 'Inter', sans-serif;
-      font-size: 1.8rem;
-      color: var(--text-dark);
-      margin: 3rem 0 1.5rem;
-      border-bottom: 2px solid var(--border);
-      padding-bottom: 0.5rem;
-    }
-    .articles-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-    .article-item {
-      margin-bottom: 1.5rem;
-      padding: 1rem;
-      border-radius: 6px;
-      transition: background 0.2s;
-    }
-    .article-item:hover {
-      background: var(--bg-light);
-    }
-    .article-link {
-      color: var(--primary-blue);
-      text-decoration: none;
-      font-size: 1.2rem;
-      font-weight: 600;
-      display: block;
-      margin-bottom: 0.3rem;
-    }
-    .article-link:hover {
-      text-decoration: underline;
-    }
-    .article-meta {
-      color: var(--text-grey);
-      font-size: 0.9rem;
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-    footer {
-      text-align: center;
-      padding: 4rem 2rem;
-      color: var(--text-grey);
-      font-size: 0.9rem;
-    }
-    @media (max-width: 900px) {
-      .main-wrapper { padding: 0 1rem; }
-      .article-container { padding: 1.5rem; }
-      h1 { font-size: 2rem; }
-      h2 { font-size: 1.5rem; }
-    }
-  </style>
-</head>
-<body>
-  <div class="top-bar">
-    <a href="/" class="journal-name">REVISTA NACIONAL DE LAS CIENCIAS PARA ESTUDIANTES</a>
-    <div class="issn">ISSN: 3087-2839</div>
-  </div>
-  <div class="main-wrapper">
-    <main class="article-container">
-      <h1>Índice de Artículos</h1>
-      <p class="description">Accede a los artículos por año de publicación. Cada enlace lleva a la página del artículo con resumen, referencias y PDF.</p>
-      
-      ${Object.keys(articlesByYear).sort().reverse().map(year => `
-      <section>
-        <h2>Año ${year}</h2>
-        <ul class="articles-list">
-          ${articlesByYear[year].map(article => {
-            const articleSlug = article.permalink || `${generateSlug(article.titulo)}-${article.numeroArticulo}`;
-            const authorsDisplay = formatAuthorsDisplay(article.autores, 'es');
-            return `
-            <li class="article-item">
-              <a href="/articles/article-${articleSlug}.html" class="article-link">${article.titulo}</a>
-              <div class="article-meta">
-                <span>${authorsDisplay}</span>
-                <span>Vol. ${article.volumen}, Núm. ${article.numero}</span>
-                <span>pp. ${article.primeraPagina}-${article.ultimaPagina}</span>
-              </div>
-            </li>
-          `;
-          }).join('')}
-        </ul>
-      </section>
-      `).join('')}
-    </main>
-  </div>
-  <footer>
-    <p>&copy; ${new Date().getFullYear()} Revista Nacional de las Ciencias para Estudiantes. ISSN 3087-2839</p>
-    <p><a href="/" style="color:var(--primary-blue); text-decoration:none;">Volver al inicio</a></p>
-  </footer>
-</body>
-</html>`;
-
-  const indexPath = path.join(OUTPUT_HTML_DIR, 'index.html');
-  fs.writeFileSync(indexPath, indexContent, 'utf8');
-  console.log(`✅ Índice español: ${indexPath}`);
-
-  // Índice inglés
-  const indexContentEn = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Index of Articles - The National Review of Sciences for Students</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:wght@400;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --primary-blue: #007398;
-      --text-dark: #333333;
-      --text-grey: #666666;
-      --border: #e4e4e4;
-      --bg-light: #f8f9fa;
-    }
-    body {
-      font-family: 'Inter', sans-serif;
-      line-height: 1.6;
-      color: var(--text-dark);
-      background-color: #f0f0f0;
-      margin: 0;
-      padding: 0;
-    }
-    .top-bar {
-      background: white;
-      border-bottom: 1px solid var(--border);
-      padding: 1rem 2rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-    .journal-name {
-      font-weight: 700;
-      color: var(--primary-blue);
-      text-decoration: none;
-      font-size: 0.9rem;
-      letter-spacing: 0.5px;
-    }
-    .main-wrapper {
-      max-width: 1200px;
-      margin: 2rem auto;
-      padding: 0 2rem;
-    }
-    .article-container {
-      background: white;
-      padding: 3rem;
-      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-      border-radius: 8px;
-    }
-    h1 {
-      font-family: 'Lora', serif;
-      font-size: 2.5rem;
-      margin: 0 0 1rem;
-      line-height: 1.2;
-      color: #000;
-    }
-    .description {
-      color: var(--text-grey);
-      margin-bottom: 3rem;
-      font-size: 1.1rem;
-    }
-    h2 {
-      font-family: 'Inter', sans-serif;
-      font-size: 1.8rem;
-      color: var(--text-dark);
-      margin: 3rem 0 1.5rem;
-      border-bottom: 2px solid var(--border);
-      padding-bottom: 0.5rem;
-    }
-    .articles-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-    .article-item {
-      margin-bottom: 1.5rem;
-      padding: 1rem;
-      border-radius: 6px;
-      transition: background 0.2s;
-    }
-    .article-item:hover {
-      background: var(--bg-light);
-    }
-    .article-link {
-      color: var(--primary-blue);
-      text-decoration: none;
-      font-size: 1.2rem;
-      font-weight: 600;
-      display: block;
-      margin-bottom: 0.3rem;
-    }
-    .article-link:hover {
-      text-decoration: underline;
-    }
-    .article-meta {
-      color: var(--text-grey);
-      font-size: 0.9rem;
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-    footer {
-      text-align: center;
-      padding: 4rem 2rem;
-      color: var(--text-grey);
-      font-size: 0.9rem;
-    }
-    @media (max-width: 900px) {
-      .main-wrapper { padding: 0 1rem; }
-      .article-container { padding: 1.5rem; }
-      h1 { font-size: 2rem; }
-      h2 { font-size: 1.5rem; }
-    }
-  </style>
-</head>
-<body>
-  <div class="top-bar">
-    <a href="/" class="journal-name">THE NATIONAL REVIEW OF SCIENCES FOR STUDENTS</a>
-    <div class="issn">ISSN: 3087-2839</div>
-  </div>
-  <div class="main-wrapper">
-    <main class="article-container">
-      <h1>Index of Articles</h1>
-      <p class="description">Access articles by year of publication. Each link leads to the article page with abstract, references and PDF.</p>
-      
-      ${Object.keys(articlesByYear).sort().reverse().map(year => `
-      <section>
-        <h2>Year ${year}</h2>
-        <ul class="articles-list">
-          ${articlesByYear[year].map(article => {
-            const articleSlug = article.permalink || `${generateSlug(article.titulo)}-${article.numeroArticulo}`;
-            const authorsDisplay = formatAuthorsDisplay(article.autores, 'en');
-            return `
-            <li class="article-item">
-              <a href="/articles/article-${articleSlug}EN.html" class="article-link">${article.titulo}</a>
-              <div class="article-meta">
-                <span>${authorsDisplay}</span>
-                <span>Vol. ${article.volumen}, No. ${article.numero}</span>
-                <span>pp. ${article.primeraPagina}-${article.ultimaPagina}</span>
-              </div>
-            </li>
-          `;
-          }).join('')}
-        </ul>
-      </section>
-      `).join('')}
-    </main>
-  </div>
-  <footer>
-    <p>&copy; ${new Date().getFullYear()} The National Review of Sciences for Students. ISSN 3087-2839</p>
-    <p><a href="/" style="color:var(--primary-blue); text-decoration:none;">Back to home</a></p>
-  </footer>
-</body>
-</html>`;
-
-  const indexPathEn = path.join(OUTPUT_HTML_DIR, 'index.EN.html');
-  fs.writeFileSync(indexPathEn, indexContentEn, 'utf8');
-  console.log(`✅ Índice inglés: ${indexPathEn}`);
-}
-
-// ========== EJECUCIÓN ==========
-generateAll();
+</html>

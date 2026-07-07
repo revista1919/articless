@@ -1,1328 +1,25 @@
-const fs = require('fs');
-const path = require('path');
-const cheerio = require('cheerio');
-// ... al inicio del archivo, junto a los otros require
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
-// ========== CONFIGURACIÓN ==========
-const ARTICLES_JSON = path.join(__dirname, 'articles.json');
-const OUTPUT_HTML_DIR = path.join(__dirname, 'articles');
-const DOMAIN = 'https://www.revistacienciasestudiantes.com';
-const JOURNAL_NAME_ES = 'Revista Nacional de las Ciencias para Estudiantes';
-const JOURNAL_NAME_EN = 'The National Review of Sciences for Students';
-const LOGO_ES = 'https://www.revistacienciasestudiantes.com/assets/logo.png';
-const LOGO_EN = 'https://www.revistacienciasestudiantes.com/logoEN.png';
-// ========== MODELO INTERMEDIO DE TABLA (AST) ==========
-
-let tableCounter = 1;
-
-function parseTable($, $table) {
-  const table = {
-    id: $table.attr('id') || `table-${tableCounter}`,
-    number: tableCounter++,
-    caption: $table.find('caption').text().trim() || null,
-    class: $table.attr('class') || null,
-    style: $table.attr('style') || null,
-    headers: [],
-    rows: [],
-    columns: 0,
-    footnotes: []
-  };
-
-  const rows = $table.find('tr');
-  let headerProcessed = false;
-
-  rows.each((i, row) => {
-    const rowData = [];
-    
-    $(row).find('th, td').each((j, cell) => {
-      const $cell = $(cell);
-      
-      rowData.push({
-        text: $cell.text().trim().replace(/\s+/g, ' '),
-        html: $cell.html(),
-        colspan: parseInt($cell.attr('colspan')) || 1,
-        rowspan: parseInt($cell.attr('rowspan')) || 1,
-        class: $cell.attr('class') || null,
-        style: $cell.attr('style') || null,
-        align: $cell.attr('align') || null,
-        type: cell.tagName.toLowerCase()
-      });
-    });
-
-    if (!headerProcessed && ($(row).find('th').length > 0 || i === 0)) {
-      table.headers = rowData;
-      headerProcessed = true;
-    } else {
-      table.rows.push(rowData);
-    }
-  });
-
-  table.columns = Math.max(
-    table.headers.length,
-    ...table.rows.map(r => r.reduce((sum, cell) => sum + (cell.colspan || 1), 0))
-  );
-
-  return table;
-}
-
-function formatCSVCell(text) {
-  let cleanText = text.replace(/"/g, '""');
-  return `"${cleanText}"`;
-}
-
-function tableToCSV(table) {
-  const rows = [];
-  if (table.headers.length) {
-    rows.push(table.headers.map(h => formatCSVCell(h.text)).join(','));
-  }
-  table.rows.forEach(row => {
-    rows.push(row.map(cell => formatCSVCell(cell.text)).join(','));
-  });
-  return rows.join('\n');
-}
-
-function tableToJSON(table) {
-  const simpleTable = {
-    number: table.number,
-    caption: table.caption,
-    headers: table.headers.map(h => h.text),
-    rows: table.rows.map(row => row.map(cell => cell.text)),
-    data: []
-  };
-
-  if (table.headers.length) {
-    simpleTable.data = table.rows.map(row => {
-      const obj = {};
-      table.headers.forEach((header, idx) => {
-        const key = header.text
-          .toLowerCase()
-          .replace(/\s+/g, '_')
-          .replace(/[^\w]/g, '');
-        obj[key] = row[idx]?.text || '';
-      });
-      return obj;
-    });
-  }
-
-  return JSON.stringify(simpleTable, null, 2);
-}
-
-function escapeLaTeX(text) {
-  return text
-    .replace(/\\/g, '\\textbackslash ')
-    .replace(/_/g, '\\_')
-    .replace(/&/g, '\\&')
-    .replace(/%/g, '\\%')
-    .replace(/\$/g, '\\$')
-    .replace(/#/g, '\\#')
-    .replace(/{/g, '\\{')
-    .replace(/}/g, '\\}')
-    .replace(/~/g, '\\textasciitilde ')
-    .replace(/\^/g, '\\textasciicircum ');
-}
-
-function tableToLaTeX(table) {
-  if (!table.rows.length && !table.headers.length) return '';
-
-  const alignment = 'l'.repeat(table.columns);
-  let latex = [];
-
-  latex.push('\\begin{table}[h]');
-  latex.push('\\centering');
-  
-  if (table.caption) {
-    latex.push(`\\caption{${escapeLaTeX(table.caption)}}`);
-  }
-  
-  latex.push(`\\label{tab:${table.number}}`);
-  latex.push(`\\begin{tabular}{|${alignment.split('').join('|')}|}`);
-  latex.push('\\hline');
-
-  if (table.headers.length) {
-    const headerLine = table.headers
-      .map(h => escapeLaTeX(h.text))
-      .join(' & ');
-    latex.push(headerLine + ' \\\\');
-    latex.push('\\hline');
-  }
-
-  table.rows.forEach(row => {
-    const rowLine = row
-      .map(cell => escapeLaTeX(cell.text))
-      .join(' & ');
-    latex.push(rowLine + ' \\\\');
-    latex.push('\\hline');
-  });
-
-  latex.push('\\end{tabular}');
-  latex.push('\\end{table}');
-
-  return latex.join('\n');
-}
-
-function escapeXML(text) {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
-
-function tableToXML(table) {
-  let xml = [];
-  
-  xml.push('<?xml version="1.0" encoding="UTF-8"?>');
-  xml.push(`<table id="${table.id}" number="${table.number}" xmlns="http://www.w3.org/1999/xhtml">`);
-
-  if (table.caption) {
-    xml.push(`  <caption>${escapeXML(table.caption)}</caption>`);
-  }
-
-  if (table.headers.length) {
-    xml.push('  <thead>');
-    xml.push('    <tr>');
-    table.headers.forEach(header => {
-      xml.push(`      <th>${escapeXML(header.text)}</th>`);
-    });
-    xml.push('    </tr>');
-    xml.push('  </thead>');
-  }
-
-  xml.push('  <tbody>');
-  table.rows.forEach(row => {
-    xml.push('    <tr>');
-    row.forEach(cell => {
-      xml.push(`      <td>${escapeXML(cell.text)}</td>`);
-    });
-    xml.push('    </tr>');
-  });
-  xml.push('  </tbody>');
-  
-  xml.push('</table>');
-
-  return xml.join('\n');
-}
-
-function resetTableCounter() {
-  tableCounter = 1;
-}
-// Asegurar que existe el directorio de salida
-if (!fs.existsSync(OUTPUT_HTML_DIR)) {
-  fs.mkdirSync(OUTPUT_HTML_DIR, { recursive: true });
-}
-
-// ========== UTILIDADES ==========
-function generateSlug(text) {
-  if (!text) return '';
-  return text.toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
-
-function formatDateEs(dateStr) {
-  if (!dateStr) return 'N/A';
-  return new Date(dateStr).toLocaleDateString('es-CL', { 
-    day: '2-digit', 
-    month: '2-digit', 
-    year: 'numeric' 
-  });
-}
-
-function formatDateEn(dateStr) {
-  if (!dateStr) return 'N/A';
-  return new Date(dateStr).toLocaleDateString('en-US', { 
-    month: '2-digit', 
-    day: '2-digit', 
-    year: 'numeric' 
-  });
-}
-
-function formatAuthorForCitation(author) {
-  // author puede ser string u objeto
-  let authorName = '';
-  if (typeof author === 'string') {
-    authorName = author;
-  } else if (author && author.name) {
-    authorName = author.name;
-  } else if (author && (author.firstName || author.lastName)) {
-    authorName = `${author.firstName || ''} ${author.lastName || ''}`.trim();
-  } else {
-    return '';
-  }
-  
-  const parts = authorName.trim().split(' ');
-  if (parts.length >= 2) {
-    const apellido = parts.pop();
-    const nombre = parts.join(' ');
-    return `${apellido}, ${nombre}`;
-  }
-  return authorName;
-}
-
-function getAPAAuthor(author) {
-  let authorName = '';
-  if (typeof author === 'string') {
-    authorName = author;
-  } else if (author && author.name) {
-    authorName = author.name;
-  } else if (author && (author.firstName || author.lastName)) {
-    authorName = `${author.firstName || ''} ${author.lastName || ''}`.trim();
-  } else {
-    return '';
-  }
-  
-  const parts = authorName.trim().split(/\s+/);
-  if (parts.length < 2) return authorName;
-  const last = parts.pop();
-  const initials = parts.map(n => n[0].toUpperCase() + '.').join(' ');
-  return `${last}, ${initials}`;
-}
-
-function formatAuthorsAPA(authors) {
-  // authors puede ser string o array
-  let authorsArray = [];
-  if (typeof authors === 'string') {
-    authorsArray = authors.split(';').map(a => a.trim()).filter(Boolean);
-  } else if (Array.isArray(authors)) {
-    authorsArray = authors;
-  }
-  
-  if (!authorsArray.length) return '';
-  const formatted = authorsArray.map(getAPAAuthor);
-  if (formatted.length === 1) {
-    return formatted[0];
-  } else if (formatted.length === 2) {
-    return formatted[0] + ', & ' + formatted[1];
-  } else {
-    return formatted.slice(0, -1).join(', ') + ', & ' + formatted[formatted.length - 1];
-  }
-}
-
-function formatAuthorsChicagoOrMLA(authors, language = 'es') {
-  let authorsArray = [];
-  if (typeof authors === 'string') {
-    authorsArray = authors.split(';').map(a => a.trim()).filter(Boolean);
-  } else if (Array.isArray(authors)) {
-    authorsArray = authors;
-  }
-  
-  if (!authorsArray.length) return '';
-  const formatted = authorsArray.map(formatAuthorForCitation);
-  const connector = language === 'es' ? 'y' : 'and';
-  const etal = 'et al.';
-  if (formatted.length === 1) {
-    return formatted[0];
-  } else if (formatted.length === 2) {
-    return `${formatted[0]}, ${connector} ${formatted[1]}`;
-  } else {
-    return `${formatted[0]}, ${etal}`;
-  }
-}
-
-function formatAuthorsDisplay(authors, language = 'es') {
-  let authorsArray = [];
-  if (typeof authors === 'string') {
-    authorsArray = authors.split(';').map(a => a.trim()).filter(Boolean);
-  } else if (Array.isArray(authors)) {
-    authorsArray = authors.map(a => {
-      if (typeof a === 'string') return a;
-      if (a.name) return a.name;
-      if (a.firstName || a.lastName) return `${a.firstName || ''} ${a.lastName || ''}`.trim();
-      return '';
-    }).filter(Boolean);
-  }
-  
-  if (!authorsArray.length) return 'Autor desconocido';
-  const connector = language === 'es' ? 'y' : 'and';
-  if (authorsArray.length === 1) {
-    return authorsArray[0];
-  } else if (authorsArray.length === 2) {
-    return `${authorsArray[0]} ${connector} ${authorsArray[1]}`;
-  } else {
-    return authorsArray.slice(0, -1).join(', ') + `, ${connector} ` + authorsArray[authorsArray.length - 1];
-  }
-}
-
-function generateBibTeX(article) {
-  const year = new Date(article.fecha).getFullYear();
-
-  function escapeBibTeX(text) {
-    if (!text) return '';
-
-    const charMap = {
-      'á': "{\\'a}", 'é': "{\\'e}", 'í': "{\\'i}", 'ó': "{\\'o}", 'ú': "{\\'u}",
-      'Á': "{\\'A}", 'É': "{\\'E}", 'Í': "{\\'I}", 'Ó': "{\\'O}", 'Ú': "{\\'U}",
-      'ä': "{\\\"a}", 'ë': "{\\\"e}", 'ï': "{\\\"i}", 'ö': "{\\\"o}", 'ü': "{\\\"u}",
-      'Ä': "{\\\"A}", 'Ë': "{\\\"E}", 'Ï': "{\\\"I}", 'Ö': "{\\\"O}", 'Ü': "{\\\"U}",
-      'ñ': "{\\~n}", 'Ñ': "{\\~N}",
-      'ç': "{\\c{c}}", 'Ç': "{\\c{C}}",
-      '&': "\\&", '%': "\\%", '$': "\\$", '#': "\\#", '_': "\\_"
-    };
-
-    let escaped = text;
-    for (const [char, latex] of Object.entries(charMap)) {
-      escaped = escaped.replace(new RegExp(char, 'g'), latex);
-    }
-
-    return escaped;
-  }
-
-  function formatAuthor(name) {
-    if (!name) return '';
-
-    const parts = name.trim().split(/\s+/);
-
-    if (parts.length === 1) {
-      return escapeBibTeX(parts[0]);
-    }
-
-    const lastName = parts.pop();
-    const firstNames = parts.join(' ');
-
-    return `${escapeBibTeX(lastName)}, ${escapeBibTeX(firstNames)}`;
-  }
-
-  let authors = [];
-
-  if (typeof article.autores === 'string') {
-    authors = article.autores.split(';').map(a => formatAuthor(a.trim()));
-  } else if (Array.isArray(article.autores)) {
-    authors = article.autores.map(a => {
-      if (typeof a === 'string') return formatAuthor(a);
-      if (a.name) return formatAuthor(a.name);
-      if (a.firstName || a.lastName) {
-        return formatAuthor(`${a.firstName || ''} ${a.lastName || ''}`.trim());
-      }
-      return '';
-    });
-  }
-
-  const authorsForBib = authors.filter(Boolean).join(' and ');
-
-  const firstAuthorLast = authors.length
-    ? authors[0].split(',')[0].toLowerCase().replace(/[^a-z]/g, '')
-    : 'article';
-
-  const key = `${firstAuthorLast}${year}${article.numeroArticulo}`;
-
-  const escapedTitle = escapeBibTeX(article.titulo);
-  const journalName = "Revista Nacional de las Ciencias para Estudiantes";
-
-  return `@article{${key},
-  author = {${authorsForBib}},
-  title = {${escapedTitle}},
-  journal = {${journalName}},
-  year = {${year}},
-  volume = {${article.volumen}},
-  number = {${article.numero}},
-  pages = {${article.primeraPagina}--${article.ultimaPagina}},
-  issn = {3087-2839},
-  url = {${DOMAIN}/articles/article-${generateSlug(article.titulo)}-${article.numeroArticulo}.html}
-}`.trim();
-}
-// ========== ICONOS SVG ==========
-const oaSvg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="72" height="72" viewBox="90 50 500 260" style="vertical-align: middle;">
-  <g transform="matrix(1.25 0 0 -1.25 0 360)">
-    <defs>
-      <path id="a" d="M-90-36h900v360H-90z"/>
-    </defs>
-    <clipPath id="b">
-      <use xlink:href="#a" overflow="visible"/>
-    </clipPath>
-    <g clip-path="url(#b)">
-      <path d="M720-3H0v294.285h720V-3z" fill="#fff"/>
-      <path d="M262.883 200.896v-8.846h25.938v8.846c0 21.412 17.421 38.831 38.831 38.831 21.409 0 38.829-17.419 38.829-38.831v-63.985h25.939v63.985c0 35.713-29.056 64.769-64.768 64.769-35.711 0-64.769-29.056-64.769-64.769M349.153 99.568c0-11.816-9.58-21.396-21.399-21.396-11.818 0-21.398 9.58-21.398 21.396 0 11.823 9.58 21.404 21.398 21.404 11.819 0 21.399-9.581 21.399-21.404" fill="#f68212"/>
-      <path d="M277.068 99.799c0 27.811 22.627 50.436 50.438 50.436 27.809 0 50.433-22.625 50.433-50.436 0-27.809-22.624-50.438-50.433-50.438-27.811.001-50.438 22.63-50.438 50.438m-25.938 0c0-42.109 34.265-76.373 76.375-76.373 42.111 0 76.373 34.265 76.373 76.373 0 42.113-34.262 76.375-76.373 76.375-42.11 0-76.375-34.262-76.375-76.375" fill="#f68212"/>
-    </g>
-  </g>
-</svg>`;
-const orcidSvg = `<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" width="16" height="16"> <circle cx="128" cy="128" r="120" fill="#A6CE39"/> <g fill="#FFFFFF"> <rect x="71" y="78" width="17" height="102"/> <circle cx="79.5" cy="56" r="11"/> <path d="M103 78 v102 h41.5 c28.2 0 51-22.8 51-51 s-22.8-51-51-51 H103 zm17 17 h24.5 c18.8 0 34 15.2 34 34 s-15.2 34-34 34 H120 V95 z" fill-rule="evenodd"/> </g> </svg>`;
-
-const emailSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; color: #005a7d;">
-  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-  <polyline points="22,6 12,13 2,6"></polyline>
-</svg>`;
-
-const ccLogoSvg = `<img src="https://bibliotecas.ucn.cl/wp-content/uploads/2025/04/by1.png" alt="CC BY 4.0" style="height: 1.2em; width: auto; vertical-align: middle;">`;
-// ========== SVG ICONS PARA REDES SOCIALES ==========
-const socialIcons = {
-  instagram: `<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>`,
-  youtube: `<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>`,
-  tiktok: `<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12.53.02C13.84 0 15.14.01 16.44 0c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>`,
-  spotify: `<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.508 17.308c-.221.362-.689.473-1.05.252-2.983-1.823-6.738-2.237-11.162-1.226-.411.094-.823-.162-.917-.573-.094-.412.162-.823.573-.917 4.847-1.108 8.995-.635 12.305 1.386.36.221.472.69.251 1.05zm1.47-3.255c-.278.452-.865.594-1.317.316-3.414-2.098-8.62-2.706-12.657-1.479-.508.154-1.04-.136-1.194-.644-.154-.508.136-1.04.644-1.194 4.613-1.399 10.366-.719 14.256 1.67.452.278.594.865.316 1.317zm.126-3.374C14.653 7.64 7.29 7.394 3.05 8.681c-.604.183-1.246-.166-1.429-.77-.183-.604.166-1.246.77-1.429 4.883-1.482 13.014-1.201 18.238 1.902.544.323.72 1.034.397 1.578-.323.544-1.034.72-1.578.397z"/></svg>`
-};
-
-// ========== SOCIAL LINKS ==========
-const socialLinks = {
-  instagram: 'https://www.instagram.com/revistanacionalcienciae',
-  youtube: 'https://www.youtube.com/@RevistaNacionaldelasCienciaspa',
-  tiktok: 'https://www.tiktok.com/@revistacienciaestudiante',
-  spotify: 'https://open.spotify.com/show/6amsgUkNXgUTD219XpuqOe?si=LPzCNpusQjSLGBq_pPrVTw'
-};
-// ========== CARGA DE TEAM.JSON CON MATCHING ROBUSTO ==========
-let authorMap = {}; // Mapa por uid
-let authorByNameMap = {}; // Mapa por nombre normalizado
-let authorBySlugMap = {}; // Mapa por slug
-
-async function loadTeamData() {
-  try {
-    const TEAM_JSON_URL = 'https://www.revistacienciasestudiantes.com/team/Team.json';
-    console.log(`🌐 Cargando equipo desde: ${TEAM_JSON_URL}`);
-
-    const response = await fetch(TEAM_JSON_URL);
-    if (!response.ok) {
-      throw new Error(`Error HTTP ${response.status} al cargar Team.json`);
-    }
-
-    const team = await response.json();
-
-    if (Array.isArray(team)) {
-      team.forEach(member => {
-        // Guardar por UID (para matching exacto)
-        if (member.uid) {
-          authorMap[member.uid] = {
-            uid: member.uid,
-            displayName: member.displayName,
-            slug: member.slug,
-            orcid: member.orcid,
-            email: member.publicEmail,
-            firstName: member.firstName,
-            lastName: member.lastName,
-            institution: member.institution,
-            imageUrl: member.imageUrl
-          };
-        }
-        
-        // Guardar por slug
-        if (member.slug) {
-          authorBySlugMap[member.slug] = {
-            ...authorMap[member.uid],
-            uid: member.uid,
-            displayName: member.displayName,
-            slug: member.slug,
-            orcid: member.orcid,
-            email: member.publicEmail
-          };
-        }
-        
-        // Guardar por displayName (nombre exacto)
-        if (member.displayName) {
-          authorByNameMap[member.displayName] = {
-            ...authorMap[member.uid],
-            uid: member.uid,
-            displayName: member.displayName,
-            slug: member.slug,
-            orcid: member.orcid,
-            email: member.publicEmail
-          };
-        }
-        
-        // También guardar versiones normalizadas del nombre para matching fuzzy
-        // (sin tildes, minúsculas, etc.)
-        const normalizedName = member.displayName ? 
-          member.displayName.toLowerCase()
-            .normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
-        
-        if (normalizedName && !authorByNameMap[normalizedName]) {
-          authorByNameMap[normalizedName] = {
-            ...authorMap[member.uid],
-            uid: member.uid,
-            displayName: member.displayName,
-            slug: member.slug,
-            orcid: member.orcid,
-            email: member.publicEmail,
-            normalizedName
-          };
-        }
-        
-        // Guardar por combinación de nombre y apellido
-        if (member.firstName || member.lastName) {
-          const fullName = `${member.firstName || ''} ${member.lastName || ''}`.trim();
-          if (fullName && !authorByNameMap[fullName]) {
-            authorByNameMap[fullName] = {
-              ...authorMap[member.uid],
-              uid: member.uid,
-              displayName: member.displayName,
-              slug: member.slug,
-              orcid: member.orcid,
-              email: member.publicEmail
-            };
-          }
-        }
-      });
-      
-      console.log(`📚 ${Object.keys(authorMap).length} autores cargados por UID`);
-      console.log(`📚 ${Object.keys(authorByNameMap).length} variantes de nombres indexadas`);
-    } else {
-      console.log('⚠️ El JSON cargado no es un array.');
-    }
-
-  } catch (e) {
-    console.log('⚠️ No se pudo cargar Team.json desde la URL, los autores no tendrán enlaces. Error:', e.message);
-  }
-}
-
-// ========== FUNCIÓN DE MATCHING DE AUTORES ==========
-function findAuthorInfo(author, articleAuthorId = null) {
-  if (!author) return null;
-  
-  // Obtener el nombre para mostrar
-  let displayName = '';
-  if (typeof author === 'string') {
-    displayName = author;
-  } else if (author.name) {
-    displayName = author.name;
-  } else if (author.firstName || author.lastName) {
-    displayName = `${author.firstName || ''} ${author.lastName || ''}`.trim();
-  } else {
-    return null;
-  }
-  
-  // 1. INTENTAR POR UID (matching más exacto)
-  if (articleAuthorId && authorMap[articleAuthorId]) {
-    console.log(`✅ Match por UID: ${articleAuthorId} -> ${authorMap[articleAuthorId].displayName}`);
-    return authorMap[articleAuthorId];
-  }
-  
-  // 2. INTENTAR POR NOMBRE EXACTO
-  if (authorByNameMap[displayName]) {
-    console.log(`✅ Match por nombre exacto: ${displayName}`);
-    return authorByNameMap[displayName];
-  }
-  
-  // 3. INTENTAR POR SLUG (si el autor tiene slug en el artículo)
-  if (author.slug && authorBySlugMap[author.slug]) {
-    console.log(`✅ Match por slug: ${author.slug}`);
-    return authorBySlugMap[author.slug];
-  }
-  
-  // 4. INTENTAR MATCHING INTELIGENTE PARA NOMBRES CON NÚMEROS (ej: "nombre-apellido2")
-  // Esto maneja casos donde hay duplicados como "Juan Pérez" y "Juan Pérez2"
-  const baseNameMatch = displayName.replace(/\d+$/, '').trim(); // Quita números al final
-  if (baseNameMatch !== displayName) {
-    // Buscar el nombre base en el mapa
-    for (const [key, value] of Object.entries(authorByNameMap)) {
-      if (key.startsWith(baseNameMatch) || baseNameMatch.startsWith(key)) {
-        console.log(`✅ Match por nombre base: ${displayName} -> ${key}`);
-        return value;
-      }
-    }
-  }
-  
-  // 5. INTENTAR NORMALIZACIÓN AVANZADA
-  const normalized = displayName.toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]/g, '');
-  
-  const normalizedWithoutNumbers = normalized.replace(/\d+/g, '');
-  
-  for (const [key, value] of Object.entries(authorByNameMap)) {
-    const keyNormalized = key.toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]/g, '');
-    
-    const keyWithoutNumbers = keyNormalized.replace(/\d+/g, '');
-    
-    // Comparar versiones normalizadas
-    if (keyNormalized === normalized || 
-        keyWithoutNumbers === normalizedWithoutNumbers ||
-        keyNormalized.includes(normalized) || 
-        normalized.includes(keyNormalized)) {
-      console.log(`✅ Match por normalización: ${displayName} -> ${key}`);
-      return value;
-    }
-  }
-  
-  // 6. ÚLTIMO RECURSO: Intentar por apellido si es que tenemos firstName/lastName
-  if (typeof author !== 'string' && (author.firstName || author.lastName)) {
-    const lastName = author.lastName || '';
-    const firstName = author.firstName || '';
-    
-    for (const [key, value] of Object.entries(authorMap)) {
-      if (value.lastName && value.lastName.toLowerCase() === lastName.toLowerCase()) {
-        // Coincidencia por apellido
-        if (value.firstName && value.firstName.toLowerCase().startsWith(firstName.toLowerCase().charAt(0))) {
-          console.log(`✅ Match por apellido + inicial: ${displayName}`);
-          return value;
-        }
-      }
-    }
-  }
-  
-  console.log(`❌ No se encontró match para: ${displayName}`);
-  return null;
-}
-
-// ========== FUNCIÓN PARA PROCESAR AUTORES CON ICONOS (MEJORADA) ==========
-// ========== FUNCIÓN PARA PROCESAR AUTORES CON ICONOS (MEJORADA CON IDIOMA) ==========
-function processAuthorsWithIcons(authors, article = null, lang = 'es') {
-  if (!authors) return 'Autor desconocido';
-  
-  let authorsArray = [];
-  if (typeof authors === 'string') {
-    authorsArray = authors.split(';').map(name => ({ name: name.trim() }));
-  } else if (Array.isArray(authors)) {
-    authorsArray = authors.map(a => {
-      if (typeof a === 'string') return { name: a };
-      return a; // ya es objeto
-    });
-  }
-  
-  const isSpanish = lang === 'es';
-  
-  const authorElements = authorsArray.map((author, index) => {
-    // Obtener nombre para mostrar
-    let displayName = '';
-    if (typeof author === 'string') {
-      displayName = author;
-    } else if (author.name) {
-      displayName = author.name;
-    } else if (author.firstName || author.lastName) {
-      displayName = `${author.firstName || ''} ${author.lastName || ''}`.trim();
-    } else {
-      displayName = 'Autor';
-    }
-    
-    // Obtener el authorId del artículo si existe
-    const articleAuthorId = article && article.authorIds ? article.authorIds[index] : null;
-    
-    // Buscar información del autor usando nuestra función de matching
-    const authorInfo = findAuthorInfo(author, articleAuthorId);
-    
-    // Construir HTML del autor
-    let authorHtml = '';
-    
-    if (authorInfo && authorInfo.slug) {
-      // Tiene slug, crear enlace - ¡VERSIÓN CORREGIDA PARA IDIOMA!
-      const authorFile = isSpanish ? `${authorInfo.slug}.html` : `${authorInfo.slug}.EN.html`;
-      authorHtml += `<a href="/team/${authorFile}" class="author-link"`;
-      
-      // Añadir atributos de datos para metadata
-      if (authorInfo.uid) {
-        authorHtml += ` data-author-uid="${authorInfo.uid}"`;
-      }
-      if (authorInfo.orcid) {
-        authorHtml += ` data-author-orcid="${authorInfo.orcid}"`;
-      }
-      
-      authorHtml += `>${displayName}</a>`;
-    } else {
-      // No tiene slug, solo texto
-      authorHtml += `<span class="author-name"`;
-      if (authorInfo && authorInfo.uid) {
-        authorHtml += ` data-author-uid="${authorInfo.uid}"`;
-      }
-      authorHtml += `>${displayName}</span>`;
-    }
-    
-    // Añadir iconos
-    const icons = [];
-    
-    // ORCID (verde) - Priorizar información del team.json
-    const orcid = (authorInfo && authorInfo.orcid) || author.orcid;
-    if (orcid && orcid.trim() !== '') {
-      icons.push(`<a href="https://orcid.org/${orcid}" target="_blank" rel="noopener noreferrer" class="author-icon orcid-icon" title="ORCID">${orcidSvg}</a>`);
-    }
-    
-    // Email (azul)
-    const email = (authorInfo && authorInfo.email) || author.email || author.publicEmail;
-    if (email && email.trim() !== '') {
-      icons.push(`<a href="mailto:${email}" class="author-icon email-icon" title="Email">${emailSvg}</a>`);
-    }
-    
-    if (icons.length > 0) {
-      authorHtml += `<span class="author-icons">${icons.join('')}</span>`;
-    }
-    
-    return authorHtml;
-  });
-  
-  return authorElements.join('<span class="author-separator">, </span>');
-}
-
-
-
-// ========== FUNCIÓN PARA PROCESAR TABLAS CON BOTONES DE DESCARGA (ACTUALIZADA CON MODELO) ==========
-function processTablesWithDownload($, html) {
-  if (!html) return html;
-  
-  // Resetear contador de tablas para cada artículo
-  resetTableCounter();
-  
-  let tableIndex = 0;
-  
-  $('table').each((i, el) => {
-    const $el = $(el);
-    tableIndex++;
-    const tableId = `table-${tableIndex}`;
-    $el.attr('id', tableId);
-    $el.addClass('article-table');
-    
-    // USAR EL MODELO INTERMEDIO - Parsear la tabla UNA vez
-    const tableModel = parseTable($, $el);
-    
-    // Generar todos los formatos usando el modelo
-    const csvContent = tableToCSV(tableModel);
-    const jsonContent = tableToJSON(tableModel);
-    const latexContent = tableToLaTeX(tableModel);
-    const xmlContent = tableToXML(tableModel);
-    
-    // Generar HTML de la tabla
-    const tableHtml = $.html($el);
-    
-    // Añadir BOM (Byte Order Mark) para UTF-8 en Excel
-    const BOM = '\uFEFF';
-    
-    // Crear el wrapper con botones
-    const tableWrapper = `
-    <div class="table-download-wrapper">
-      <div class="table-header">
-        <span class="table-label">Tabla ${tableIndex}</span>
-
-        <div class="table-download-buttons">
-          <!-- CSV -->
-          <a href="data:text/csv;charset=utf-8,${encodeURIComponent(BOM + csvContent)}"
-             download="tabla-${tableIndex}.csv"
-             class="table-download-btn"
-             title="Descargar como CSV">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="2"
-                 stroke-linecap="round" stroke-linejoin="round">
-              <path d="M9 12h6"/>
-              <path d="M9 16h6"/>
-              <path d="M9 8h3"/>
-              <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>
-              <path d="M14 2v6h6"/>
-            </svg>
-            <span>CSV</span>
-          </a>
-
-          <!-- Excel -->
-          <a href="data:application/vnd.ms-excel;charset=utf-8,${encodeURIComponent(BOM + tableHtml)}"
-             download="tabla-${tableIndex}.xls"
-             class="table-download-btn"
-             title="Descargar como Excel">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="2"
-                 stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <line x1="3" y1="9" x2="21" y2="9"/>
-              <line x1="3" y1="15" x2="21" y2="15"/>
-              <line x1="9" y1="3" x2="9" y2="21"/>
-              <line x1="15" y1="3" x2="15" y2="21"/>
-            </svg>
-            <span>Excel</span>
-          </a>
-
-          <!-- JSON -->
-          <a href="data:application/json;charset=utf-8,${encodeURIComponent(jsonContent)}"
-             download="tabla-${tableIndex}.json"
-             class="table-download-btn"
-             title="Descargar como JSON">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="2"
-                 stroke-linecap="round" stroke-linejoin="round">
-              <path d="M10 20c-1.5 0-2.5-1-2.5-2.5v-3.5c0-1-1-1.5-2-1.5s-2-.5-2-1.5v-1c0-1 1-1.5 2-1.5s2-.5 2-1.5v-3.5c0-1.5 1-2.5 2.5-2.5"/>
-              <path d="M14 4c1.5 0 2.5 1 2.5 2.5v3.5c0 1 1 1.5 2 1.5s2 .5 2 1.5v1c0 1-1 1.5-2 1.5s-2 .5-2 1.5v3.5c0 1.5-1 2.5-2.5 2.5"/>
-            </svg>
-            <span>JSON</span>
-          </a>
-
-          <!-- LaTeX -->
-          <a href="data:text/plain;charset=utf-8,${encodeURIComponent(latexContent)}"
-             download="tabla-${tableIndex}.tex"
-             class="table-download-btn"
-             title="Descargar como LaTeX">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="2"
-                 stroke-linecap="round" stroke-linejoin="round">
-              <path d="M19 4h-12l7 8-7 8h12"/>
-            </svg>
-            <span>LaTeX</span>
-          </a>
-
-          <!-- XML -->
-          <a href="data:application/xml;charset=utf-8,${encodeURIComponent(xmlContent)}"
-             download="tabla-${tableIndex}.xml"
-             class="table-download-btn"
-             title="Descargar como XML">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="2"
-                 stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="16 18 22 12 16 6"/>
-              <polyline points="8 6 2 12 8 18"/>
-            </svg>
-            <span>XML</span>
-          </a>
-        </div>
-      </div>
-
-      <div class="table-wrapper">
-        ${$.html($el)}
-      </div>
-    </div>
-    `;
-    
-    $el.replaceWith(tableWrapper);
-  });
-  
-  return $.html();
-}
-
-// ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML (CORREGIDA) ==========
-function processCodeBlocks(html) {
-  if (!html) return html;
-  
-  // Limpiar basura de documento
-  let cleanedHtml = html
-    .replace(/<!DOCTYPE[^>]*>/gi, '')
-    .replace(/<html[^>]*>/gi, '')
-    .replace(/<\/html>/gi, '')
-    .replace(/<head[^>]*>/gi, '')
-    .replace(/<\/head>/gi, '')
-    .replace(/<body[^>]*>/gi, '')
-    .replace(/<\/body>/gi, '');
-  
-  const $ = cheerio.load(cleanedHtml, { decodeEntities: false });
-  let codeIndex = 0;
-  
-  // Procesar SOLO bloques de código, sin afectar listas
-  $('pre').each((i, el) => {
-    const $el = $(el);
-    
-    // Evitar reprocesar si ya tiene wrapper
-    if ($el.parent().hasClass('code-block-wrapper')) {
-      return;
-    }
-    
-    // Buscar el elemento code dentro
-    let $codeElement = $el.find('code').first();
-    let code;
-    let language = '';
-    
-    if ($codeElement.length > 0) {
-      code = $codeElement.text();
-      const classAttr = $codeElement.attr('class') || '';
-      if (classAttr.includes('language-')) {
-        language = classAttr.split('language-')[1].split(' ')[0];
-      } else if (classAttr.includes('lang-')) {
-        language = classAttr.split('lang-')[1].split(' ')[0];
-      }
-    } else {
-      code = $el.text();
-    }
-    
-    const lines = code.split('\n');
-    const lineCount = lines.length;
-    
-    // Generar números de línea
-    let lineNumbersHtml = '';
-    for (let i = 1; i <= lineCount; i++) {
-      lineNumbersHtml += `<span class="code-line-number">${i}</span>`;
-    }
-    
-    codeIndex++;
-    const codeId = `code-${codeIndex}`;
-    
-    // Escapar código y envolver cada línea
-    const escapedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const wrappedLines = lines.map(line => 
-      `<span class="line">${line || ' '}</span>`
-    ).join('\n');
-    
-    const copySvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
-    
-    const codeHtml = `
-<div class="code-block-wrapper" id="${codeId}">
-  <div class="code-header">
-    <span class="code-language">${language || 'código'}</span>
-    <button class="code-copy-btn" onclick="copyCode('${codeId}', this)" title="Copiar código (Ctrl+C)">
-      ${copySvg}
-      <span class="copy-text">Copiar</span>
-    </button>
-  </div>
-  <div class="code-block-container">
-    <div class="code-line-numbers" aria-hidden="true">
-      ${lineNumbersHtml}
-    </div>
-    <pre class="code-block ${language ? `language-${language}` : ''}"><code class="${language ? `language-${language}` : ''}">${wrappedLines}</code></pre>
-  </div>
-</div>`;
-    
-    $el.replaceWith(codeHtml);
-  });
-  
-  let processedHtml = $.html();
-  
-  // Procesar tablas DESPUÉS del código (no antes)
-  const $2 = cheerio.load(processedHtml, { decodeEntities: false });
-  processedHtml = processTablesWithDownload($2, processedHtml);
-  
-  // Procesar imágenes y ecuaciones
-  const $3 = cheerio.load(processedHtml, { decodeEntities: false });
-  
-  let figureIndex = 0;
-  $3('img').each((i, el) => {
-    const $el = $3(el);
-    const alt = $el.attr('alt') || '';
-    const src = $el.attr('src') || '';
-    const style = $el.attr('style') || '';
-    const align = $el.attr('align') || '';
-    
-    if (src && !src.startsWith('http') && !src.startsWith('data:')) {
-      $el.attr('src', src);
-    }
-    
-    $el.addClass('article-image');
-    
-    let floatClass = '';
-    if (style.includes('float: left') || align === 'left') {
-      floatClass = ' float-left';
-    } else if (style.includes('float: right') || align === 'right') {
-      floatClass = ' float-right';
-    }
-    
-    figureIndex++;
-    const figureId = `figure-${figureIndex}`;
-    
-    if (src) {
-      $el.wrap(`<a href="${src}" target="_blank" rel="noopener noreferrer" class="image-link"></a>`);
-    }
-    
-    if (alt) {
-      $el.parent().wrap(`<figure class="image-figure${floatClass}" id="${figureId}"></figure>`);
-      $el.parent().after(`<figcaption class="image-caption">${alt}</figcaption>`);
-    } else {
-      $el.parent().wrap(`<figure class="image-figure${floatClass}" id="${figureId}"></figure>`);
-    }
-  });
-  
-  let equationIndex = 0;
-  $3('.MathJax_Display, .math-container').each((i, el) => {
-    const $el = $3(el);
-    equationIndex++;
-    const equationId = `equation-${equationIndex}`;
-    $el.attr('id', equationId);
-  });
-  
-  return $3.html();
-}
-// ========== FUNCIÓN PRINCIPAL ==========
-async function generateAll() {
-  console.log('🚀 Iniciando generación de artículos estáticos...');
-  
-  try {
-    // 1. Leer articles.json
-    if (!fs.existsSync(ARTICLES_JSON)) {
-      throw new Error(`No se encuentra ${ARTICLES_JSON}`);
-    }
-    
-    const articles = JSON.parse(fs.readFileSync(ARTICLES_JSON, 'utf8'));
-    console.log(`📄 ${articles.length} artículos cargados`);
-
-    // 2. Cargar team.json desde la URL para slugs de autores
-    await loadTeamData();
-
-    // 3. Generar HTML para cada artículo
-    for (const article of articles) {
-      await generateArticleHtml(article);
-    }
-
-    // 4. Generar índices
-    generateIndexes(articles);
-
-    console.log('🎉 ¡Proceso completado con éxito!');
-    
-  } catch (err) {
-    console.error('❌ Error:', err);
-    process.exit(1);
-  }
-}
-
-async function generateArticleHtml(article) {
-  // Procesar autores para meta tags de citación
-  let authorsList = [];
-  if (typeof article.autores === 'string') {
-    authorsList = article.autores.split(';').map(a => formatAuthorForCitation(a));
-  } else if (Array.isArray(article.autores)) {
-    authorsList = article.autores.map(a => formatAuthorForCitation(a));
-  }
-  const authorMetaTags = authorsList.map(author => `<meta name="citation_author" content="${author}">`).join('\n');
-  
-  const articleSlug = article.permalink || `${generateSlug(article.titulo)}-${article.numeroArticulo}`;
-
-  // Construir autores con iconos - AHORA PASAMOS EL ARTÍCULO COMPLETO
-  const authorsDisplayEs = processAuthorsWithIcons(article.autores, article, 'es');
-  const authorsDisplayEn = processAuthorsWithIcons(article.autores, article, 'en');
-  const finalAuthorsDisplay = formatAuthorsDisplay(article.autores, 'es');
-  const authorsAPA = formatAuthorsAPA(article.autores);
-  const authorsChicagoEs = formatAuthorsChicagoOrMLA(article.autores, 'es');
-  const authorsMLAEs = formatAuthorsChicagoOrMLA(article.autores, 'es');
-  const authorsChicagoEn = formatAuthorsChicagoOrMLA(article.autores, 'en');
-  const authorsMLAEn = formatAuthorsChicagoOrMLA(article.autores, 'en');
-  const year = new Date(article.fecha).getFullYear();
-  const tipoEs = article.tipo || 'Artículo de Investigación';
-  const typeEn = article.type || 'Research Article';
-  const bibtex = generateBibTeX(article);
-  
-  // Procesar abstracts con párrafos
-  const resumenParagraphs = (article.resumen || '').split('\n\n').map(p => `<p class="abstract-text">${p}</p>`).join('');
-  const abstractParagraphs = (article.abstract || '').split('\n\n').map(p => `<p class="abstract-text">${p}</p>`).join('');
-
-  // Procesar HTML del artículo (con bloques de código, tablas, etc.)
-  const processedHtmlEs = processCodeBlocks(article.html_es || '');
-  const processedHtmlEn = processCodeBlocks(article.html_en || '');
-
-  // Procesar referencias
-  const referencesHtml = (() => {
-    if (!article.referencias) return '<p>No hay referencias disponibles.</p>';
-    
-    if (article.referencias.includes('<div class="references-list">')) {
-      return article.referencias;
-    }
-    
-    const refItems = article.referencias.split('\n').filter(line => line.trim());
-    if (refItems.length) {
-      const items = refItems.map(ref => {
-        const idMatch = ref.match(/id="([^"]+)"/);
-        const id = idMatch ? idMatch[1] : '';
-        return `<div class="reference-item"${id ? ` id="${id}"` : ''}>${ref}</div>`;
-      }).join('');
-      return `<div class="references-list">${items}</div>`;
-    }
-    
-    return '<p>No hay referencias disponibles.</p>';
-  })();
-
-  // ========== HTML ESPAÑOL ==========
-  const htmlContentEs = generateHtmlTemplate({
-    lang: 'es',
-    article,
-    articleSlug,
-    authorMetaTags,
-    authorsDisplay: authorsDisplayEs,
-    finalAuthorsDisplay,
-    authorsAPA,
-    authorsChicagoEs,
-    authorsMLAEs,
-    authorsChicagoEn,
-    authorsMLAEn,
-    year,
-    tipoEs,
-    typeEn,
-    bibtex,
-    resumenParagraphs,
-    abstractParagraphs,
-    referencesHtml,
-    htmlContent: processedHtmlEs,
-    domain: DOMAIN,
-    oaSvg,
-    orcidSvg,
-    emailSvg,
-    ccLogoSvg
-  });
-
-  const filePathEs = path.join(OUTPUT_HTML_DIR, `article-${articleSlug}.html`);
-  fs.writeFileSync(filePathEs, htmlContentEs, 'utf8');
-  console.log(`✅ Generado: ${filePathEs}`);
-
-  // ========== HTML INGLÉS ==========
-  const htmlContentEn = generateHtmlTemplate({
-    lang: 'en',
-    article,
-    articleSlug,
-    authorMetaTags,
-    authorsDisplay: authorsDisplayEn,
-    finalAuthorsDisplay,
-    authorsAPA,
-    authorsChicagoEs,
-    authorsMLAEs,
-    authorsChicagoEn,
-    authorsMLAEn,
-    year,
-    tipoEs,
-    typeEn,
-    bibtex,
-    resumenParagraphs,
-    abstractParagraphs,
-    referencesHtml,
-    htmlContent: processedHtmlEn,
-    domain: DOMAIN,
-    oaSvg,
-    orcidSvg,
-    emailSvg,
-    ccLogoSvg
-  });
-
-  const filePathEn = path.join(OUTPUT_HTML_DIR, `article-${articleSlug}EN.html`);
-  fs.writeFileSync(filePathEn, htmlContentEn, 'utf8');
-  console.log(`✅ Generado: ${filePathEn}`);
-}
-
-function generateHtmlTemplate({
-  lang,
-  article,
-  articleSlug,
-  authorMetaTags,
-  authorsDisplay,
-  finalAuthorsDisplay,
-  authorsAPA,
-  authorsChicagoEs,
-  authorsMLAEs,
-  authorsChicagoEn,
-  authorsMLAEn,
-  year,
-  tipoEs,
-  typeEn,
-  bibtex,
-  resumenParagraphs,
-  abstractParagraphs,
-  referencesHtml,
-  htmlContent,
-  domain,
-  oaSvg,
-  orcidSvg,
-  emailSvg,
-  ccLogoSvg
-}) {
-  const isSpanish = lang === 'es';
-  
-  // Título y metadatos según idioma - LÓGICA MEJORADA PARA TÍTULOS BILINGÜES
-  // Determinar títulos disponibles
-  const hasSpanishTitle = article.titulo && article.titulo.trim() !== '';
-  const hasEnglishTitle = article.tituloEnglish && article.tituloEnglish.trim() !== '';
-  
-  // Título principal según idioma actual
-  let title = '';
-  let altTitle = '';
-  
-  if (isSpanish) {
-    // Versión en español
-    title = hasSpanishTitle ? article.titulo : (hasEnglishTitle ? article.tituloEnglish : '');
-    
-    // Título alternativo (solo si hay título en inglés)
-    if (hasEnglishTitle && hasSpanishTitle) {
-      altTitle = article.tituloEnglish;
-    }
-  } else {
-    // Versión en inglés
-    title = hasEnglishTitle ? article.tituloEnglish : (hasSpanishTitle ? article.titulo : '');
-    
-    // Título alternativo (solo si hay título en español)
-    if (hasSpanishTitle && hasEnglishTitle) {
-      altTitle = article.titulo;
-    }
-  }
-  
-  const articleType = isSpanish ? tipoEs : typeEn;
-  const abstractContent = isSpanish ? resumenParagraphs : abstractParagraphs;
-  const altAbstract = isSpanish ? abstractParagraphs : resumenParagraphs;
-  const keywords = isSpanish ? (article.palabras_clave || []) : (article.keywords_english || []);
-  const funding = isSpanish ? article.funding : article.fundingEnglish;
-  const conflicts = isSpanish ? article.conflicts : article.conflictsEnglish;
-  const acknowledgments = isSpanish ? article.acknowledgments : article.acknowledgmentsEnglish;
-  const authorCredits = isSpanish ? article.authorCredits : article.authorCreditsEnglish;
-  const dataAvailability = isSpanish ? article.dataAvailability : article.dataAvailabilityEnglish;
-  const fecha = isSpanish ? formatDateEs(article.fecha) : formatDateEn(article.fecha);
-  const receivedDate = isSpanish ? formatDateEs(article.receivedDate) : formatDateEn(article.receivedDate);
-  const acceptedDate = isSpanish ? formatDateEs(article.acceptedDate) : formatDateEn(article.acceptedDate);
-
-  // Textos según idioma
-  const texts = {
-    es: {
-      backToCatalog: 'Volver al catálogo',
-      backToHome: 'Volver al inicio',
-      viewOtherLang: 'View in English',
-      abstract: 'Resumen',
-      viewAbstract: 'Ver abstract en inglés / View English abstract',
-      references: 'Referencias',
-      acknowledgments: 'Agradecimientos',
-      funding: 'Financiamiento',
-      dataAvailability: 'Disponibilidad de datos',
-      authorContributions: 'Contribución de autores',
-      conflictOfInterest: 'Conflicto de intereses',
-      pdfPreview: 'Visualización del PDF',
-      viewFullScreen: 'Ver en pantalla completa',
-      downloadPDF: 'Descargar PDF',
-      howToCite: 'Cómo citar',
-      information: 'Información',
-      keywords: 'Palabras clave',
-      articleInfo: 'Información del artículo',
-      received: 'Recibido',
-      accepted: 'Aceptado',
-      published: 'Publicado',
-      area: 'Área',
-      fundingLabel: 'Financiación',
-      copy: 'Copiar',
-      copied: '✓ Copiado con formato',
-      downloadBibTeX: 'Descargar BibTeX',
-      contents: 'CONTENIDO',
-      copyCode: 'Copiar código',
-      codeCopied: '✓ Copiado',
-      license: 'Licencia',
-      contact: 'Contacto'
-    },
-    en: {
-      backToCatalog: 'Back to catalog',
-      backToHome: 'Back to home',
-      viewOtherLang: 'Ver en español',
-      abstract: 'Abstract',
-      viewAbstract: 'Ver resumen en español / View Spanish abstract',
-      references: 'References',
-      acknowledgments: 'Acknowledgments',
-      funding: 'Funding',
-      dataAvailability: 'Data availability',
-      authorContributions: 'Author contributions',
-      conflictOfInterest: 'Conflict of interest',
-      pdfPreview: 'PDF Preview',
-      viewFullScreen: 'View Full Screen',
-      downloadPDF: 'Download PDF',
-      howToCite: 'How to cite',
-      information: 'Information',
-      keywords: 'Keywords',
-      articleInfo: 'Article Information',
-      received: 'Received',
-      accepted: 'Accepted',
-      published: 'Published',
-      area: 'Area',
-      fundingLabel: 'Funding',
-      copy: 'Copy',
-      copied: '✓ Copied!',
-      downloadBibTeX: 'Download BibTeX',
-      contents: 'CONTENTS',
-      copyCode: 'Copy code',
-      codeCopied: '✓ Copied',
-      license: 'License',
-      contact: 'Contact'
-    }
-  };
-
-  const t = texts[lang];
-
-  return `<!DOCTYPE html>
-<html lang="${lang}">
+<!DOCTYPE html>
+<html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-  <meta name="citation_title" content="${title.replace(/"/g, '&quot;')}">
-  ${authorMetaTags}
-  <meta name="citation_publication_date" content="${article.fecha}">
+  <meta name="citation_title" content="Impacto Sociodemográfico de las Políticas de Reforma Agraria en el Valle del Aconcagua">
+  <meta name="citation_author" content="Cea, Pascal">
+  <meta name="citation_publication_date" content="2025-11-10">
   <meta name="citation_journal_title" content="Revista Nacional de las Ciencias para Estudiantes">
   <meta name="citation_issn" content="3087-2839">
-  <meta name="citation_volume" content="${article.volumen}">
-  <meta name="citation_issue" content="${article.numero}">
-  <meta name="citation_firstpage" content="${article.primeraPagina}">
-  <meta name="citation_lastpage" content="${article.ultimaPagina}">
-  <meta name="citation_pdf_url" content="${article.pdfUrl}">
-  <meta name="citation_abstract_html_url" content="${domain}/articles/article-${articleSlug}${isSpanish ? '' : 'EN'}.html">
-  <meta name="citation_abstract" content="${(isSpanish ? article.resumen : article.abstract).replace(/"/g, '&quot;').substring(0, 500)}">
-  <meta name="citation_keywords" content="${keywords.join('; ')}">
-  <meta name="citation_language" content="${lang}">
-  <meta name="description" content="${(isSpanish ? article.resumen : article.abstract).replace(/"/g, '&quot;').substring(0, 160)}...">
-  <meta name="keywords" content="${keywords.join(', ')}">
-  <title>${title.replace(/"/g, '&quot;')} - Revista Nacional de las Ciencias para Estudiantes</title>
+  <meta name="citation_volume" content="1">
+  <meta name="citation_issue" content="1">
+  <meta name="citation_firstpage" content="1">
+  <meta name="citation_lastpage" content="11">
+  <meta name="citation_pdf_url" content="https://www.revistacienciasestudiantes.com/Articles/Article-impacto-sociodemografico-de-las-politicas-de-reforma-agraria-en-el-valle-del-aconcagua-1.pdf">
+  <meta name="citation_abstract_html_url" content="https://www.revistacienciasestudiantes.com/articles/article-impacto-sociodemografico-de-las-politicas-de-reforma-agraria-en-el-valle-del-aconcagua-1.html">
+  <meta name="citation_abstract" content="El estudio analiza el proceso de la Reforma Agraria en el Valle del Aconcagua, Chile, con el objetivo de evaluar su impacto socioeconómico y cultural. Se examina la transformación de las familias terratenientes, marcadas por la pérdida y eventual recuperación de tierras, y del campesinado, que transitó desde el inquilinaje hacia la propiedad agrícola. Los resultados muestran que la Reforma no solo implicó la redistribución de tierras, sino también una reconfiguración de las relaciones sociales, ">
+  <meta name="citation_keywords" content="Reforma Agraria; Valle del Aconcagua; Propiedad de la Tierra; Transformación Social; Estructuras Agrarias; Siglo XX">
+  <meta name="citation_language" content="es">
+  <meta name="description" content="El estudio analiza el proceso de la Reforma Agraria en el Valle del Aconcagua, Chile, con el objetivo de evaluar su impacto socioeconómico y cultural. Se examin...">
+  <meta name="keywords" content="Reforma Agraria, Valle del Aconcagua, Propiedad de la Tierra, Transformación Social, Estructuras Agrarias, Siglo XX">
+  <title>Impacto Sociodemográfico de las Políticas de Reforma Agraria en el Valle del Aconcagua - Revista Nacional de las Ciencias para Estudiantes</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,700;1,700&family=JetBrains+Mono&family=Lora:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
@@ -3385,14 +2082,11 @@ body {
     }
 
     .citation-item {
-    position: relative;
-    padding: 0.75rem 0;
-    border-bottom: 1px solid var(--border-color);
-    font-size: 0.8rem;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    word-break: break-all;
-}
+      position: relative;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.8rem;
+    }
 
     .citation-item:last-child {
       border-bottom: none;
@@ -3713,48 +2407,6 @@ body {
     max-width: 100%;
   }
     }
-  /* ===== KEYWORDS: SOPORTE DUAL (LEGACY + CONTROLADO) ===== */
-.keyword-tag.keyword-controlled {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 8px;
-    background: white;
-    border: 1px solid #c0a86a;
-    border-radius: 4px;
-    font-size: 0.7rem;
-    font-family: 'Inter', sans-serif;
-}
-
-.keyword-code {
-    font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
-    font-size: 0.65rem;
-    font-weight: 700;
-    color: #0A1929;
-    background: #f0f4f8;
-    padding: 1px 5px;
-    border-radius: 3px;
-    letter-spacing: 0.02em;
-}
-
-.keyword-term {
-    color: var(--text-light);
-    font-weight: 400;
-}
-
-/* Ajuste responsive para keywords controladas */
-@media (max-width: 600px) {
-    .keyword-tag.keyword-controlled {
-        font-size: 0.65rem;
-        padding: 3px 6px;
-        gap: 3px;
-    }
-    
-    .keyword-code {
-        font-size: 0.6rem;
-        padding: 1px 4px;
-    }
-}
     /* ===== CORRECCIONES PARA DOI ===== */
 /* 1. Estilo en la meta-box (debajo del título) */
 .meta-doi-wrapper {
@@ -3886,9 +2538,9 @@ body {
   <div class="sd-header-top">
     <div class="sd-brand-container">
       <a href="/" class="sd-journal-logo">
-        <img src="${isSpanish ? LOGO_ES : LOGO_EN}" alt="Logo ${isSpanish ? 'RNCE' : 'TNRSFS'}" class="sd-logo-img">
+        <img src="https://www.revistacienciasestudiantes.com/assets/logo.png" alt="Logo RNCE" class="sd-logo-img">
         <div class="sd-journal-titles">
-          <span class="sd-journal-name">${isSpanish ? JOURNAL_NAME_ES : JOURNAL_NAME_EN}</span>
+          <span class="sd-journal-name">Revista Nacional de las Ciencias para Estudiantes</span>
           <span class="sd-issn">ISSN: 3087-2839</span>
         </div>
       </a>
@@ -3900,19 +2552,19 @@ body {
         <svg class="sd-search-icon" viewBox="0 0 24 24" width="18" height="18">
           <path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
         </svg>
-        <input type="text" id="search-input" placeholder="${isSpanish ? 'Buscar artículos, autores...' : 'Search articles, authors...'}" aria-label="Buscar">
+        <input type="text" id="search-input" placeholder="Buscar artículos, autores..." aria-label="Buscar">
       </form>
     </div>
     
     <!-- User Nav - Solo visible en desktop -->
     <div class="sd-user-nav">
-      <a href="${isSpanish ? '/submit' : '/en/submit'}" class="sd-nav-link">${isSpanish ? 'Envíos' : 'Submissions'}</a>
-      <a href="${isSpanish ? '/faq' : '/en/faq'}" class="sd-nav-link">${isSpanish ? 'Ayuda' : 'Help'}</a>
-      <a href="${isSpanish ? '/login' : '/en/login'}" class="sd-nav-link sd-account">
+      <a href="/submit" class="sd-nav-link">Envíos</a>
+      <a href="/faq" class="sd-nav-link">Ayuda</a>
+      <a href="/login" class="sd-nav-link sd-account">
         <svg viewBox="0 0 24 24" width="18" height="18">
           <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
         </svg>
-        ${isSpanish ? 'Mi cuenta' : 'My account'}
+        Mi cuenta
       </a>
     </div>
     
@@ -3938,7 +2590,7 @@ body {
 <!-- Menú móvil -->
 <div class="sd-mobile-menu" id="mobileMenu">
   <div class="sd-mobile-menu-header">
-    <span class="sd-mobile-menu-title">${isSpanish ? 'MENÚ DEL ARTÍCULO' : 'ARTICLE MENU'}</span>
+    <span class="sd-mobile-menu-title">MENÚ DEL ARTÍCULO</span>
     <button class="sd-mobile-close-btn" onclick="closeMobileMenu()">
       <svg viewBox="0 0 24 24">
         <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
@@ -3952,13 +2604,13 @@ body {
       <svg width="16" height="16" viewBox="0 0 24 24">
         <path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
       </svg>
-      <input type="text" id="mobile-search-input" placeholder="${isSpanish ? 'Buscar artículos...' : 'Search articles...'}" aria-label="Buscar" value="${isSpanish ? 'busca autores, artículos, etc...' : 'search authors, articles, etc...'}">
+      <input type="text" id="mobile-search-input" placeholder="Buscar artículos..." aria-label="Buscar" value="busca autores, artículos, etc...">
     </form>
   </div>
   
   <!-- Sección 1: CONTENIDO DEL ARTÍCULO (Tabla de contenidos) -->
   <div class="sd-mobile-nav-section">
-    <div class="sd-mobile-nav-section-title">${t.contents}</div>
+    <div class="sd-mobile-nav-section-title">CONTENIDO</div>
     <ul class="sd-mobile-nav-items" id="mobile-toc-list">
       <!-- Los elementos se generarán dinámicamente con JavaScript -->
       <li class="sd-mobile-nav-item">
@@ -3966,7 +2618,7 @@ body {
           <svg viewBox="0 0 24 24" width="20" height="20">
             <path d="M4 6H20v2H4zM4 12H20v2H4zM4 18H20v2H4z"/>
           </svg>
-          ${t.abstract}
+          Resumen
         </a>
       </li>
       <!-- Más elementos se añadirán vía JS -->
@@ -3975,30 +2627,30 @@ body {
   
   <!-- Sección 2: ENLACES DE USUARIO (Solo Envíos, Ayuda, Mi cuenta) -->
   <div class="sd-mobile-nav-section">
-    <div class="sd-mobile-nav-section-title">${isSpanish ? 'MI CUENTA' : 'MY ACCOUNT'}</div>
+    <div class="sd-mobile-nav-section-title">MI CUENTA</div>
     <ul class="sd-mobile-nav-items">
       <li class="sd-mobile-nav-item">
-        <a href="${isSpanish ? '/submit' : '/en/submit'}" class="sd-mobile-nav-link">
+        <a href="/submit" class="sd-mobile-nav-link">
           <svg viewBox="0 0 24 24" width="20" height="20">
             <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
           </svg>
-          ${isSpanish ? 'Envíos' : 'Submissions'}
+          Envíos
         </a>
       </li>
       <li class="sd-mobile-nav-item">
-        <a href="${isSpanish ? '/faq' : '/en/faq'}" class="sd-mobile-nav-link">
+        <a href="/faq" class="sd-mobile-nav-link">
           <svg viewBox="0 0 24 24" width="20" height="20">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2-7h-2v-2h2v2zm-4 0h-2v-2h2v2zm0-4h-2V6h2v2z"/>
           </svg>
-          ${isSpanish ? 'Ayuda' : 'Help'}
+          Ayuda
         </a>
       </li>
       <li class="sd-mobile-nav-item">
-        <a href="${isSpanish ? '/login' : '/en/login'}" class="sd-mobile-nav-link">
+        <a href="/login" class="sd-mobile-nav-link">
           <svg viewBox="0 0 24 24" width="20" height="20">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
           </svg>
-          ${isSpanish ? 'Mi cuenta' : 'My account'}
+          Mi cuenta
         </a>
       </li>
     </ul>
@@ -4008,7 +2660,7 @@ body {
   <div class="sd-mobile-menu-footer">
     <div>ISSN: 3087-2839</div>
     <div style="margin-top: 0.5rem; font-size: 0.7rem;">
-      &copy; ${new Date().getFullYear()} ${isSpanish ? 'RNCE' : 'TNRSFS'}
+      &copy; 2026 RNCE
     </div>
   </div>
 </div>
@@ -4016,7 +2668,7 @@ body {
   <div class="main-wrapper">
     <!-- Left Sidebar - Table of Contents -->
     <nav class="toc-sidebar">
-      <div class="toc-title">${t.contents}</div>
+      <div class="toc-title">CONTENIDO</div>
       <ul class="toc-list" id="toc-list"></ul>
     </nav>
 
@@ -4024,46 +2676,52 @@ body {
     <main class="article-container">
       <article>
         <header class="article-header">
-          <div class="article-type">${articleType}</div>
+          <div class="article-type">Artículo de Investigación</div>
           
           <!-- Título bilingüe - LÓGICA MEJORADA -->
-          <h1 id="main-title">${title}</h1>
-          ${altTitle ? `
-          <div class="alt-title-container">
-            <span class="alt-title" title="${isSpanish ? 'Título en inglés / English title' : 'Título en español / Spanish title'}">${altTitle}</span>
-          </div>
-          ` : ''}
+          <h1 id="main-title">Impacto Sociodemográfico de las Políticas de Reforma Agraria en el Valle del Aconcagua</h1>
+          
 
           <div class="authors">
-            ${authorsDisplay}
+            <a href="/team/pascal-cea.html" class="author-link" data-author-uid="LbeObFgrZgdyKQmUgldPmjnh8Sj1">Pascal Cea</a><span class="author-icons"><a href="mailto:pascalcea08@gmail.com" class="author-icon email-icon" title="Email"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; color: #005a7d;">
+  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+  <polyline points="22,6 12,13 2,6"></polyline>
+</svg></a></span>
           </div>
 
           <!-- ===== META BOX CORREGIDA CON DOI ===== -->
           <div class="meta-box">
-            <span>Vol. ${article.volumen}, ${isSpanish ? 'Núm.' : 'No.'} ${article.numero}</span>
-            <span>pp. ${article.primeraPagina}-${article.ultimaPagina}</span>
-            <span>${fecha}</span>
-            ${article.doi ? `
-            <span class="meta-doi-wrapper">
-              <span class="meta-doi-label">DOI:</span>
-              <a href="https://doi.org/${article.doi}" target="_blank" rel="noopener noreferrer" class="meta-doi-link">
-                https://doi.org/${article.doi}
-              </a>
-            </span>
-            ` : ''}
+            <span>Vol. 1, Núm. 1</span>
+            <span>pp. 1-11</span>
+            <span>10-11-2025</span>
+            
           </div>
 
           <!-- Action Bar -->
           <div class="action-bar">
-            <a href="${article.pdfUrl}" target="_blank" rel="noopener noreferrer" class="btn-pdf">
+            <a href="https://www.revistacienciasestudiantes.com/Articles/Article-impacto-sociodemografico-de-las-politicas-de-reforma-agraria-en-el-valle-del-aconcagua-1.pdf" target="_blank" rel="noopener noreferrer" class="btn-pdf">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
                 <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
               </svg>
-              ${isSpanish ? 'Abrir PDF' : 'Open PDF'}
+              Abrir PDF
             </a>
             <span class="oa-label">
-              ${oaSvg}
+              <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="72" height="72" viewBox="90 50 500 260" style="vertical-align: middle;">
+  <g transform="matrix(1.25 0 0 -1.25 0 360)">
+    <defs>
+      <path id="a" d="M-90-36h900v360H-90z"/>
+    </defs>
+    <clipPath id="b">
+      <use xlink:href="#a" overflow="visible"/>
+    </clipPath>
+    <g clip-path="url(#b)">
+      <path d="M720-3H0v294.285h720V-3z" fill="#fff"/>
+      <path d="M262.883 200.896v-8.846h25.938v8.846c0 21.412 17.421 38.831 38.831 38.831 21.409 0 38.829-17.419 38.829-38.831v-63.985h25.939v63.985c0 35.713-29.056 64.769-64.768 64.769-35.711 0-64.769-29.056-64.769-64.769M349.153 99.568c0-11.816-9.58-21.396-21.399-21.396-11.818 0-21.398 9.58-21.398 21.396 0 11.823 9.58 21.404 21.398 21.404 11.819 0 21.399-9.581 21.399-21.404" fill="#f68212"/>
+      <path d="M277.068 99.799c0 27.811 22.627 50.436 50.438 50.436 27.809 0 50.433-22.625 50.433-50.436 0-27.809-22.624-50.438-50.433-50.438-27.811.001-50.438 22.63-50.438 50.438m-25.938 0c0-42.109 34.265-76.373 76.375-76.373 42.111 0 76.373 34.265 76.373 76.373 0 42.113-34.262 76.375-76.373 76.375-42.11 0-76.375-34.262-76.375-76.375" fill="#f68212"/>
+    </g>
+  </g>
+</svg>
               Open Access
             </span>
           </div>
@@ -4071,79 +2729,317 @@ body {
 
         <!-- Abstract Section -->
         <section id="abstract">
-          <h2>${t.abstract}</h2>
+          <h2>Resumen</h2>
           <div class="abstract-container">
             <div class="abstract-text">
-              ${abstractContent}
+              <p class="abstract-text">El estudio analiza el proceso de la Reforma Agraria en el Valle del Aconcagua, Chile, con el objetivo de evaluar su impacto socioeconómico y cultural. Se examina la transformación de las familias terratenientes, marcadas por la pérdida y eventual recuperación de tierras, y del campesinado, que transitó desde el inquilinaje hacia la propiedad agrícola. Los resultados muestran que la Reforma no solo implicó la redistribución de tierras, sino también una reconfiguración de las relaciones sociales, la identidad campesina y las formas de organización comunitaria. Se concluye que este proceso constituyó un momento importante en la historia agraria chilena y dejó un legado estructural en el espacio rural.</p>
             </div>
             
-            ${altAbstract ? `
+            
             <details class="abstract-toggle">
-              <summary>${t.viewAbstract}</summary>
+              <summary>Ver abstract en inglés / View English abstract</summary>
               <div class="abstract-toggle-content">
-                ${altAbstract}
+                <p class="abstract-text">This study analyzes the Agrarian Reform process in the Aconcagua Valley, Chile, aiming to evaluate its socioeconomic and cultural impact. It examines the transformation of landowner families, marked by the loss and eventual recovery of lands, and the peasantry, which transitioned from tenancy to agricultural ownership.
+The results show that the Reform not only involved land redistribution but also a reconfiguration of social relations, peasant identity, and forms of community organization. It is concluded that this process was a significant moment in Chilean agrarian history and left a structural legacy in the rural landscape.</p>
               </div>
             </details>
-            ` : ''}
+            
           </div>
         </section>
 
         <!-- Full Article Content -->
         <section id="full-text" class="article-content">
-          ${htmlContent || '<p>El texto completo estará disponible próximamente.</p>'}
+          <html><head></head><body><h2>Introducción</h2>
+
+<h3>Latifundio y Hacienda Chilena del siglo XX</h3>
+
+<p>Para comenzar con este artículo, se intentará resumir el planteamiento principal y la problemática que abordaremos. El latifundio chileno fue la estructura agrícola que se estaba ocupando en Chile hacía más de 300 años:</p>
+
+<blockquote>La Hacienda, en cuanto sistema productivo, pero también como estructura de dominación y subordinación, determinó la Historia de Chile hasta la segunda parte del siglo XX. <a href="#ref-theza2017" class="citation-link">(Theza, Cáceres, and Jiménez 2017, 141)</a>.</blockquote>
+
+<p>Por lo que el campesinado, harto del abuso y el aprovechamiento que sufría, fue en busca de apoyo a la acomplejada clase política. Esta, exceptuando algunos sectores, tomaron de las quejumbres del campesinado y formaron a este parte de su campaña y comenzaron una serie de peticiones que buscaban favorecer al inquilino. La reforma agraria llega como una especie de salvavidas para todas esas familias rurales que no habían logrado una transición o migración campo-ciudad y seguían viviendo en el precario y poco regulado campo chileno. Toda esta problemática la ubicamos en la zona central, más específicamente en el Valle del Aconcagua, el cual fue uno de los más afectados por la dependencia de la agricultura que históricamente ha tenido.</p>
+
+<p>La producción agrícola chilena se sustentaba gracias a los principales latifundios, que se encontraban en cada región del país. Estos eran extensiones de tierra inmensas. Según estableció la reforma agraria: era latifundio cualquier predio con mínimo 80 Hectáreas de Riego Básica (HRB). Estos latifundios eran propiedad de las familias terratenientes importantes o elitistas de la época, por lo que la organización de estos predios era bastante tradicional, conservadora, esclavizadora y hasta hostil:</p>
+
+<blockquote>había aproximadamente 1,8 millones de personas que trabajaban en el campo como inquilinos; 10 mil latifundios representaban el 78 por ciento de la superficie agrícola, mientras que las pequeñas explotaciones campesinas sólo disponían del 8,5 por ciento. <a href="#ref-escobar2017" class="citation-link">(Escobar 2017)</a>.</blockquote>
+
+<p>El latifundio general tenía una estructura muy marcada, partiendo por la pirámide social del predio, esta misma era encabezada por el dueño del predio o latifundista y su familia, luego venía el administrador del latifundio y su familia, y por último venían todos los inquilinos o peones de este. Luego viene la organización dentro del predio, puesto que a los trabajadores no se les pagaba con un sueldo ni con dinero, sino que se usaba el sistema de regalías. Este sistema consistía en el antiquísimo sistema de inquilinaje, aquí el dueño provee de necesidades básicas a todos sus peones e inquilinos a cambio de trabajo y mano de obra. Por ejemplo, el latifundista entrega una cierta cantidad de metros cuadrados a un peón; este mismo tenía vivienda, comida y muchos beneficios.</p>
+
+<p>El problema se genera cuando el campesinado se da cuenta de que todo lo que "posee" no es de su propiedad y el dueño del predio puede arrebatárselo cuando desee.</p>
+
+<p>Luego de esto, y dentro del mismo sistema de regalías, está el sistema de deudas, este consistía en una serie de "tiendas" las cuales estaban a disposición del inquilino para lo que quisiera, el dueño le daba una suerte de préstamo al peón, el cual podía ser en dinero o en bienes como: materiales, herramientas, cultivo, etc.:</p>
+
+<blockquote>por otra, los terratenientes extendieron el sistema de inquilinaje, lo cual les permitió bajar los costos monetarios, pagando a sus trabajadores estables no en dinero, sino en regalías. <a href="#ref-biblioteca_hacienda" class="citation-link">(Biblioteca Nacional de Chile, s. f.-b)</a>.</blockquote>
+
+<p>Esto luego quedaba registrado y debía ser pagado mediante trabajos extra o como estimara el latifundista. La dificultad llega a la hora de intentar pagar la deuda, pues estas eran complicadas de saldar y se traspasaban por generaciones, lo que generaba una especie de dependencia del inquilino hacia el patrón. Vale mencionar que se entenderá por Hacienda a un gran latifundio, con la estructura ya mencionada.</p>
+
+<h3>Valle del Aconcagua</h3>
+
+<p>El Valle del Aconcagua fue una zona muy relevante para la agricultura del país, dado que era una de las principales zonas agrícolas que estaban cerca de la capital y en la cual muchas de las familias de la alta clase eran propietarias de haciendas y latifundios. A continuación, haremos un pequeño recorrido por las más grandes e importantes haciendas que concentraba este valle entre finales del siglo XIX e inicios del XX.</p>
+
+<blockquote>Las principales haciendas existentes en esta zona de la región de Valparaíso fueron:<br>
+La Hacienda de Alegría Catán ubicada en la localidad de Putaendo:<br>
+La Hacienda de Don Alegría Catán era enorme y muy próspera. Su dueño don Alegría Catán era sumamente respetado en nuestro pueblo, este era el único millonario que conocíamos cuando éramos niños y siempre era invitado especial de cualquier acto que se hiciera en Putaendo, siempre contó con un trato especial aunque no haya sido ningún tipo de político o autoridad, esto se debía a que muchos de los que vivían en Putaendo eran empleados de este caballero <a href="#ref-coddou2021" class="citation-link">(Coddou 2021)</a>.</blockquote>
+
+<p>Esto nos muestra el poder que concentraban los dueños de estas tierras en ese entonces. Como dice el testimonio de la Sra. Mariella Alvarado, estos tenían tratos especiales, más cuando se trata de un pueblo tan pequeño como Putaendo en el que, a fin de cuentas, el latifundista tenía más peso que el mismo alcalde.</p>
+
+<blockquote>La siguiente hacienda es la Hacienda Lo Vicuña, propiedad de la tradicional familia Vicuña:<br>
+La construcción del conjunto arquitectónico se inicia en 1790 respondiendo a la necesidad de Tomás Vicuña Madariaga de crear un complejo donde estuviera su residencia y desde donde pudiera controlar y administrar su Hacienda, dedicada en un comienzo a la ganadería. <a href="#ref-consejo_monumentos" class="citation-link">(Consejo de Monumentos Nacionales de Chile, s. f.)</a>.</blockquote>
+
+<p>Aquí podemos ver lo antiguas que son estas haciendas debido a que algunas datan de antes del siglo XVI, lo que se traduce en que estos predios llevaban 200 años propiedad de las mismas familias y esta es una de las problemáticas principales que hay con la llegada de la Reforma Agraria.</p>
+
+<p>Y por último, puede que no haya sido la más grande, pero sí fue la más importante e influyente de la época. La Hacienda de Quilpué, ubicada en la comuna de San Felipe, fue una de las haciendas más ricas del país y propiedad de una de las familias más acaudaladas del siglo XX, la familia Edwards:</p>
+
+<blockquote>la conectividad viaria con el tren trasandino hizo de este predio y su suntuosa residencia patronal ser el anfitrión de renombradas personas y personajes, tales como el Príncipe Eduardo de Gales, Humberto de Saboya, Enrique de Prusia, Fernando María de Borbón y el Cardenal Benlloch. <a href="#ref-coddou2021" class="citation-link">(Coddou 2021)</a>.</blockquote>
+
+<p>El fragmento anterior nos ilustra sobre el alcance que tenían las familias dueñas de estas Haciendas y los círculos sociales en los que se movían sus propietarios.</p>
+
+<h2>Metodología</h2>
+
+<h3>Enfoque de la investigación</h3>
+
+<p>El presente estudio se desarrolló bajo un enfoque cualitativo de carácter descriptivo y documental, orientado a comprender el impacto socio-demográfico de la Reforma Agraria en el Valle del Aconcagua. Este enfoque permitió analizar los procesos históricos, sociales y económicos que acompañaron el fenómeno, incorporando tanto fuentes documentales como testimoniales para construir una interpretación integral del periodo. Dado que la investigación aborda la configuración y transformación de las familias terratenientes y campesinas de la zona, se consideró fundamental integrar perspectivas que permitieran comprender las dinámicas sociales y jerárquicas de la época, así como sus repercusiones en la estructura local posterior a la reforma.</p>
+
+<h3>Fuentes y técnicas de recolección de información</h3>
+
+<p>La información se obtuvo a partir de diversas fuentes documentales y testimoniales, recurriendo a estrategias de búsqueda y contraste académico:</p>
+
+<ul>
+<li>Motores de búsqueda especializados, principalmente Google Académico, SciELO y RedALyC, que facilitaron el acceso a artículos científicos, tesis y estudios previos sobre la Reforma Agraria chilena y sus efectos regionales.</li>
+<li>Fuentes institucionales y de archivo, tales como Memoria Chilena, el Ministerio de Agricultura y el Museo de la Educación Gabriela Mistral, que aportaron documentos oficiales, material histórico y antecedentes contextuales del periodo.</li>
+<li>Entrevistas informales y semiestructuradas realizadas a distintos ex trabajadores agrícolas y a descendientes de familias vinculadas a la propiedad de la tierra en el Valle del Aconcagua. Estas entrevistas permitieron rescatar memorias personales y visiones sociales que complementan la evidencia documental.</li>
+</ul>
+
+<p>Cabe señalar que las entrevistas no fueron grabadas en audio, ya que se desarrollaron en un tono informal y conversacional, en el marco de encuentros personales. Sin embargo, se elaboraron registros escritos inmediatamente después de cada conversación, procurando conservar con exactitud las ideas, expresiones y significados aportados por los participantes. Este procedimiento se enmarca dentro de las prácticas aceptadas en la investigación cualitativa de campo, priorizando la fidelidad interpretativa y el respeto por la privacidad de las personas involucradas, especialmente al tratar temas vinculados a familias y grupos de la élite terrateniente local.</p>
+
+<h3>Procedimiento</h3>
+
+<p>En una primera etapa, se llevó a cabo una revisión bibliográfica sistemática con el propósito de identificar las principales interpretaciones académicas sobre la Reforma Agraria y sus repercusiones socioeconómicas.</p>
+
+<p>Posteriormente, se seleccionaron las fuentes más pertinentes y se diseñó una guía flexible de entrevista, estructurada a partir de las categorías de análisis definidas en el marco teórico: propiedad de la tierra, participación campesina y transformación social.</p>
+
+<p>Los registros de entrevistas fueron analizados mediante técnicas de análisis de contenido, buscando identificar patrones temáticos, recurrencias discursivas y contrastes entre los testimonios y los documentos académicos.</p>
+
+<h3>Análisis de la información</h3>
+
+<p>El análisis se estructuró en torno a tres ejes temáticos principales:</p>
+
+<ol>
+<li>Contexto político y económico previo a la Reforma Agraria.</li>
+<li>Implementación de las políticas de redistribución de tierras.</li>
+<li>Impactos sociales, familiares y testimoniales del proceso en el Valle del Aconcagua.</li>
+</ol>
+
+<p>Se aplicó una triangulación metodológica, contrastando los testimonios orales con la información bibliográfica y los documentos institucionales, con el fin de garantizar la coherencia, validez y profundidad interpretativa de los resultados.</p>
+
+<h3>Consideraciones éticas</h3>
+
+<p>Todas las entrevistas se realizaron bajo consentimiento informado, asegurando la confidencialidad de los participantes y el uso exclusivo del material con fines académicos. Se procuró mantener la autenticidad y respeto hacia las narrativas personales, especialmente en los casos en que se abordaron recuerdos vinculados a familias históricas y estructuras sociales del poder agrario en la región.</p>
+
+<h2>Contexto Histórico de la Reforma Agraria</h2>
+
+<p>A inicios del siglo XX Chile se encontraba con una estructura agrícola totalmente tradicional, sin ningún tipo de reformas ni preocupaciones por los obreros. Con esto también viene la estructura social de clases chilena, muy marcada e importante en la época. En esta estructura el campesinado no formaba parte, pues eran tomados como una suerte de objetos facilitadores del trabajo:</p>
+
+<blockquote>Asimismo, era necesario asegurar la continuidad del sistema social tradicional en las haciendas, ya que constituían la base del apoyo electoral para el propietario y señor. <a href="#ref-biblioteca_hacienda" class="citation-link">(Biblioteca Nacional de Chile, s. f.-b)</a>.</blockquote>
+
+<p>En el contexto de reformas que se estaba viviendo en la época con el cambio al presidencialismo y la recientemente publicada Constitución de 1925, la política estaba pasando por un momento agitado. Por esto, y por la precaria legislación agrícola, es que se comenzaron a plantear ideas de una reforma agraria. Esta idea fue primeramente propuesta por los sectores progresistas de la política, ya que se oponían a las ideas tradicionales del sector conservador, el cual basaba la agricultura chilena en el gran latifundio y la organización que estos tenían. Así es que para las elecciones presidenciales de 1938 se presentó una campaña que incluía la idea de una reforma agraria:</p>
+
+<blockquote>En vista de esta situación las demandas por una reforma agraria fueron desde comienzos de siglo una propuesta de los sectores progresistas del país, como fue en el caso de la campaña presidencial del Frente Popular, en 1938 <a href="#ref-biblioteca_reforma" class="citation-link">(Biblioteca Nacional de Chile, s. f.-c)</a>.</blockquote>
+
+<p>Cuando por fin llegaron a gobernar los radicales se enfocaron mucho más en el desarrollo industrial que en el ámbito agrícola, por lo que la población rural tuvo que migrar hacia los sectores urbanos e industriales en busca de mejores condiciones laborales y mejor calidad de vida. Por todo lo anterior es que el sector agrícola quedó sumergido en una profunda crisis, ya que no había mano de obra suficiente y la que había estaba descontenta con el estilo de vida que llevaban. Así es como nos damos cuenta cómo afectó a la agricultura y por ende a la economía, la masiva migración que hubo en estos años. De este modo los gobiernos se vieron obligados a iniciar una reforma agraria, ya que la producción agrícola de Chile estaba en su peor momento. En efecto, la baja de mano de obra y la escasa industrialización implementada a agricultura, no le permitían a esta progresar. Chile estaba en una crisis económica general, a causa de la crisis mundial. Sin embargo, la crisis agrícola no tuvo que ver con la crisis internacional, al menos no a grandes rasgos, debido a que la primera se venía previendo hace años, por la precaria situación en la que se encontraba el agro chileno:</p>
+
+<blockquote>... la economía agraria comenzó a experimentar una crisis profunda caracterizada por su incapacidad productiva, siendo necesario, en los años cincuenta, llegar a la importación de alimentos. <a href="#ref-biblioteca_reforma" class="citation-link">(Biblioteca Nacional de Chile, s. f.-c)</a>.</blockquote>
+
+<h2>La Reforma Agraria</h2>
+
+<p>Nos ubicamos en el año 1958, el primer año de gobierno del presidente Jorge Alessandri, hijo del expresidente Arturo Alessandri. El gobierno de Alessandri se esperaba como un gobierno bastante conservador y alejado de la innovación e ideas rupturistas. Sin embargo, fue en este gobierno que se comenzó la implementación de una reforma agraria:</p>
+
+<blockquote>el gobierno de Jorge Alessandri promulgó en 1962 la primera ley de Reforma Agraria N° 15.020, la que permitió redistribuir tierras estatales entre campesinos y organizar instituciones fiscales para llevar a cabo la reforma en el campo. <a href="#ref-biblioteca_reforma" class="citation-link">(Biblioteca Nacional de Chile, s. f.-c)</a>.</blockquote>
+
+<p>Esto resulta sorprendente, puesto que fue en un gobierno que tenía una carga política totalmente opuesta a la que apoyaba la reforma. Siendo el gobierno de Alessandri el principal promotor de la Reforma Agraria de 1962, junto a él existieron instituciones internacionales que lo apoyaron y ayudaron, tal es el caso de la Alianza para el Progreso. Al implementar esta ley, sin embargo, esta no surtió muchos resultados, por la precaria y poco efectiva implementación. Tuvo entonces que llegar el gobierno siguiente para que la reforma empezase a notarse. Es así como en el año 1964 llega al poder Eduardo Frei Montalva, quien hizo una efectiva implementación de esta ley y provocó el primer gran impacto que esta reforma tuvo. En el segundo año de gobierno de Frei Montalva, este envía una ley al congreso:</p>
+
+<blockquote>El gobierno de Eduardo Frei Montalva envío al Congreso, en noviembre de 1965, una nueva ley de Reforma Agraria...Se promulgó en julio de 1967, fue la ley básica bajo la cual se realizó el proceso de Reforma Agraria en Chile... <a href="#ref-biblioteca_nueva_ley" class="citation-link">(Biblioteca Nacional de Chile, s. f.-d)</a>.</blockquote>
+
+<p>Esta ley traía una serie de regulaciones nuevas, mucho más radicales que la anteriormente implementada ley de reforma. La nueva ley establecía que nadie podía tener más de 80 HRB, estaba permitido expropiar tierras de sociedades, corporaciones y cualquier latifundio que estuviera mal trabajado. La ley también buscaba mejorar las viviendas y ofrecer servicios como la electricidad en las zonas más rurales. Frei creía que la reforma debía ir más allá de la regulación de los terratenientes y la protección de los campesinos, esta debía también contemplar una educación del campesinado para permitirles progresar fuera del mundo del inquilinaje y de manera independiente. Esta ley permitió expropiar predios con más de 80 hectáreas de riego cultivable, otros de cualquier tamaño que se encontraran mal administradas productivamente, y aquellos que estuvieran abandonados. Además, se consideró como causal de expropiación la injusticia social vivida por algunos campesinos, a quienes no se les aplicaban las leyes sociales que el Estado exigía <a href="#ref-biblioteca_nueva_ley" class="citation-link">(Biblioteca Nacional de Chile, s. f.-d)</a>.</p>
+
+<p>Aquí es cuando se inicia una fiscalización general de los predios del país, buscando a todo aquel que cumpliera los requisitos para ser expropiado y entregado a los campesinos. Con la llegada de Salvador Allende al poder, todos estos procesos se intensificaron masivamente y se aceleraron todo tipo de expropiaciones y entrega de títulos de propiedad a los campesinos:</p>
+
+<blockquote>Al producirse el golpe de Estado, el 11 de septiembre de 1973, la Unidad Popular había expropiado cerca de 4.400 predios agrícolas, que sumaban más de 6,4 millones de hectáreas <a href="#ref-biblioteca_reforma" class="citation-link">(Biblioteca Nacional de Chile, s. f.-c)</a>.</blockquote>
+
+<p>Se agruparon a los nuevos propietarios en cooperativas para poder trabajar la tierra de manera colectiva y equitativa, pues la idea de Allende era llegar a una sociedad menos desigual y sin distinciones sociales en la agricultura, en la cual todos formaran parte y cooperaran entre sí para tener beneficios. La expropiación de los predios contemplaba una subdivisión de estos para luego ser entregados por parcelas a cada campesino. Dependiendo de la fertilidad del suelo y la humedad o acceso al agua que tuviera se determinaba el tamaño de la parcela, por ejemplo, una parcela más grande sería menos fértil o más seca y una más pequeña sería más fértil o húmeda. Si bien la idea de Eduardo Frei era educar al campesinado para entregarle todas las herramientas necesarias para tener un cultivo próspero y funcional, hubo ciertas cosas que se dejaron de lado, como el estado financiero que tenían estos campesinos, ahora dueños de tierras.</p>
+
+<p>Los campesinos por lo general eran de escasos recursos, escasa educación y escasa habilidad para el comercio. Si bien el plan de educación de Frei les entregó mayor conocimiento sobre agricultura y comercio, muchos no pudieron siquiera sostener el campo por un año. Estos no tenían los ingresos para comprar maquinaria o pagar sueldos, por lo que poco a poco los campesinos comenzaron a perder sus tierras o, al verse incapaces de mantener el campo, vendieron ellos mismos las tierras a nuevos dueños, aunque difícilmente podría llamárseles así, dado que muchas de las tierras llegaron devuelta a manos de sus antiguos dueños:</p>
+
+<blockquote>El campesino nunca tuvo ni los recursos ni los conocimientos para mantener un campo, y no es como que el gobierno haya regalado tractores y arados a los campesinos. Es así como todos estos campesinos vendieron sus tierras a los antiguos dueños y volvieron a surgir las antiguas familias poderosas de la agronomía. Y bueno, también se posicionaron nuevas familias con la compra masiva de parcelas <a href="#ref-entrevista_diaz" class="citation-link">(Entrevista con Alfredo Díaz, por Pascal Cea, San Felipe, noviembre de 2024)</a>.</blockquote>
+
+<p>De igual forma, la reforma sirvió para diversificar las propiedades. Por ejemplo, un latifundio de 80 hectáreas se subdividió en 8 parcelas de 10 hectáreas cada una, el anterior dueño compro 4 de las 8 parcelas y las otras restantes las compró otra familia tradicional, así se fueron mezclando propiedades y se erradicó la concentración total de tierras.</p>
+
+<p>Alfredo Díaz, propietario de predios agrícolas y testigo de la reforma agraria, en una conversación sobre su experiencia con la reforma agraria nos cuenta lo violento y hostil que fue la expropiación de tierras en ciertas zonas: Mi padre fue mucho tiempo administrador del fundo de una de las familias más importantes de la zona de Catemu y Llay-Llay. Y, con la llegada de la reforma agraria, llegó también la expropiación. Sin embargo, el jefe de mi padre y dueño del predio se resistió a la expropiación, por lo que a escopetazos y piedrazos fue que combatimos para evitar que nos expropiaran la tierra, y eso nadie lo cuenta.</p>
+
+<p>Claramente la reforma agraria tuvo momentos positivos y negativos, al igual que consecuencias positivas y negativas. Pero es así como, finalmente en el año 1973, con la llegada del Golpe de Estado del 11 de septiembre, la Reforma Agraria acabó forzosamente y hasta con cosas quizás inconclusas, como la modernización de los modos productivos, o la viabilidad económica de pequeñas propiedades entregadas.</p>
+
+<h2>Reforma Agraria en el Valle del Aconcagua</h2>
+
+<p>El valle central fue escenario casi principal de la reforma agraria, esto porque era una zona fértil, llena de latifundios y predios. Con la llegada de la Reforma Agraria el Valle del Aconcagua se vio rápidamente afectado, pues, como es natural, todo cambio drástico genera gran controversia. Es tomando los cambios que sufrió el valle como nos podemos dar cuenta de cómo afectó a todo el país la reforma.</p>
+
+<p>En el año 1960, Chile contaba con pequeñas y casi inexistentes agrupaciones de campesinos o movilizaciones de estos. Así es como en el valle del Aconcagua, uno de los principales del Gran Valle Central, se produce el mismo efecto: a inicios de los sesenta, empiezan a aparecer agrupaciones campesinas, apoyadas por la iglesia y sectores progresistas locales.</p>
+
+<p>Estos poco a poco fueron posicionándose, porque habían muchos campesinos que no querían formar parte y le temía a la reforma por lo que podía conllevar el revelarse contra el patrón. Fue al contar con el apoyo de la iglesia que lograron avanzar y tener voz.</p>
+
+<blockquote>El apoyo de la iglesia no fue sólo ideológico, sino que también tomó acciones sobre este movimiento,<br>
+Alrededor de 3200 hás. de riego básico benefició a una población de 220 familias campesinas. Ello marca el comienzo de la REFORMA AGRARIA en predios de la iglesia <a href="#ref-instituto_promocion" class="citation-link">(Instituto de Promoción Agraria 1962--73, 4)</a>.</blockquote>
+
+<p>Es así como los inicios de los movimientos campesinos fueron totalmente apoyados por la iglesia.</p>
+
+<p>En Aconcagua existían organizaciones de estilo sindicalistas, pero en la década de los sesenta no existió ni un solo sindicato campesino con personalidad jurídica en el valle, ya que temían ciertas represalias en contra de quien fuera el dirigente del sindicato. Según encuestas, San Felipe era la ciudad que más exigía la formación de un sindicato o el reconocimiento de los ya existentes y un lugar donde poder hacer sus reuniones. En comparación con Talca, Santiago y O'Higgins, Aconcagua tenía casi un 10% más de habitantes que exigieran las peticiones anteriormente nombradas. Es así cómo es que la UCC (Unión de Campesinos Cristianos), la cual se encontraba trabajando en Talca, se traslada con todo y sus dirigentes a las ciudades de San Felipe y Los Andes, para iniciar un proceso de conversaciones y reuniones con los campesinos locales y así compartir ideas, ideologías, soluciones y problemáticas que presenta el valle del Aconcagua.</p>
+
+<p>La UCC y la Universidad Católica inician una especie de campaña o ayuda social para la educación a los campesinos principalmente en los sectores de Santa María, San Esteban y Calle Larga, enseñándoles lo básico e instruyéndolos en materias de derechos laborales, reforma agraria, higiene ambiental, primeros auxilios y la Doctrina Social de la Iglesia.</p>
+
+<p>Es en Santa María donde en el año 1963 se haría un congreso al cual llegarían alrededor de trescientos trabajadores y estudiantes de Santa María y San Felipe a expresar sus inquietudes y soluciones con los dirigentes sindicales:</p>
+
+<blockquote>1. Como una manera de mejorar la atención médica de los campos, adquirir una política que obligue a los médicos recién egresados a comenzar su carrera en provincias. Contar con servicios ambulantes para que vayan al campo a atender enfermos que no quieran hospitalización, pero al mismo tiempo que no estén en condiciones de trasladarse a los servicios médicos. 2. Que se propicie la dictación de una ley que imponga a los patrones contar con vehículos apropiados para el traslado de enfermos accidentes <a href="#ref-asich" class="citation-link">(ASICH 1960--65)</a>.</blockquote>
+
+<p>Estos fueron algunos de los temas que se trataron ese día con los dirigentes sindicales locales. También se hicieron congresos en otras ciudades de Aconcagua y, por supuesto, en Santiago. Todo este proceso de educación al campesinado fue auspiciado por la Democracia Cristiana y fue así como consiguieron una enorme magnitud de votos.</p>
+
+<p>En Aconcagua se subdividieron o expropiaron muchas haciendas, pero las más afectadas fueron las tres nombradas en la Introducción, II, las cuales son: Lo Vicuña, Alegría Catán y Hacienda de Quilpué. Esta última en el año 1966 fue dividida en dos predios, Las Casas de Quilpué y Las Casas Chicas de Quilpué. La Hacienda de Las Casas de Quilpué fue cedida voluntariamente por su dueña a la Corporación de la Reforma Agraria y el otro fundo, Casas Chicas de Quilpué fue expropiado gubernamentalmente por la agencia correspondiente en el año 1971 y fue este el cual se subdividió en más parcelas agrícolas.</p>
+
+<h2>Impacto Sociodemográfico en Aconcagua</h2>
+
+<p>Al terminar con la Reforma Agraria en el año 1973, la consecuencia sociodemográfica en Aconcagua es evidente, pues, si vemos en retrospectiva, la sociedad en Aconcagua se basaba en el antiguo régimen latifundista, y la relación del patrón y los trabajadores. Con el término de la reforma, este tipo de sociedad campesina y cultura de inquilinato cesó.</p>
+
+<blockquote>Como consecuencias sociales podemos encontrar:</blockquote>
+
+<ul>
+<li>Una enorme alza en la educación básica de la población, debido a que fueron varias las campañas de educación realizadas en el valle del Aconcagua.</li>
+<li>También podemos encontrar como consecuencia social o demográfica, la desaparición de familias elitistas en Aconcagua, dado que ya no había predio que administrar. Con esto viene el término de las injusticias sociales, beneficios al latifundista y control económico en las ciudades aledañas a la hacienda.</li>
+<li>La incorporación de los campesinos al comercio, porque estos tenían que vender sus cosechas, ganados o incluso los mismos campos.</li>
+<li>Una sociedad campesina religiosa, pues fue en parte gracias a la iglesia que se logró ejecutar la reforma agraria.</li>
+<li>Una comunidad agrícola más organizada:</li>
+</ul>
+
+<blockquote>Y aquellas que no son parte de dicha estructura, fomentada especialmente por la reforma agraria el 7 de agosto de 1968 y es que ha implementado la organización comunitaria, es decir la creación de juntas de vecinos, centros de madres, centros de culturas y organizaciones deportivas. <a href="#ref-guzman2014" class="citation-link">(Guzmán 2014, 45)</a>.</blockquote>
+
+<blockquote>Ya que fue parte de la reforma la creación de sindicatos campesinos que ayudaron a la organización del agro:<br>
+y se organizaron más de 400 sindicatos que sumaron más de 100 mil campesinos. <a href="#ref-biblioteca_reforma" class="citation-link">(Biblioteca Nacional de Chile, s. f.-c)</a>.</blockquote>
+
+<p>En la población del valle del Aconcagua hubo gran cantidad de cambios, ya que, gracias a la Reforma Agraria, fue que muchas familias salieron de la pobreza; también con la expropiación del predio Casas de Quilpué se instaló una sede de la Universidad de Chile, la cual impartía carreras relacionadas con el ámbito agrícola:</p>
+
+<blockquote>Profundo impacto y amplio regocijo en todos los sectores de la provincia han despertado las exitosas gestiones del Intendente de Aconcagua Neison Avila Contreras y del Vicerrector de la Universidad de Chile de Valparaíso Carlos Martínez en orden a obtener para la provincia y concretamente para San Felipe, una sede universitaria que entrará a funcionar en el Palacio de la ex-Hacienda Quilpue denominada "Las Casas de Quilpué" <a href="#ref-nacion1972" class="citation-link">(Nación 1972, 8)</a>.</blockquote>
+
+<p>Por lo que para la población de Aconcagua fue mucho más fácil formar parte de la educación superior; otro efecto demográfico de la Reforma puede haber sido la urbanización de las ciudades, debido a que ya no habían predios enormes y continuos, si no que habían pequeños campos y parcelas los cuales necesitaban conectividad y calles, por lo que se ideó un plan de leve urbanización a las afueras de las ciudades del valle; y como último, el desarrollo de las ciudades de Aconcagua fue exponencial, pues la llegada de grandes capitales nacionales a invertir en el campo del valle del Aconcagua no fue para nada despreciable. Por ello, poco a poco, se integró más esta zona tan rural a la globalización:</p>
+
+<blockquote>Los cambios demográficos influyeron profundamente en la estructura social chilena, y fueron acompañados por un acelerado proceso de urbanización y redistribución territorial, que transformó a una sociedad de marcado carácter rural en una predominantemente urbana. <a href="#ref-biblioteca_poblacion" class="citation-link">(Biblioteca Nacional de Chile, s. f.-a)</a>.</blockquote>
+
+<h2>Conclusión</h2>
+
+<p>La reforma agraria, particularmente en el contexto del Valle del Aconcagua, representa un evento de gran importancia socio-demográfica y económica en Chile. Este proceso no solo remodeló la estructura de la tenencia de la tierra y la producción agrícola, sino que también transformó la configuración sociocultural del país, marcando un antes y un después en las relaciones entre las clases sociales dependientes del sistema agrario. En el caso específico del valle, surgió un claro contraste entre el régimen latifundista dominante y la nueva estructura social promovida por la reforma, la cual buscaba acabar con las desigualdades sociales históricas.</p>
+
+<p>Uno de los principales resultados positivos de la reforma fue el empoderamiento del campesinado, que anteriormente vivía bajo un sistema de inquilinaje opresivo y dependiente. A través de la redistribución de tierras y campañas educativas promovidas tanto por el gobierno como por instituciones como la Iglesia Católica, el campesinado transitó gradualmente hacia pequeños propietarios y trabajadores agrícolas con mayor autonomía. Sin embargo muchos campesinos carecían de los recursos financieros y conocimientos técnicos necesarios para gestionar de manera eficiente las tierras que recibieron. En algunos casos, esto condujo a la pérdida o venta de estas propiedades, devolviendo parte del control a los antiguos terratenientes.</p>
+
+<p>La reforma fomentó cambios significativos en la organización comunitaria y sindical. En el Valle del Aconcagua, la aparición de sindicatos campesinos y el apoyo de la Iglesia fortalecieron la cohesión social y aumentaron la conciencia sobre los derechos, permitiendo al campesinado exigir mejores condiciones laborales y una mayor participación en las decisiones locales.</p>
+
+<p>No obstante, el proceso de la reforma agraria también generó conflictos, especialmente durante las etapas de expropiación de tierras. La resistencia de los terratenientes y la violencia en algunos casos destacaron las dificultades inherentes a una transformación de tal magnitud. A pesar de estos obstáculos, la reforma dejó un impacto duradero en la estructura social del Valle del Aconcagua, contribuyendo a una distribución más equitativa de los recursos e integrando la región a la globalización.</p>
+
+<p>En conclusión, la Reforma Agraria en el Valle del Aconcagua muestra un esfuerzo por construir una sociedad más justa y equitativa, rompiendo con siglos de dependencia y desigualdad en la agricultura chilena. Aunque sus resultados fueron mixtos y, en muchos casos, inconclusos debido a factores políticos y económicos, su legado es recordatorio del potencial transformador de las políticas públicas orientadas al bienestar colectivo. Este proceso reconfiguró el panorama agrícola y demostró que el cambio social es posible cuando se construye desde la base y cuenta con el apoyo de actores importantes como el Estado, la Iglesia y las organizaciones populares.</p></body></html>
         </section>
 
         <!-- References Section -->
         <section id="references">
-          <h2>${t.references}</h2>
-          ${referencesHtml}
+          <h2>Referencias</h2>
+          <div class="references-list">
+  <div class="reference-item" id="ref-asich">
+    ASICH. 1960–65. <em>Diario "Tierra y libertad", Compilado de diarios desde 1960 hasta 1965</em>.
+  </div>
+
+  <div class="reference-item" id="ref-biblioteca_poblacion">
+    Biblioteca Nacional de Chile. s. f.-a. «Desarrollo y dinámica de la población en el siglo XX». Memoria Chilena. Accedido 9 de noviembre de 2025. <a href="https://www.memoriachilena.gob.cl/602/w3-article-3351.html" target="_blank" rel="noopener">https://www.memoriachilena.gob.cl/602/w3-article-3351.html</a>.
+  </div>
+
+  <div class="reference-item" id="ref-biblioteca_hacienda">
+    ———. s. f.-b. «La Hacienda (1830-1930)». Memoria Chilena. Accedido 9 de noviembre de 2025. <a href="https://www.memoriachilena.gob.cl/602/w3-article-695.html" target="_blank" rel="noopener">https://www.memoriachilena.gob.cl/602/w3-article-695.html</a>.
+  </div>
+
+  <div class="reference-item" id="ref-biblioteca_reforma">
+    ———. s. f.-c. «La Reforma Agraria (1962-1973)». Memoria Chilena. Accedido 9 de noviembre de 2025. <a href="https://www.memoriachilena.gob.cl/602/w3-article-3536.html" target="_blank" rel="noopener">https://www.memoriachilena.gob.cl/602/w3-article-3536.html</a>.
+  </div>
+
+  <div class="reference-item" id="ref-biblioteca_nueva_ley">
+    ———. s. f.-d. «Nueva Ley de Reforma Agraria N°16.640». Memoria Chilena. Accedido 9 de noviembre de 2025. <a href="https://www.memoriachilena.gob.cl/602/w3-article-97342.html" target="_blank" rel="noopener">https://www.memoriachilena.gob.cl/602/w3-article-97342.html</a>.
+  </div>
+
+  <div class="reference-item" id="ref-coddou2021">
+    Coddou, Gastón G. 2021. «El patrimonio rural del Aconcagua. Segunda parte: Haciendas del valle». Noticias de la Universidad de Playa Ancha. 29 de septiembre de 2021. <a href="https://www.upla.cl/noticias/2021/09/29/el-patrimonio-rural-del-aconcagua-segunda-parte-haciendas-del-valle/" target="_blank" rel="noopener">https://www.upla.cl/noticias/2021/09/29/elpatrimonio-rural-del-aconcagua-segunda-parte-haciendas-del-valle/</a>.
+  </div>
+
+  <div class="reference-item" id="ref-consejo_monumentos">
+    Consejo de Monumentos Nacionales de Chile. s. f. «Hacienda Lo Vicuña». Consejo de Monumentos Nacionales de Chile. Accedido 9 de noviembre de 2025. <a href="https://www.monumentos.gob.cl/monumentos/zonas-tipicas/hacienda-lo-vicuna" target="_blank" rel="noopener">https://www.monumentos.gob.cl/monumentos/zonastipicas/hacienda-lo-vicuna</a>.
+  </div>
+
+  <div class="reference-item" id="ref-entrevista_diaz">
+    Díaz, Alfredo. 2024. Entrevista realizada por Pascal Cea. San Felipe, noviembre.
+  </div>
+
+  <div class="reference-item" id="ref-escobar2017">
+    Escobar, Carolina. 2017. «Lo que dejó la Reforma Agraria en Chile que permite comprender el modelo socioeconómico actual». 14 de diciembre de 2017.
+  </div>
+
+  <div class="reference-item" id="ref-guzman2014">
+    Guzmán, Francesca. 2014. «Movimiento Campesino en el Valle de Aconcagua 1960-1973: Sindicalismo, Representación Política-ideológica y Desmovilización Rural». Julio de 2014.
+  </div>
+
+  <div class="reference-item" id="ref-instituto_promocion">
+    Instituto de Promoción Agraria. 1962–73. «Reforma agraria de la Iglesia en Chile». Accedido 9 de noviembre de 2025. <a href="https://www.memoriachilena.gob.cl/602/w3-article-9101.html" target="_blank" rel="noopener">https://www.memoriachilena.gob.cl/602/w3-article-9101.html</a>.
+  </div>
+
+  <div class="reference-item" id="ref-nacion1972">
+    Nación, La. 1972. «Alegría en San Felipe: sede universitaria para la zona». <em>La Nación</em> LV (19.951): 8. 28 de julio de 1972.
+  </div>
+
+  <div class="reference-item" id="ref-theza2017">
+    Theza, Marcel, Daniel Cáceres, y Daniella Jiménez. 2017. «Reforma Agraria en Chile, ¿Palimpsesto de otra ruralidad? Reflexiones y propuestas». <em>Polis</em> 16 (47): 137-46. <a href="https://doi.org/10.4067/S0718-65682017000200137" target="_blank" rel="noopener">https://doi.org/10.4067/S0718-65682017000200137</a>.
+  </div>
+</div>
         </section>
 
         <!-- Additional Info Section -->
         <section id="additional-info">
-          ${acknowledgments ? `
-          <h2>${t.acknowledgments}</h2>
-          <p>${acknowledgments}</p>
-          ` : ''}
           
-          ${funding && funding.trim() !== '' && funding !== 'No declarada' && funding !== 'Not declared' ? `
-          <h2>${t.funding}</h2>
-          <p>${funding}</p>
-          ` : ''}
           
-          ${dataAvailability && dataAvailability.trim() !== '' ? `
-          <h2>${t.dataAvailability}</h2>
-          <p>${dataAvailability}</p>
-          ` : ''}
           
-          ${authorCredits && authorCredits.trim() !== '' ? `
-          <h2>${t.authorContributions}</h2>
-          <p>${authorCredits}</p>
-          ` : ''}
           
-          <h2>${t.conflictOfInterest}</h2>
-          <p>${conflicts}</p>
+          
+          <h2>Disponibilidad de datos</h2>
+          <p>La información analizada es de carácter público y se encuentra disponible en las fuentes citadas en la bibliografía.</p>
+          
+          
+          
+          <h2>Contribución de autores</h2>
+          <p>Conceptualización, Metodología, Análisis formal, Investigación, Curaduría de datos, Redacción – borrador original, Redacción – revisión y edición, Visualización y Supervisión: Pascal Cea.</p>
+          
+          
+          <h2>Conflicto de intereses</h2>
+          <p>Los autores declaran no tener conflictos de interés.</p>
         </section>
 
         <!-- PDF Preview Section -->
-        ${article.pdfUrl ? `
+        
         <section id="pdf-preview">
-          <h2>${t.pdfPreview}</h2>
-          <embed src="${article.pdfUrl}" type="application/pdf" class="pdf-preview" />
+          <h2>Visualización del PDF</h2>
+          <embed src="https://www.revistacienciasestudiantes.com/Articles/Article-impacto-sociodemografico-de-las-politicas-de-reforma-agraria-en-el-valle-del-aconcagua-1.pdf" type="application/pdf" class="pdf-preview" />
           <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-            <a href="${article.pdfUrl}" target="_blank" class="btn-pdf">${t.viewFullScreen}</a>
-            <a href="${article.pdfUrl}" download class="btn-pdf" style="background: var(--text-light);">${t.downloadPDF}</a>
+            <a href="https://www.revistacienciasestudiantes.com/Articles/Article-impacto-sociodemografico-de-las-politicas-de-reforma-agraria-en-el-valle-del-aconcagua-1.pdf" target="_blank" class="btn-pdf">Ver en pantalla completa</a>
+            <a href="https://www.revistacienciasestudiantes.com/Articles/Article-impacto-sociodemografico-de-las-politicas-de-reforma-agraria-en-el-valle-del-aconcagua-1.pdf" download class="btn-pdf" style="background: var(--text-light);">Descargar PDF</a>
           </div>
         </section>
-        ` : ''}
+        
 
         <!-- License Section -->
         <section id="license" class="license-section">
           <p>
-            <strong>${t.license}:</strong> 
+            <strong>Licencia:</strong> 
             Este artículo se publica bajo la licencia 
-            <a href="https://creativecommons.org/licenses/by/4.0/deed.${isSpanish ? 'es' : 'en'}" target="_blank" rel="license noopener noreferrer">
-              ${ccLogoSvg} CC BY 4.0
+            <a href="https://creativecommons.org/licenses/by/4.0/deed.es" target="_blank" rel="license noopener noreferrer">
+              <img src="https://bibliotecas.ucn.cl/wp-content/uploads/2025/04/by1.png" alt="CC BY 4.0" style="height: 1.2em; width: auto; vertical-align: middle;"> CC BY 4.0
             </a>
           </p>
           <p style="margin-top: 0.5rem; font-size: 0.8rem;">
@@ -4158,92 +3054,67 @@ body {
       <div class="mobile-info">
         <div class="info-tabs">
           <div class="tab-buttons">
-            <button class="tab-button active" onclick="switchTab('mobile', 'citations')">${t.howToCite}</button>
-            <button class="tab-button" onclick="switchTab('mobile', 'metadata')">${t.information}</button>
+            <button class="tab-button active" onclick="switchTab('mobile', 'citations')">Cómo citar</button>
+            <button class="tab-button" onclick="switchTab('mobile', 'metadata')">Información</button>
           </div>
           
           <!-- Citations Tab -->
           <div id="mobile-citations" class="tab-panel active">
-            <h4>${t.howToCite}</h4>
+            <h4>Cómo citar</h4>
             <div class="citation-box">
               <div class="citation-item">
                 <strong>APA</strong>
-                <button class="copy-btn" onclick="copyRichText('apa-text-${lang}-mobile', event)">${t.copy}</button>
-                <div id="apa-text-${lang}-mobile" style="margin-top: 0.25rem;">${authorsAPA}. (${year}). ${title}. <em>Revista Nacional de las Ciencias para Estudiantes</em>, ${article.volumen}(${article.numero}), ${article.primeraPagina}-${article.ultimaPagina}. ${article.doi ? `https://doi.org/${article.doi}` : ''}</div>
+                <button class="copy-btn" onclick="copyRichText('apa-text-es-mobile', event)">Copiar</button>
+                <div id="apa-text-es-mobile" style="margin-top: 0.25rem;">Cea, P.. (2025). Impacto Sociodemográfico de las Políticas de Reforma Agraria en el Valle del Aconcagua. <em>Revista Nacional de las Ciencias para Estudiantes</em>, 1(1), 1-11. </div>
               </div>
               <div class="citation-item">
                 <strong>MLA</strong>
-                <button class="copy-btn" onclick="copyRichText('mla-text-${lang}-mobile', event)">${t.copy}</button>
-                <div id="mla-text-${lang}-mobile" style="margin-top: 0.25rem;">${isSpanish ? authorsMLAEs : authorsMLAEn}. "${title}." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. ${article.volumen}, no. ${article.numero}, ${year}, pp. ${article.primeraPagina}-${article.ultimaPagina}. ${article.doi ? `https://doi.org/${article.doi}` : ''}</div>
+                <button class="copy-btn" onclick="copyRichText('mla-text-es-mobile', event)">Copiar</button>
+                <div id="mla-text-es-mobile" style="margin-top: 0.25rem;">Cea, Pascal. "Impacto Sociodemográfico de las Políticas de Reforma Agraria en el Valle del Aconcagua." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. 1, no. 1, 2025, pp. 1-11. </div>
               </div>
               <div class="citation-item">
                 <strong>Chicago</strong>
-                <button class="copy-btn" onclick="copyRichText('chi-text-${lang}-mobile', event)">${t.copy}</button>
-                <div id="chi-text-${lang}-mobile" style="margin-top: 0.25rem;">${isSpanish ? authorsChicagoEs : authorsChicagoEn}. "${title}." <em>Revista Nacional de las Ciencias para Estudiantes</em> ${article.volumen}, no. ${article.numero} (${year}): ${article.primeraPagina}-${article.ultimaPagina}. ${article.doi ? `https://doi.org/${article.doi}` : ''}</div>
+                <button class="copy-btn" onclick="copyRichText('chi-text-es-mobile', event)">Copiar</button>
+                <div id="chi-text-es-mobile" style="margin-top: 0.25rem;">Cea, Pascal. "Impacto Sociodemográfico de las Políticas de Reforma Agraria en el Valle del Aconcagua." <em>Revista Nacional de las Ciencias para Estudiantes</em> 1, no. 1 (2025): 1-11. </div>
               </div>
-              <a href="data:text/plain;charset=utf-8,${encodeURIComponent(bibtex)}" download="article-${article.numeroArticulo}.bib" class="bibtex-download">
+              <a href="data:text/plain;charset=utf-8,%40article%7Bcea20251%2C%0A%20%20author%20%3D%20%7BCea%5C%24%2C%20Pascal%5C%24%7D%2C%0A%20%20title%20%3D%20%7BImpacto%20Sociodemogr%7B%5C'a%7Dfico%20de%20las%20Pol%7B%5C'i%7Dticas%20de%20Reforma%20Agraria%20en%20el%20Valle%20del%20Aconcagua%5C%24%7D%2C%0A%20%20journal%20%3D%20%7BRevista%20Nacional%20de%20las%20Ciencias%20para%20Estudiantes%7D%2C%0A%20%20year%20%3D%20%7B2025%7D%2C%0A%20%20volume%20%3D%20%7B1%7D%2C%0A%20%20number%20%3D%20%7B1%7D%2C%0A%20%20pages%20%3D%20%7B1--11%7D%2C%0A%20%20issn%20%3D%20%7B3087-2839%7D%2C%0A%20%20url%20%3D%20%7Bhttps%3A%2F%2Fwww.revistacienciasestudiantes.com%2Farticles%2Farticle-impacto-sociodemografico-de-las-politicas-de-reforma-agraria-en-el-valle-del-aconcagua-1.html%7D%0A%7D" download="article-1.bib" class="bibtex-download">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                   <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
                   <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
                 </svg>
-                ${t.downloadBibTeX}
+                Descargar BibTeX
               </a>
             </div>
           </div>
           
           <!-- Metadata Tab -->
           <div id="mobile-metadata" class="tab-panel">
-            <h4>${t.keywords}</h4>
+            <h4>Palabras clave</h4>
             <div class="keywords" style="margin-bottom: 1.5rem;">
-              ${keywords.map(kw => {
-    // Detectar si es formato controlado: "CÓDIGO: Término"
-    const match = typeof kw === 'string' ? kw.match(/^([A-Za-z0-9.]+):\s*(.+)/) : null;
-    if (match) {
-        return `<span class="keyword-tag keyword-controlled">
-            <code class="keyword-code">${match[1]}</code>
-            <span class="keyword-term">${match[2]}</span>
-        </span>`;
-    }
-    // Formato legacy: término simple
-    return `<span class="keyword-tag">${kw}</span>`;
-}).join('')}
+              <span class="keyword-tag">Reforma Agraria</span><span class="keyword-tag">Valle del Aconcagua</span><span class="keyword-tag">Propiedad de la Tierra</span><span class="keyword-tag">Transformación Social</span><span class="keyword-tag">Estructuras Agrarias</span><span class="keyword-tag">Siglo XX</span>
             </div>
             
-            <h4>${t.articleInfo}</h4>
+            <h4>Información del artículo</h4>
             <div class="metadata-item">
-              <span class="metadata-label">${t.received}</span>
-              <span class="metadata-value">${receivedDate}</span>
+              <span class="metadata-label">Recibido</span>
+              <span class="metadata-value">26-08-2025</span>
             </div>
             <div class="metadata-item">
-              <span class="metadata-label">${t.accepted}</span>
-              <span class="metadata-value">${acceptedDate}</span>
+              <span class="metadata-label">Aceptado</span>
+              <span class="metadata-value">10-11-2025</span>
             </div>
             <div class="metadata-item">
-              <span class="metadata-label">${t.published}</span>
-              <span class="metadata-value">${fecha}</span>
+              <span class="metadata-label">Publicado</span>
+              <span class="metadata-value">10-11-2025</span>
             </div>
             <div class="metadata-item">
-              <span class="metadata-label">${t.area}</span>
-              <span class="metadata-value">${article.area}</span>
+              <span class="metadata-label">Área</span>
+              <span class="metadata-value">Historia del s. XX Chilena</span>
             </div>
 
-            ${article.doi ? `
-            <div class="metadata-item metadata-doi-item">
-              <span class="metadata-label">DOI</span>
-              <span class="metadata-value">
-                <a href="https://doi.org/${article.doi}" target="_blank" rel="noopener noreferrer" class="sidebar-doi-link">
-                  ${article.doi}
-                </a>
-              </span>
-            </div>
-            ` : ''}
+            
 
-            ${funding && funding !== 'No declarada' && funding !== 'Not declared' ? `
-            <div class="metadata-item">
-              <span class="metadata-label">${t.fundingLabel}</span>
-              <span class="metadata-value">${funding}</span>
-            </div>
-            ` : ''}
+            
           </div>
         </div>
       </div>
@@ -4253,92 +3124,67 @@ body {
     <aside class="right-sidebar">
       <div class="info-tabs">
         <div class="tab-buttons">
-          <button class="tab-button active" onclick="switchTab('desktop', 'citations')">${t.howToCite}</button>
-          <button class="tab-button" onclick="switchTab('desktop', 'metadata')">${t.information}</button>
+          <button class="tab-button active" onclick="switchTab('desktop', 'citations')">Cómo citar</button>
+          <button class="tab-button" onclick="switchTab('desktop', 'metadata')">Información</button>
         </div>
         
         <!-- Citations Tab -->
         <div id="desktop-citations" class="tab-panel active">
-          <h4>${t.howToCite}</h4>
+          <h4>Cómo citar</h4>
           <div class="citation-box">
             <div class="citation-item">
               <strong>APA</strong>
-              <button class="copy-btn" onclick="copyRichText('apa-text-${lang}', event)">${t.copy}</button>
-              <div id="apa-text-${lang}" style="margin-top: 0.25rem;">${authorsAPA}. (${year}). ${title}. <em>Revista Nacional de las Ciencias para Estudiantes</em>, ${article.volumen}(${article.numero}), ${article.primeraPagina}-${article.ultimaPagina}. ${article.doi ? `https://doi.org/${article.doi}` : ''}</div>
+              <button class="copy-btn" onclick="copyRichText('apa-text-es', event)">Copiar</button>
+              <div id="apa-text-es" style="margin-top: 0.25rem;">Cea, P.. (2025). Impacto Sociodemográfico de las Políticas de Reforma Agraria en el Valle del Aconcagua. <em>Revista Nacional de las Ciencias para Estudiantes</em>, 1(1), 1-11. </div>
             </div>
             <div class="citation-item">
               <strong>MLA</strong>
-              <button class="copy-btn" onclick="copyRichText('mla-text-${lang}', event)">${t.copy}</button>
-              <div id="mla-text-${lang}" style="margin-top: 0.25rem;">${isSpanish ? authorsMLAEs : authorsMLAEn}. "${title}." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. ${article.volumen}, no. ${article.numero}, ${year}, pp. ${article.primeraPagina}-${article.ultimaPagina}. ${article.doi ? `https://doi.org/${article.doi}` : ''}</div>
+              <button class="copy-btn" onclick="copyRichText('mla-text-es', event)">Copiar</button>
+              <div id="mla-text-es" style="margin-top: 0.25rem;">Cea, Pascal. "Impacto Sociodemográfico de las Políticas de Reforma Agraria en el Valle del Aconcagua." <em>Revista Nacional de las Ciencias para Estudiantes</em>, vol. 1, no. 1, 2025, pp. 1-11. </div>
             </div>
             <div class="citation-item">
               <strong>Chicago</strong>
-              <button class="copy-btn" onclick="copyRichText('chi-text-${lang}', event)">${t.copy}</button>
-              <div id="chi-text-${lang}" style="margin-top: 0.25rem;">${isSpanish ? authorsChicagoEs : authorsChicagoEn}. "${title}." <em>Revista Nacional de las Ciencias para Estudiantes</em> ${article.volumen}, no. ${article.numero} (${year}): ${article.primeraPagina}-${article.ultimaPagina}. ${article.doi ? `https://doi.org/${article.doi}` : ''}</div>
+              <button class="copy-btn" onclick="copyRichText('chi-text-es', event)">Copiar</button>
+              <div id="chi-text-es" style="margin-top: 0.25rem;">Cea, Pascal. "Impacto Sociodemográfico de las Políticas de Reforma Agraria en el Valle del Aconcagua." <em>Revista Nacional de las Ciencias para Estudiantes</em> 1, no. 1 (2025): 1-11. </div>
             </div>
-            <a href="data:text/plain;charset=utf-8,${encodeURIComponent(bibtex)}" download="article-${article.numeroArticulo}.bib" class="bibtex-download">
+            <a href="data:text/plain;charset=utf-8,%40article%7Bcea20251%2C%0A%20%20author%20%3D%20%7BCea%5C%24%2C%20Pascal%5C%24%7D%2C%0A%20%20title%20%3D%20%7BImpacto%20Sociodemogr%7B%5C'a%7Dfico%20de%20las%20Pol%7B%5C'i%7Dticas%20de%20Reforma%20Agraria%20en%20el%20Valle%20del%20Aconcagua%5C%24%7D%2C%0A%20%20journal%20%3D%20%7BRevista%20Nacional%20de%20las%20Ciencias%20para%20Estudiantes%7D%2C%0A%20%20year%20%3D%20%7B2025%7D%2C%0A%20%20volume%20%3D%20%7B1%7D%2C%0A%20%20number%20%3D%20%7B1%7D%2C%0A%20%20pages%20%3D%20%7B1--11%7D%2C%0A%20%20issn%20%3D%20%7B3087-2839%7D%2C%0A%20%20url%20%3D%20%7Bhttps%3A%2F%2Fwww.revistacienciasestudiantes.com%2Farticles%2Farticle-impacto-sociodemografico-de-las-politicas-de-reforma-agraria-en-el-valle-del-aconcagua-1.html%7D%0A%7D" download="article-1.bib" class="bibtex-download">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                 <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
                 <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
               </svg>
-              ${t.downloadBibTeX}
+              Descargar BibTeX
             </a>
           </div>
         </div>
         
         <!-- Metadata Tab -->
         <div id="desktop-metadata" class="tab-panel">
-          <h4>${t.keywords}</h4>
+          <h4>Palabras clave</h4>
           <div class="keywords" style="margin-bottom: 1.5rem;">
-            ${keywords.map(kw => {
-    // Detectar si es formato controlado: "CÓDIGO: Término"
-    const match = typeof kw === 'string' ? kw.match(/^([A-Za-z0-9.]+):\s*(.+)/) : null;
-    if (match) {
-        return `<span class="keyword-tag keyword-controlled">
-            <code class="keyword-code">${match[1]}</code>
-            <span class="keyword-term">${match[2]}</span>
-        </span>`;
-    }
-    // Formato legacy: término simple
-    return `<span class="keyword-tag">${kw}</span>`;
-}).join('')}
+            <span class="keyword-tag">Reforma Agraria</span><span class="keyword-tag">Valle del Aconcagua</span><span class="keyword-tag">Propiedad de la Tierra</span><span class="keyword-tag">Transformación Social</span><span class="keyword-tag">Estructuras Agrarias</span><span class="keyword-tag">Siglo XX</span>
           </div>
           
-          <h4>${t.articleInfo}</h4>
+          <h4>Información del artículo</h4>
           <div class="metadata-item">
-            <span class="metadata-label">${t.received}</span>
-            <span class="metadata-value">${receivedDate}</span>
+            <span class="metadata-label">Recibido</span>
+            <span class="metadata-value">26-08-2025</span>
           </div>
           <div class="metadata-item">
-            <span class="metadata-label">${t.accepted}</span>
-            <span class="metadata-value">${acceptedDate}</span>
+            <span class="metadata-label">Aceptado</span>
+            <span class="metadata-value">10-11-2025</span>
           </div>
           <div class="metadata-item">
-            <span class="metadata-label">${t.published}</span>
-            <span class="metadata-value">${fecha}</span>
+            <span class="metadata-label">Publicado</span>
+            <span class="metadata-value">10-11-2025</span>
           </div>
           <div class="metadata-item">
-            <span class="metadata-label">${t.area}</span>
-            <span class="metadata-value">${article.area}</span>
+            <span class="metadata-label">Área</span>
+            <span class="metadata-value">Historia del s. XX Chilena</span>
           </div>
 
-          ${article.doi ? `
-          <div class="metadata-item metadata-doi-item">
-            <span class="metadata-label">DOI</span>
-            <span class="metadata-value">
-              <a href="https://doi.org/${article.doi}" target="_blank" rel="noopener noreferrer" class="sidebar-doi-link">
-                ${article.doi}
-              </a>
-            </span>
-          </div>
-          ` : ''}
+          
 
-          ${funding && funding !== 'No declarada' && funding !== 'Not declared' ? `
-          <div class="metadata-item">
-            <span class="metadata-label">${t.fundingLabel}</span>
-            <span class="metadata-value">${funding}</span>
-          </div>
-          ` : ''}
+          
         </div>
       </div>
     </aside>
@@ -4349,27 +3195,27 @@ body {
     <div class="footer-container">
       <!-- Redes Sociales -->
       <div class="footer-social">
-        <a href="${socialLinks.instagram}" target="_blank" rel="noopener" class="social-icon">
-          ${socialIcons.instagram}
+        <a href="https://www.instagram.com/revistanacionalcienciae" target="_blank" rel="noopener" class="social-icon">
+          <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
           <span class="social-label">Instagram</span>
         </a>
-        <a href="${socialLinks.youtube}" target="_blank" rel="noopener" class="social-icon">
-          ${socialIcons.youtube}
+        <a href="https://www.youtube.com/@RevistaNacionaldelasCienciaspa" target="_blank" rel="noopener" class="social-icon">
+          <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
           <span class="social-label">YouTube</span>
         </a>
-        <a href="${socialLinks.tiktok}" target="_blank" rel="noopener" class="social-icon">
-          ${socialIcons.tiktok}
+        <a href="https://www.tiktok.com/@revistacienciaestudiante" target="_blank" rel="noopener" class="social-icon">
+          <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12.53.02C13.84 0 15.14.01 16.44 0c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>
           <span class="social-label">TikTok</span>
         </a>
-        <a href="${socialLinks.spotify}" target="_blank" rel="noopener" class="social-icon">
-          ${socialIcons.spotify}
+        <a href="https://open.spotify.com/show/6amsgUkNXgUTD219XpuqOe?si=LPzCNpusQjSLGBq_pPrVTw" target="_blank" rel="noopener" class="social-icon">
+          <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.508 17.308c-.221.362-.689.473-1.05.252-2.983-1.823-6.738-2.237-11.162-1.226-.411.094-.823-.162-.917-.573-.094-.412.162-.823.573-.917 4.847-1.108 8.995-.635 12.305 1.386.36.221.472.69.251 1.05zm1.47-3.255c-.278.452-.865.594-1.317.316-3.414-2.098-8.62-2.706-12.657-1.479-.508.154-1.04-.136-1.194-.644-.154-.508.136-1.04.644-1.194 4.613-1.399 10.366-.719 14.256 1.67.452.278.594.865.316 1.317zm.126-3.374C14.653 7.64 7.29 7.394 3.05 8.681c-.604.183-1.246-.166-1.429-.77-.183-.604.166-1.246.77-1.429 4.883-1.482 13.014-1.201 18.238 1.902.544.323.72 1.034.397 1.578-.323.544-1.034.72-1.578.397z"/></svg>
           <span class="social-label">Spotify</span>
         </a>
       </div>
 
       <!-- Contacto - Versión ultra simple sin JavaScript -->
       <div class="footer-contact">
-        <span class="contact-label">${t.contact}</span>
+        <span class="contact-label">Contacto</span>
         
         <!-- Versión para escritorio (Gmail) - visible solo en pantallas grandes -->
         <a href="https://mail.google.com/mail/?view=cm&fs=1&to=contact@revistacienciasestudiantes.com" 
@@ -4389,36 +3235,36 @@ body {
 
       <!-- Navegación adicional: Volver al catálogo, Volver al home, Ver en otro idioma -->
       <div class="footer-nav-links">
-        <a href="${isSpanish ? '/articles/index.html' : '/articles/index.EN.html'}" class="footer-nav-link">
+        <a href="/articles/index.html" class="footer-nav-link">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
           </svg>
-          ${t.backToCatalog}
+          Volver al catálogo
         </a>
         <a href="/" class="footer-nav-link">
-          ${t.backToHome}
+          Volver al inicio
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
             <path d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
           </svg>
         </a>
-        <a href="/articles/article-${articleSlug}${isSpanish ? 'EN' : ''}.html" class="footer-nav-link">
+        <a href="/articles/article-impacto-sociodemografico-de-las-politicas-de-reforma-agraria-en-el-valle-del-aconcagua-1EN.html" class="footer-nav-link">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12.87 15.07l-2.54-2.51.03-.03c1.68-1.68 2.77-3.85 2.96-6.03h3.68V3h-8V1h-2v2H3v2h11.17C13.93 6.69 12.69 8.45 11 10.22c-.74-.74-1.36-1.59-1.86-2.52h-2c.59 1.43 1.46 2.78 2.55 3.88L3 20.59 4.41 22 12 14.41l3.29 3.29L17 15.06l-4.13-3.99z"/>
           </svg>
-          ${t.viewOtherLang}
+          View in English
         </a>
       </div>
 
       <!-- Copyright y enlaces legales -->
       <div class="footer-bottom">
         <div class="footer-links">
-          <a href="/privacy${isSpanish ? '' : 'EN'}.html">Privacidad</a>
+          <a href="/privacy.html">Privacidad</a>
           <span>|</span>
-          <a href="/terms${isSpanish ? '' : 'EN'}.html">Términos</a>
+          <a href="/terms.html">Términos</a>
           <span>|</span>
-          <a href="/credits${isSpanish ? '' : 'EN'}.html">Créditos</a>
+          <a href="/credits.html">Créditos</a>
         </div>
-        <p>© ${new Date().getFullYear()} ${isSpanish ? JOURNAL_NAME_ES : JOURNAL_NAME_EN} · ISSN 3087-2839</p>
+        <p>© 2026 Revista Nacional de las Ciencias para Estudiantes · ISSN 3087-2839</p>
       </div>
     </div>
   </footer>
@@ -4938,344 +3784,4 @@ window.__SPECIAL_ELEMENTS__ = (function() {
 })();
 </script>
 </body>
-</html>`;
-}
-
-function generateIndexes(articles) {
-  // Agrupar por año
-  const articlesByYear = articles.reduce((acc, article) => {
-    const year = new Date(article.fecha).getFullYear() || 'Sin fecha';
-    if (!acc[year]) acc[year] = [];
-    acc[year].push(article);
-    return acc;
-  }, {});
-
-  // Índice español
-  const indexContent = `<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Índice de Artículos - Revista Nacional de las Ciencias para Estudiantes</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:wght@400;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --primary-blue: #007398;
-      --text-dark: #333333;
-      --text-grey: #666666;
-      --border: #e4e4e4;
-      --bg-light: #f8f9fa;
-    }
-    body {
-      font-family: 'Inter', sans-serif;
-      line-height: 1.6;
-      color: var(--text-dark);
-      background-color: #f0f0f0;
-      margin: 0;
-      padding: 0;
-    }
-    .top-bar {
-      background: white;
-      border-bottom: 1px solid var(--border);
-      padding: 1rem 2rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-    .journal-name {
-      font-weight: 700;
-      color: var(--primary-blue);
-      text-decoration: none;
-      font-size: 0.9rem;
-      letter-spacing: 0.5px;
-    }
-    .main-wrapper {
-      max-width: 1200px;
-      margin: 2rem auto;
-      padding: 0 2rem;
-    }
-    .article-container {
-      background: white;
-      padding: 3rem;
-      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-      border-radius: 8px;
-    }
-    h1 {
-      font-family: 'Lora', serif;
-      font-size: 2.5rem;
-      margin: 0 0 1rem;
-      line-height: 1.2;
-      color: #000;
-    }
-    .description {
-      color: var(--text-grey);
-      margin-bottom: 3rem;
-      font-size: 1.1rem;
-    }
-    h2 {
-      font-family: 'Inter', sans-serif;
-      font-size: 1.8rem;
-      color: var(--text-dark);
-      margin: 3rem 0 1.5rem;
-      border-bottom: 2px solid var(--border);
-      padding-bottom: 0.5rem;
-    }
-    .articles-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-    .article-item {
-      margin-bottom: 1.5rem;
-      padding: 1rem;
-      border-radius: 6px;
-      transition: background 0.2s;
-    }
-    .article-item:hover {
-      background: var(--bg-light);
-    }
-    .article-link {
-      color: var(--primary-blue);
-      text-decoration: none;
-      font-size: 1.2rem;
-      font-weight: 600;
-      display: block;
-      margin-bottom: 0.3rem;
-    }
-    .article-link:hover {
-      text-decoration: underline;
-    }
-    .article-meta {
-      color: var(--text-grey);
-      font-size: 0.9rem;
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-    footer {
-      text-align: center;
-      padding: 4rem 2rem;
-      color: var(--text-grey);
-      font-size: 0.9rem;
-    }
-    @media (max-width: 900px) {
-      .main-wrapper { padding: 0 1rem; }
-      .article-container { padding: 1.5rem; }
-      h1 { font-size: 2rem; }
-      h2 { font-size: 1.5rem; }
-    }
-  </style>
-</head>
-<body>
-  <div class="top-bar">
-    <a href="/" class="journal-name">REVISTA NACIONAL DE LAS CIENCIAS PARA ESTUDIANTES</a>
-    <div class="issn">ISSN: 3087-2839</div>
-  </div>
-  <div class="main-wrapper">
-    <main class="article-container">
-      <h1>Índice de Artículos</h1>
-      <p class="description">Accede a los artículos por año de publicación. Cada enlace lleva a la página del artículo con resumen, referencias y PDF.</p>
-      
-      ${Object.keys(articlesByYear).sort().reverse().map(year => `
-      <section>
-        <h2>Año ${year}</h2>
-        <ul class="articles-list">
-          ${articlesByYear[year].map(article => {
-            const articleSlug = article.permalink || `${generateSlug(article.titulo)}-${article.numeroArticulo}`;
-            const authorsDisplay = formatAuthorsDisplay(article.autores, 'es');
-            return `
-            <li class="article-item">
-              <a href="/articles/article-${articleSlug}.html" class="article-link">${article.titulo}</a>
-              <div class="article-meta">
-                <span>${authorsDisplay}</span>
-                <span>Vol. ${article.volumen}, Núm. ${article.numero}</span>
-                <span>pp. ${article.primeraPagina}-${article.ultimaPagina}</span>
-              </div>
-            </li>
-          `;
-          }).join('')}
-        </ul>
-      </section>
-      `).join('')}
-    </main>
-  </div>
-  <footer>
-    <p>&copy; ${new Date().getFullYear()} Revista Nacional de las Ciencias para Estudiantes. ISSN 3087-2839</p>
-    <p><a href="/" style="color:var(--primary-blue); text-decoration:none;">Volver al inicio</a></p>
-  </footer>
-</body>
-</html>`;
-
-  const indexPath = path.join(OUTPUT_HTML_DIR, 'index.html');
-  fs.writeFileSync(indexPath, indexContent, 'utf8');
-  console.log(`✅ Índice español: ${indexPath}`);
-
-  // Índice inglés
-  const indexContentEn = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Index of Articles - The National Review of Sciences for Students</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lora:wght@400;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --primary-blue: #007398;
-      --text-dark: #333333;
-      --text-grey: #666666;
-      --border: #e4e4e4;
-      --bg-light: #f8f9fa;
-    }
-    body {
-      font-family: 'Inter', sans-serif;
-      line-height: 1.6;
-      color: var(--text-dark);
-      background-color: #f0f0f0;
-      margin: 0;
-      padding: 0;
-    }
-    .top-bar {
-      background: white;
-      border-bottom: 1px solid var(--border);
-      padding: 1rem 2rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-    .journal-name {
-      font-weight: 700;
-      color: var(--primary-blue);
-      text-decoration: none;
-      font-size: 0.9rem;
-      letter-spacing: 0.5px;
-    }
-    .main-wrapper {
-      max-width: 1200px;
-      margin: 2rem auto;
-      padding: 0 2rem;
-    }
-    .article-container {
-      background: white;
-      padding: 3rem;
-      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-      border-radius: 8px;
-    }
-    h1 {
-      font-family: 'Lora', serif;
-      font-size: 2.5rem;
-      margin: 0 0 1rem;
-      line-height: 1.2;
-      color: #000;
-    }
-    .description {
-      color: var(--text-grey);
-      margin-bottom: 3rem;
-      font-size: 1.1rem;
-    }
-    h2 {
-      font-family: 'Inter', sans-serif;
-      font-size: 1.8rem;
-      color: var(--text-dark);
-      margin: 3rem 0 1.5rem;
-      border-bottom: 2px solid var(--border);
-      padding-bottom: 0.5rem;
-    }
-    .articles-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-    .article-item {
-      margin-bottom: 1.5rem;
-      padding: 1rem;
-      border-radius: 6px;
-      transition: background 0.2s;
-    }
-    .article-item:hover {
-      background: var(--bg-light);
-    }
-    .article-link {
-      color: var(--primary-blue);
-      text-decoration: none;
-      font-size: 1.2rem;
-      font-weight: 600;
-      display: block;
-      margin-bottom: 0.3rem;
-    }
-    .article-link:hover {
-      text-decoration: underline;
-    }
-    .article-meta {
-      color: var(--text-grey);
-      font-size: 0.9rem;
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-    footer {
-      text-align: center;
-      padding: 4rem 2rem;
-      color: var(--text-grey);
-      font-size: 0.9rem;
-    }
-    @media (max-width: 900px) {
-      .main-wrapper { padding: 0 1rem; }
-      .article-container { padding: 1.5rem; }
-      h1 { font-size: 2rem; }
-      h2 { font-size: 1.5rem; }
-    }
-  </style>
-</head>
-<body>
-  <div class="top-bar">
-    <a href="/" class="journal-name">THE NATIONAL REVIEW OF SCIENCES FOR STUDENTS</a>
-    <div class="issn">ISSN: 3087-2839</div>
-  </div>
-  <div class="main-wrapper">
-    <main class="article-container">
-      <h1>Index of Articles</h1>
-      <p class="description">Access articles by year of publication. Each link leads to the article page with abstract, references and PDF.</p>
-      
-      ${Object.keys(articlesByYear).sort().reverse().map(year => `
-      <section>
-        <h2>Year ${year}</h2>
-        <ul class="articles-list">
-          ${articlesByYear[year].map(article => {
-            const articleSlug = article.permalink || `${generateSlug(article.titulo)}-${article.numeroArticulo}`;
-            const authorsDisplay = formatAuthorsDisplay(article.autores, 'en');
-            return `
-            <li class="article-item">
-              <a href="/articles/article-${articleSlug}EN.html" class="article-link">${article.titulo}</a>
-              <div class="article-meta">
-                <span>${authorsDisplay}</span>
-                <span>Vol. ${article.volumen}, No. ${article.numero}</span>
-                <span>pp. ${article.primeraPagina}-${article.ultimaPagina}</span>
-              </div>
-            </li>
-          `;
-          }).join('')}
-        </ul>
-      </section>
-      `).join('')}
-    </main>
-  </div>
-  <footer>
-    <p>&copy; ${new Date().getFullYear()} The National Review of Sciences for Students. ISSN 3087-2839</p>
-    <p><a href="/" style="color:var(--primary-blue); text-decoration:none;">Back to home</a></p>
-  </footer>
-</body>
-</html>`;
-
-  const indexPathEn = path.join(OUTPUT_HTML_DIR, 'index.EN.html');
-  fs.writeFileSync(indexPathEn, indexContentEn, 'utf8');
-  console.log(`✅ Índice inglés: ${indexPathEn}`);
-}
-
-// ========== EJECUCIÓN ==========
-generateAll();
+</html>
