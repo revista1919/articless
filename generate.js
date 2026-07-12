@@ -1308,7 +1308,10 @@ function generateHtmlTemplate({
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
   <meta name="citation_title" content="${title.replace(/"/g, '&quot;')}">
   ${authorMetaTags}
-  <meta name="citation_publication_date" content="${article.fecha}">
+  <!-- Envía solo el código limpio (ej: 10.xxxx/yyyy) sin la URL https://doi.org -->
+  <meta name="citation_doi" content="${article.doi.replace('https://doi.org', '')}">
+  <!-- Convierte guiones en barras diagonales (AAAA/MM/DD) para Google Scholar -->
+  <meta name="citation_publication_date" content="${article.fecha.replace(/-/g, '/')}">
   <meta name="citation_journal_title" content="Revista Nacional de las Ciencias para Estudiantes">
   <meta name="citation_issn" content="3087-2839">
   <meta name="citation_volume" content="${article.volumen}">
@@ -1317,12 +1320,14 @@ function generateHtmlTemplate({
   <meta name="citation_lastpage" content="${article.ultimaPagina}">
   <meta name="citation_pdf_url" content="${article.pdfUrl}">
   <meta name="citation_abstract_html_url" content="${domain}/articles/article-${articleSlug}${isSpanish ? '' : 'EN'}.html">
-  <meta name="citation_abstract" content="${(isSpanish ? article.resumen : article.abstract).replace(/"/g, '&quot;').substring(0, 500)}">
+  <!-- SIN LÍMITE: El abstract se envía completo para una indexación indexación profunda -->
+  <meta name="citation_abstract" content="${(isSpanish ? article.resumen : article.abstract).replace(/"/g, '&quot;')}">
   <meta name="citation_keywords" content="${keywords.join('; ')}">
   <meta name="citation_language" content="${lang}">
   <meta name="description" content="${(isSpanish ? article.resumen : article.abstract).replace(/"/g, '&quot;').substring(0, 160)}...">
   <meta name="keywords" content="${keywords.join(', ')}">
   <title>${title.replace(/"/g, '&quot;')} - Revista Nacional de las Ciencias para Estudiantes</title>
+
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,700;1,700&family=JetBrains+Mono&family=Lora:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
