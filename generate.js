@@ -4138,21 +4138,28 @@ body {
         </section>
         ` : ''}
 
-        <!-- License Section -->
-        <section id="license" class="license-section">
-          <p>
-            <strong>${t.license}:</strong> 
-            Este artículo se publica bajo la licencia 
-            <a href="https://creativecommons.org/licenses/by/4.0/deed.${isSpanish ? 'es' : 'en'}" target="_blank" rel="license noopener noreferrer">
-              ${ccLogoSvg} CC BY 4.0
-            </a>
-          </p>
-          <p style="margin-top: 0.5rem; font-size: 0.8rem;">
-            <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="license noopener noreferrer">
-              Creative Commons Attribution 4.0 International License
-            </a>
-          </p>
-        </section>
+      <!-- License Section -->
+<section id="license" class="license-section">
+  <p>
+    <strong>© ${new Date().getFullYear()} ${authorsAPA}</strong>
+    <span style="margin: 0 0.5rem;">·</span>
+    <strong>${t.license}:</strong> 
+    Este artículo se publica bajo la licencia 
+    <a href="https://creativecommons.org/licenses/by/4.0/deed.${isSpanish ? 'es' : 'en'}" target="_blank" rel="license noopener noreferrer">
+      ${ccLogoSvg} CC BY 4.0
+    </a>
+  </p>
+  
+  <p style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-muted);">
+    ${isSpanish ? 'Los autores retienen los derechos de autor y conceden a la revista el derecho de primera publicación' : 'Authors retain copyright and grant the journal right of first publication'}
+  </p>
+  
+  <p style="margin-top: 0.5rem; font-size: 0.8rem;">
+    <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="license noopener noreferrer">
+      Creative Commons Attribution 4.0 International License
+    </a>
+  </p>
+</section>
       </article>
 
       <!-- Mobile Info Section -->
