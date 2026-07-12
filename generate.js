@@ -1308,9 +1308,7 @@ function generateHtmlTemplate({
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
   <meta name="citation_title" content="${title.replace(/"/g, '&quot;')}">
   ${authorMetaTags}
-  <!-- Envía solo el código limpio (ej: 10.xxxx/yyyy) sin la URL https://doi.org -->
   <meta name="citation_doi" content="${article.doi.replace('https://doi.org', '')}">
-  <!-- Convierte guiones en barras diagonales (AAAA/MM/DD) para Google Scholar -->
   <meta name="citation_publication_date" content="${article.fecha.replace(/-/g, '/')}">
   <meta name="citation_journal_title" content="Revista Nacional de las Ciencias para Estudiantes">
   <meta name="citation_issn" content="3087-2839">
@@ -1320,7 +1318,6 @@ function generateHtmlTemplate({
   <meta name="citation_lastpage" content="${article.ultimaPagina}">
   <meta name="citation_pdf_url" content="${article.pdfUrl}">
   <meta name="citation_abstract_html_url" content="${domain}/articles/article-${articleSlug}${isSpanish ? '' : 'EN'}.html">
-  <!-- SIN LÍMITE: El abstract se envía completo para una indexación indexación profunda -->
   <meta name="citation_abstract" content="${(isSpanish ? article.resumen : article.abstract).replace(/"/g, '&quot;')}">
   <meta name="citation_keywords" content="${keywords.join('; ')}">
   <meta name="citation_language" content="${lang}">
@@ -1373,7 +1370,6 @@ body {
   overflow-x: hidden;
 }
 /* --- Estilos I --- */
-/* ===== HEADER MEJORADO PARA MÓVIL ===== */
 /* ===== HEADER CON MENÚ HAMBURGUESA PARA MÓVIL ===== */
 .sd-header {
   background: #fff;
