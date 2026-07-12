@@ -6,6 +6,7 @@ on:
     paths:
       - 'articles.json'
       - 'generate.js'
+      - 'convert-jats.js'
       - '.github/workflows/deploy.yml'
   workflow_dispatch: # Permite ejecución manual
 
@@ -36,6 +37,9 @@ jobs:
 
       - name: Generate articles HTML
         run: npm run generate
+
+      - name: Convert articles to JATS XML
+        run: npm run convert-jats
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
