@@ -2792,7 +2792,41 @@ blockquote cite {
   letter-spacing: 4px;
   padding-top: 30px;
 }
+/* ===== DOI EN SIDEBAR (metadata-item) ===== */
+.metadata-doi-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
 
+.metadata-doi-item .metadata-label {
+  flex-shrink: 0;
+  min-width: 70px;
+}
+
+.metadata-doi-item .metadata-value {
+  flex: 1;
+  text-align: left;
+  word-break: break-all;
+}
+
+.sidebar-doi-link {
+  color: var(--nature-blue);
+  text-decoration: none;
+  font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
+  font-size: 0.72rem;
+  transition: color 0.2s ease;
+  display: inline-block;
+  border-bottom: 1px dotted #94a3b8;
+  word-break: break-all;
+}
+
+.sidebar-doi-link:hover {
+  color: #e86125;
+  border-bottom: 1px solid #e86125;
+}
 .mobile-only { display: none; }
 .desktop-only { display: inline-block; }
 
@@ -2970,6 +3004,7 @@ blockquote cite {
     padding: 0.1rem 0.4rem;
   }
 }
+
   </style>
  
 </head>
@@ -3384,22 +3419,21 @@ blockquote cite {
             </a>
           </div>
         </div>
-        
- <!-- Metadata Tab -->
+   <!-- Metadata Tab -->
 <div id="desktop-metadata" class="tab-panel active">
   <div class="info-card">
     <!-- Palabras Clave (Libres) -->
-    ${keywordsArray.length > 0 && `
+    ${keywordsArray.length > 0 ? `
     <div class="metadata-section">
       <h4>${isSpanish ? 'Palabras Clave' : 'Keywords'}</h4>
       <div class="keywords">
         ${keywordsArray.map(kw => `<span class="keyword-tag">${kw.replace(/"/g, '&quot;')}</span>`).join('')}
       </div>
     </div>
-    `}
+    ` : ''}
 
     <!-- Códigos Especializados (SEPARADOS) -->
-    ${specializedCodesArray.length > 0 && `
+    ${specializedCodesArray.length > 0 ? `
     <div class="metadata-section" style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
       <h4 style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
         ${isSpanish ? 'Códigos Especializados' : 'Specialized Codes'}
@@ -3417,7 +3451,7 @@ blockquote cite {
         `).join('')}
       </div>
     </div>
-    `}
+    ` : ''}
           
           <h4>${t.articleInfo}</h4>
           <div class="metadata-item">
