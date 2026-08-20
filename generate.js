@@ -1841,14 +1841,13 @@ h3 {
   gap: 4px;
 }
 /* ==========================================================================
-   MODERN EDITORIAL FOOTNOTES SYSTEM
-   High-end academic styling for journal publications
+   MODERN EDITORIAL FOOTNOTES SYSTEM - CORREGIDO
    ========================================================================== */
 
-/* Estilo para el enlace de la nota en el texto (superíndice) */
+/* Enlace en el texto (superíndice) */
 .footnote-link {
   text-decoration: none;
-  color: #002147; /* Oxford Blue */
+  color: #002147;
   font-weight: 700;
   font-size: 0.75em;
   vertical-align: super;
@@ -1856,19 +1855,36 @@ h3 {
   margin: 0 0.2em;
   padding: 0.2em 0.5em;
   border-radius: 4px;
-  background-color: rgba(0, 33, 71, 0.05);
+  background-color: rgba(0, 33, 71, 0.08);
   transition: all 0.2s ease;
   white-space: nowrap;
+  display: inline-block;
+  min-width: 1.5em;
+  text-align: center;
+}
+
+/* El número se genera con el contador */
+body {
+  counter-reset: footnote-link-counter;
+}
+
+.footnote-link {
+  counter-increment: footnote-link-counter;
+}
+
+.footnote-link::after {
+  content: counter(footnote-link-counter);
+  font-weight: 700;
 }
 
 .footnote-link:hover {
-  background-color: rgba(0, 33, 71, 0.1);
+  background-color: rgba(0, 33, 71, 0.15);
   color: #00152e;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
   text-decoration: none;
 }
 
-/* Contenedor de la sección de notas al pie */
+/* Sección de notas */
 .footnotes {
   margin-top: 3.5rem;
   padding-top: 2rem;
@@ -1876,12 +1892,10 @@ h3 {
   font-size: 0.92rem;
 }
 
-/* Ocultamos la línea horizontal por defecto (puedes eliminarla del HTML si quieres) */
 .footnotes hr {
   display: none;
 }
 
-/* Título de la sección de notas al pie */
 .footnotes h2, 
 .footnotes h3 {
   font-family: 'Inter', sans-serif;
@@ -1889,22 +1903,20 @@ h3 {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #002147; /* Oxford Blue */
+  color: #002147;
   margin-bottom: 1.5rem;
   border-bottom: none;
 }
 
-/* Lista ordenada de notas al pie */
 .footnotes ol {
   list-style: none;
   padding: 0;
   margin: 0;
-  counter-reset: footnote-counter; /* Inicializa el contador */
+  counter-reset: footnote-counter;
 }
 
-/* Cada elemento de la lista (cada nota) */
 .footnotes ol li {
-  counter-increment: footnote-counter; /* Incrementa el contador */
+  counter-increment: footnote-counter;
   position: relative;
   padding: 0.75rem 0 0.75rem 2.75rem;
   margin-bottom: 0.75rem;
@@ -1912,9 +1924,9 @@ h3 {
   line-height: 1.7;
 }
 
-/* El número de la nota dentro del círculo */
+/* Número en círculo */
 .footnotes ol li::before {
-  content: counter(footnote-counter); /* Usa el valor del contador */
+  content: counter(footnote-counter);
   position: absolute;
   left: 0;
   top: 0.85rem;
@@ -1933,31 +1945,43 @@ h3 {
   box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);
 }
 
-/* Estilo para el párrafo de la nota (si usas <p>) */
 .footnotes ol li p {
   margin: 0;
   color: #334155;
 }
 
-/* Enlaces de retorno a la nota en el texto */
-.footnotes ol li a[aria-label*="Volver"],
-.footnotes ol li a[href^="#fn"] {
+/* Enlace de retorno */
+.footnotes ol li a[href^="#fnref"] {
   text-decoration: none;
   color: #002147;
-  font-size: 0.8em;
-  vertical-align: super;
+  font-size: 0.9em;
   margin-left: 0.5em;
-  transition: color 0.2s;
-  font-weight: 600;
+  transition: all 0.2s;
+  display: inline-block;
+  width: 1.8em;
+  height: 1.8em;
+  line-height: 1.8em;
+  text-align: center;
+  border-radius: 50%;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
 }
 
-/* Efecto hover para los enlaces de retorno */
-.footnotes ol li a[aria-label*="Volver"]:hover,
-.footnotes ol li a[href^="#fn"]:hover {
-  color: #FF6C0C; /* Naranja Elsevier */
+.footnotes ol li a[href^="#fnref"]::before {
+  content: "↩";
+  font-size: 0.9em;
 }
 
-/* --- Estilos para el tooltip moderno (hover) --- */
+.footnotes ol li a[href^="#fnref"]:hover {
+  color: #FF6C0C;
+  border-color: #FF6C0C;
+  background: #fff;
+}
+
+/* Tooltip */
 .footnote-tooltip {
   position: fixed;
   z-index: 9999;
@@ -1982,7 +2006,6 @@ h3 {
   transform: translateY(0);
 }
 
-/* La flecha del tooltip */
 .footnote-tooltip::before {
   content: '';
   position: absolute;
@@ -1996,11 +2019,11 @@ h3 {
   transform: rotate(45deg);
 }
 
-/* --- Ajustes responsive --- */
 @media (max-width: 768px) {
   .footnote-link {
     font-size: 0.7em;
     padding: 0.15em 0.4em;
+    min-width: 1.3em;
   }
 
   .footnotes ol li {
@@ -2012,6 +2035,12 @@ h3 {
     height: 1.5rem;
     font-size: 0.6rem;
     top: 0.7rem;
+  }
+  
+  .footnotes ol li a[href^="#fnref"] {
+    width: 1.5em;
+    height: 1.5em;
+    line-height: 1.5em;
   }
 }
 /* ===== DOI LINKS (PREMIUM) ===== */
