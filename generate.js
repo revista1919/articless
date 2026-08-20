@@ -1845,6 +1845,7 @@ h3 {
    High-end academic styling for journal publications
    ========================================================================== */
 
+/* Estilo para el enlace de la nota en el texto (superíndice) */
 .footnote-link {
   text-decoration: none;
   color: #002147; /* Oxford Blue */
@@ -1867,6 +1868,7 @@ h3 {
   text-decoration: none;
 }
 
+/* Contenedor de la sección de notas al pie */
 .footnotes {
   margin-top: 3.5rem;
   padding-top: 2rem;
@@ -1874,10 +1876,12 @@ h3 {
   font-size: 0.92rem;
 }
 
+/* Ocultamos la línea horizontal por defecto (puedes eliminarla del HTML si quieres) */
 .footnotes hr {
-  display: none; /* Ocultamos la línea horizontal por defecto */
+  display: none;
 }
 
+/* Título de la sección de notas al pie */
 .footnotes h2, 
 .footnotes h3 {
   font-family: 'Inter', sans-serif;
@@ -1890,15 +1894,17 @@ h3 {
   border-bottom: none;
 }
 
+/* Lista ordenada de notas al pie */
 .footnotes ol {
   list-style: none;
   padding: 0;
   margin: 0;
-  counter-reset: footnote-counter;
+  counter-reset: footnote-counter; /* Inicializa el contador */
 }
 
+/* Cada elemento de la lista (cada nota) */
 .footnotes ol li {
-  counter-increment: footnote-counter;
+  counter-increment: footnote-counter; /* Incrementa el contador */
   position: relative;
   padding: 0.75rem 0 0.75rem 2.75rem;
   margin-bottom: 0.75rem;
@@ -1906,8 +1912,9 @@ h3 {
   line-height: 1.7;
 }
 
+/* El número de la nota dentro del círculo */
 .footnotes ol li::before {
-  content: counter(footnote-counter);
+  content: counter(footnote-counter); /* Usa el valor del contador */
   position: absolute;
   left: 0;
   top: 0.85rem;
@@ -1926,6 +1933,7 @@ h3 {
   box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);
 }
 
+/* Estilo para el párrafo de la nota (si usas <p>) */
 .footnotes ol li p {
   margin: 0;
   color: #334155;
@@ -1943,16 +1951,10 @@ h3 {
   font-weight: 600;
 }
 
+/* Efecto hover para los enlaces de retorno */
 .footnotes ol li a[aria-label*="Volver"]:hover,
 .footnotes ol li a[href^="#fn"]:hover {
   color: #FF6C0C; /* Naranja Elsevier */
-}
-
-/* Ajuste para que el enlace de retorno no se confunda con el texto */
-.footnotes ol li a[aria-label*="Volver"]::before,
-.footnotes ol li a[href^="#fn"]::before {
-  content: " ↩";
-  font-weight: normal;
 }
 
 /* --- Estilos para el tooltip moderno (hover) --- */
@@ -1980,6 +1982,7 @@ h3 {
   transform: translateY(0);
 }
 
+/* La flecha del tooltip */
 .footnote-tooltip::before {
   content: '';
   position: absolute;
@@ -1993,7 +1996,7 @@ h3 {
   transform: rotate(45deg);
 }
 
-/* --- Responsive adjustments --- */
+/* --- Ajustes responsive --- */
 @media (max-width: 768px) {
   .footnote-link {
     font-size: 0.7em;
