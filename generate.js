@@ -1841,7 +1841,7 @@ h3 {
   gap: 4px;
 }
 /* ==========================================================================
-   MODERN EDITORIAL FOOTNOTES SYSTEM - CORREGIDO
+   MODERN EDITORIAL FOOTNOTES SYSTEM - REFINADO FINAL
    ========================================================================== */
 
 /* Enlace en el texto (superíndice) */
@@ -1851,19 +1851,19 @@ h3 {
   font-weight: 700;
   font-size: 0.75em;
   vertical-align: super;
-  line-height: 0;
+  line-height: 1; /* Ajuste para centrar mejor */
   margin: 0 0.2em;
-  padding: 0.2em 0.5em;
+  padding: 0.1em 0.35em; /* Padding más ajustado */
   border-radius: 4px;
   background-color: rgba(0, 33, 71, 0.08);
   transition: all 0.2s ease;
   white-space: nowrap;
   display: inline-block;
-  min-width: 1.5em;
+  min-width: 1.2em;
   text-align: center;
 }
 
-/* El número se genera con el contador */
+/* Contador para los enlaces de notas */
 body {
   counter-reset: footnote-link-counter;
 }
@@ -1875,6 +1875,7 @@ body {
 .footnote-link::after {
   content: counter(footnote-link-counter);
   font-weight: 700;
+  line-height: 1; /* Asegura que el número no desborde */
 }
 
 .footnote-link:hover {
@@ -1908,25 +1909,28 @@ body {
   border-bottom: none;
 }
 
+/* Lista ordenada de notas */
 .footnotes ol {
-  list-style: none;
+  list-style: none; /* Elimina números por defecto */
   padding: 0;
   margin: 0;
-  counter-reset: footnote-counter;
+  counter-reset: fn-circle-counter; /* Contador independiente para el círculo */
 }
 
+/* Elemento de la lista */
 .footnotes ol li {
-  counter-increment: footnote-counter;
+  counter-increment: fn-circle-counter; /* Incrementa el contador del círculo */
   position: relative;
   padding: 0.75rem 0 0.75rem 2.75rem;
   margin-bottom: 0.75rem;
   border-bottom: 1px solid #f1f5f9;
   line-height: 1.7;
+  list-style: none; /* Refuerzo para eliminar viñetas/números */
 }
 
-/* Número en círculo */
+/* Número en el círculo */
 .footnotes ol li::before {
-  content: counter(footnote-counter);
+  content: counter(fn-circle-counter); /* Usa el contador del círculo */
   position: absolute;
   left: 0;
   top: 0.85rem;
@@ -2019,11 +2023,12 @@ body {
   transform: rotate(45deg);
 }
 
+/* Ajustes responsive */
 @media (max-width: 768px) {
   .footnote-link {
     font-size: 0.7em;
-    padding: 0.15em 0.4em;
-    min-width: 1.3em;
+    padding: 0.1em 0.3em;
+    min-width: 1.1em;
   }
 
   .footnotes ol li {
