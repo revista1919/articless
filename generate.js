@@ -1840,7 +1840,177 @@ h3 {
   font-family: 'Inter', sans-serif;
   gap: 4px;
 }
+/* ==========================================================================
+   MODERN EDITORIAL FOOTNOTES SYSTEM
+   High-end academic styling for journal publications
+   ========================================================================== */
 
+.footnote-link {
+  text-decoration: none;
+  color: #002147; /* Oxford Blue */
+  font-weight: 700;
+  font-size: 0.75em;
+  vertical-align: super;
+  line-height: 0;
+  margin: 0 0.2em;
+  padding: 0.2em 0.5em;
+  border-radius: 4px;
+  background-color: rgba(0, 33, 71, 0.05);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.footnote-link:hover {
+  background-color: rgba(0, 33, 71, 0.1);
+  color: #00152e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  text-decoration: none;
+}
+
+.footnotes {
+  margin-top: 3.5rem;
+  padding-top: 2rem;
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.92rem;
+}
+
+.footnotes hr {
+  display: none; /* Ocultamos la línea horizontal por defecto */
+}
+
+.footnotes h2, 
+.footnotes h3 {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #002147; /* Oxford Blue */
+  margin-bottom: 1.5rem;
+  border-bottom: none;
+}
+
+.footnotes ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  counter-reset: footnote-counter;
+}
+
+.footnotes ol li {
+  counter-increment: footnote-counter;
+  position: relative;
+  padding: 0.75rem 0 0.75rem 2.75rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid #f1f5f9;
+  line-height: 1.7;
+}
+
+.footnotes ol li::before {
+  content: counter(footnote-counter);
+  position: absolute;
+  left: 0;
+  top: 0.85rem;
+  width: 1.8rem;
+  height: 1.8rem;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #002147;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);
+}
+
+.footnotes ol li p {
+  margin: 0;
+  color: #334155;
+}
+
+/* Enlaces de retorno a la nota en el texto */
+.footnotes ol li a[aria-label*="Volver"],
+.footnotes ol li a[href^="#fn"] {
+  text-decoration: none;
+  color: #002147;
+  font-size: 0.8em;
+  vertical-align: super;
+  margin-left: 0.5em;
+  transition: color 0.2s;
+  font-weight: 600;
+}
+
+.footnotes ol li a[aria-label*="Volver"]:hover,
+.footnotes ol li a[href^="#fn"]:hover {
+  color: #FF6C0C; /* Naranja Elsevier */
+}
+
+/* Ajuste para que el enlace de retorno no se confunda con el texto */
+.footnotes ol li a[aria-label*="Volver"]::before,
+.footnotes ol li a[href^="#fn"]::before {
+  content: " ↩";
+  font-weight: normal;
+}
+
+/* --- Estilos para el tooltip moderno (hover) --- */
+.footnote-tooltip {
+  position: fixed;
+  z-index: 9999;
+  max-width: 320px;
+  padding: 0.85rem 1.15rem;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  box-shadow: 0 10px 25px -5px rgba(0, 33, 71, 0.1), 0 8px 10px -6px rgba(0, 33, 71, 0.1);
+  font-family: 'Lora', Georgia, serif;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: #1e293b;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(5px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.footnote-tooltip.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.footnote-tooltip::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 20px;
+  width: 12px;
+  height: 12px;
+  background: #ffffff;
+  border-left: 1px solid #cbd5e1;
+  border-top: 1px solid #cbd5e1;
+  transform: rotate(45deg);
+}
+
+/* --- Responsive adjustments --- */
+@media (max-width: 768px) {
+  .footnote-link {
+    font-size: 0.7em;
+    padding: 0.15em 0.4em;
+  }
+
+  .footnotes ol li {
+    padding-left: 2.25rem;
+  }
+
+  .footnotes ol li::before {
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 0.6rem;
+    top: 0.7rem;
+  }
+}
 /* ===== DOI LINKS (PREMIUM) ===== */
 .doi-academic-link,
 .meta-doi-wrapper {
@@ -4085,6 +4255,61 @@ window.__SPECIAL_ELEMENTS__ = (function() {
   console.log('Elementos especiales detectados:', elements); // Para debug
   return elements;
 })();
+</script>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const footnoteLinks = document.querySelectorAll('.footnote-link');
+
+    footnoteLinks.forEach(link => {
+      link.addEventListener('mouseenter', function(e) {
+        const href = this.getAttribute('href');
+        if (!href || !href.startsWith('#')) return;
+        const targetId = href.substring(1);
+        const targetFootnote = document.getElementById(targetId);
+        if (!targetFootnote) return;
+
+        // Crear el tooltip
+        const tooltip = document.createElement('div');
+        tooltip.className = 'footnote-tooltip';
+        tooltip.textContent = targetFootnote.textContent.replace('↩', '').trim();
+
+        document.body.appendChild(tooltip);
+
+        // Posicionar el tooltip cerca del enlace
+        const rect = this.getBoundingClientRect();
+        const tooltipRect = tooltip.getBoundingClientRect();
+        let top = rect.bottom + window.scrollY + 10;
+        let left = rect.left + window.scrollX;
+
+        // Ajustar si se sale por la derecha
+        if (left + tooltipRect.width > window.innerWidth - 20) {
+          left = window.innerWidth - tooltipRect.width - 20;
+        }
+
+        // Ajustar si se sale por abajo
+        if (top + tooltipRect.height > window.innerHeight + window.scrollY - 20) {
+          top = rect.top + window.scrollY - tooltipRect.height - 10;
+        }
+
+        tooltip.style.top = top + 'px';
+        tooltip.style.left = left + 'px';
+
+        // Mostrar con un pequeño retraso para evitar parpadeo
+        setTimeout(() => tooltip.classList.add('visible'), 10);
+
+        // Guardar referencia al tooltip para eliminarlo después
+        this._tooltip = tooltip;
+
+        // Listener para eliminarlo al salir del enlace
+        this.addEventListener('mouseleave', function() {
+          if (this._tooltip) {
+            this._tooltip.remove();
+            this._tooltip = null;
+          }
+        }, { once: true });
+      });
+    });
+  });
 </script>
 </body>
 </html>`;
