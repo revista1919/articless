@@ -3501,7 +3501,9 @@ blockquote cite {
             <span class="alt-title" title="${isSpanish ? 'Título en inglés / English title' : 'Título en español / Spanish title'}">${altTitle}</span>
           </div>
           ` : ''}
-
+<div class="authors">
+            ${authorsDisplay}
+          </div>
           <!-- Botón Show more / Show less -->
 <div>
   <button id="showMoreBtn" class="show-more-btn" onclick="toggleAuthorDetails()">
