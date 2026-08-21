@@ -656,7 +656,7 @@ function findAuthorInfo(author, articleAuthorId = null) {
 }
 
 // ========== FUNCIÓN PARA PROCESAR AUTORES CON ICONOS (MEJORADA) ==========
-// ========== FUNCIÓN PARA PROCESAR AUTORES CON ICONOS (MEJORADA CON IDIOMA) ==========
+// ========== FUNCIÓN PARA PROCESAR AUTORES CON ICONOS (MEJORADA CON IDIOMA Y CORRESPONDENCIA) ==========
 function processAuthorsWithIcons(authors, article = null, lang = 'es') {
   if (!authors) return 'Autor desconocido';
   
@@ -671,6 +671,7 @@ function processAuthorsWithIcons(authors, article = null, lang = 'es') {
   }
   
   const isSpanish = lang === 'es';
+  const superindices = 'abcdefghijklmnopqrstuvwxyz';
   
   const authorElements = authorsArray.map((author, index) => {
     // Obtener nombre para mostrar
@@ -717,6 +718,10 @@ function processAuthorsWithIcons(authors, article = null, lang = 'es') {
       authorHtml += `>${displayName}</span>`;
     }
     
+    // AÑADIR SUPERÍNDICE (a, b, c, etc.)
+    const supLetter = superindices[index] || String(index + 1);
+    authorHtml += `<sup class="author-sup">${supLetter}</sup>`;
+    
     // Añadir iconos
     const icons = [];
     
@@ -732,6 +737,17 @@ function processAuthorsWithIcons(authors, article = null, lang = 'es') {
       icons.push(`<a href="mailto:${email}" class="author-icon email-icon" title="Email">${emailSvg}</a>`);
     }
     
+    // ICONO DE CORRESPONDENCIA (solo si isCorresponding === true)
+    const isCorresponding = author.isCorresponding === true || (authorInfo && authorInfo.isCorresponding === true);
+    if (isCorresponding) {
+      icons.push(`<span class="author-icon corresponding-icon" title="${isSpanish ? 'Autor de correspondencia' : 'Corresponding author'}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+      </span>`);
+    }
+    
     if (icons.length > 0) {
       authorHtml += `<span class="author-icons">${icons.join('')}</span>`;
     }
@@ -741,8 +757,29 @@ function processAuthorsWithIcons(authors, article = null, lang = 'es') {
   
   return authorElements.join('<span class="author-separator">, </span>');
 }
+function generateInstitutionsList(autores, lang) {
+  let authorsArray;
+  if (typeof autores === 'string') {
+    authorsArray = autores.split(';').map(a => ({ name: a.trim() }));
+  } else if (Array.isArray(autores)) {
+    authorsArray = autores;
+  } else {
+    authorsArray = [];
+  }
 
+  const superindices = 'abcdefghijklmnopqrstuvwxyz';
+  const institutions = [];
+  
+  authorsArray.forEach((author, index) => {
+    if (author.institution) {
+      const supLetter = superindices[index] || String(index + 1);
+      institutions.push(`<li><sup>${supLetter}</sup> ${author.institution}</li>`);
+    }
+  });
 
+  return institutions.length ? 
+    `<ul class="institutions-list">${institutions.join('')}</ul>` : '';
+}
 
 // ========== FUNCIÓN PARA PROCESAR TABLAS CON BOTONES DE DESCARGA (ACTUALIZADA CON MODELO) ==========
 function processTablesWithDownload($, html) {
@@ -1056,6 +1093,7 @@ async function generateArticleHtml(article) {
   // Construir autores con iconos - AHORA PASAMOS EL ARTÍCULO COMPLETO
   const authorsDisplayEs = processAuthorsWithIcons(article.autores, article, 'es');
   const authorsDisplayEn = processAuthorsWithIcons(article.autores, article, 'en');
+  const institutionsList = generateInstitutionsList(article.autores, 'es');
   const finalAuthorsDisplay = formatAuthorsDisplay(article.autores, 'es');
   const authorsAPA = formatAuthorsAPA(article.autores);
   const authorsChicagoEs = formatAuthorsChicagoOrMLA(article.autores, 'es');
@@ -1103,6 +1141,7 @@ async function generateArticleHtml(article) {
     articleSlug,
     authorMetaTags,
     authorsDisplay: authorsDisplayEs,
+    institutionsList,
     finalAuthorsDisplay,
     authorsAPA,
     authorsChicagoEs,
@@ -1135,6 +1174,7 @@ async function generateArticleHtml(article) {
     articleSlug,
     authorMetaTags,
     authorsDisplay: authorsDisplayEn,
+    institutionsList,
     finalAuthorsDisplay,
     authorsAPA,
     authorsChicagoEs,
@@ -1168,6 +1208,7 @@ function generateHtmlTemplate({
   authorMetaTags,
   authorsDisplay,
   finalAuthorsDisplay,
+  institutionsList,
   authorsAPA,
   authorsChicagoEs,
   authorsMLAEs,
@@ -1783,6 +1824,99 @@ h3 {
 
 .author-icon:hover {
   opacity: 1;
+  color: var(--accent);
+}
+
+/* ===== AUTHOR SEPARATORS & SUPERSCRIPTS ===== */
+.author-separator {
+  margin-right: 0.3rem;
+  color: var(--text-muted);
+}
+
+.author-sup {
+  font-size: 0.75em;
+  vertical-align: super;
+  color: var(--text-light);
+  margin-left: 1px;
+}
+
+/* ===== SHOW MORE / LESS & METADATA EXTENDED ===== */
+.show-more-btn {
+  background: none;
+  border: 1px solid var(--nature-blue);
+  color: var(--nature-blue);
+  padding: 0.4rem 0.9rem;
+  border-radius: 4px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0.5rem 0 1.2rem 0;
+  transition: all 0.2s;
+}
+
+.show-more-btn:hover {
+  background: var(--bg-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.show-more-btn svg {
+  width: 12px;
+  height: 12px;
+  transition: transform 0.2s;
+}
+
+.extended-author-info {
+  display: none;
+  background: var(--bg-soft);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  animation: fadeIn 0.25s ease-in-out;
+}
+
+.extended-author-info.active {
+  display: block;
+}
+
+.institutions-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem 0;
+}
+
+.institutions-list li {
+  margin-bottom: 0.4rem;
+  color: var(--text-light);
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.institutions-list sup {
+  font-weight: 700;
+  color: var(--nature-blue);
+  font-size: 0.75rem;
+}
+
+.article-dates-block {
+  border-top: 1px solid var(--border-color);
+  padding-top: 0.75rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .meta-box {
@@ -3368,9 +3502,21 @@ blockquote cite {
           </div>
           ` : ''}
 
-          <div class="authors">
-            ${authorsDisplay}
-          </div>
+          <!-- Botón Show more / Show less -->
+<div>
+  <button id="showMoreBtn" class="show-more-btn" onclick="toggleAuthorDetails()">
+    <span id="showMoreText">${isSpanish ? 'Mostrar más' : 'Show more'}</span>
+    <svg id="showMoreArrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+  </button>
+</div>
+
+<!-- Contenedor desplegable con Instituciones y Fechas -->
+<div id="extendedAuthorInfo" class="extended-author-info">
+  ${institutionsList}
+  <div class="article-dates-block">
+    ${isSpanish ? 'Recibido' : 'Received'} ${receivedDate} · ${isSpanish ? 'Aceptado' : 'Accepted'} ${acceptedDate} · ${isSpanish ? 'Disponible en línea' : 'Available online'} ${fecha}
+  </div>
+</div>
 
           <!-- ===== META BOX CORREGIDA CON DOI ===== -->
           <div class="meta-box">
@@ -3780,6 +3926,20 @@ blockquote cite {
   </footer>
 
 <script>
+function toggleAuthorDetails() {
+  const info = document.getElementById('extendedAuthorInfo');
+  const text = document.getElementById('showMoreText');
+  const arrow = document.getElementById('showMoreArrow');
+  
+  info.classList.toggle('active');
+  if (info.classList.contains('active')) {
+    text.textContent = '${isSpanish ? 'Mostrar menos' : 'Show less'}';
+    arrow.style.transform = 'rotate(180deg)';
+  } else {
+    text.textContent = '${isSpanish ? 'Mostrar más' : 'Show more'}';
+    arrow.style.transform = 'rotate(0deg)';
+  }
+}
 // ========== FUNCIONES PARA MENÚ MÓVIL ==========
 let mobileSearchVisible = false;
 
