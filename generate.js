@@ -2994,12 +2994,18 @@ body {
 /* ===== CODE BLOCKS (CODEMIRROR) ===== */
 .code-block-wrapper {
   margin: 2.5rem 0;
-  border-radius: 8px;
+  border-radius: 10px;
   background: #1e1e1e;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.25), 0 0 1px 1px rgba(255, 255, 255, 0.05) inset;
   overflow: hidden;
-  border: 1px solid #333333;
+  border: 1px solid #2d2d2d;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.code-block-wrapper:hover {
+  border-color: #404040;
+  box-shadow: 0 12px 35px -5px rgba(0, 0, 0, 0.35), 0 0 1px 1px rgba(255, 255, 255, 0.08) inset;
 }
 
 .code-header {
@@ -3008,24 +3014,25 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #333333;
+  border-bottom: 1px solid #2d2d2d;
   font-family: 'Inter', sans-serif;
 }
 
 .code-language {
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.7rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #858585;
+  letter-spacing: 0.08em;
+  color: #9cdcfe;
+  opacity: 0.85;
 }
 
 .code-copy-btn {
-  background: #3c3c3c;
-  border: 1px solid #555555;
-  border-radius: 4px;
-  padding: 0.3rem 0.8rem;
-  font-size: 0.7rem;
+  background: #2d2d2d;
+  border: 1px solid #3c3c3c;
+  border-radius: 5px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.72rem;
   font-family: 'Inter', sans-serif;
   font-weight: 500;
   cursor: pointer;
@@ -3033,13 +3040,19 @@ body {
   align-items: center;
   gap: 0.4rem;
   color: #cccccc;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .code-copy-btn:hover {
   background: #4ec9b0;
   border-color: #4ec9b0;
   color: #1e1e1e;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(78, 201, 176, 0.25);
+}
+
+.code-copy-btn:active {
+  transform: translateY(0);
 }
 
 .code-block-container {
@@ -3049,30 +3062,36 @@ body {
 /* CodeMirror overrides */
 .code-block-container .CodeMirror {
   height: auto;
-  max-height: 500px;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 0.85rem;
-  line-height: 1.6;
+  line-height: 1.65;
   background: #1e1e1e;
   color: #d4d4d4;
+  padding: 0.5rem 0;
 }
 
 .code-block-container .CodeMirror-gutters {
-  background: #252526;
-  border-right: 1px solid #333333;
+  background: #1e1e1e;
+  border-right: 1px solid #2d2d2d;
+  padding-right: 4px;
 }
 
 .code-block-container .CodeMirror-linenumber {
-  color: #858585;
-  padding: 0 8px;
+  color: #656565;
+  padding: 0 10px 0 12px;
+  font-size: 0.8rem;
 }
 
 .code-block-container .CodeMirror-cursor {
-  border-left: 1px solid #d4d4d4;
+  border-left: 2px solid #4ec9b0;
 }
 
 .code-block-container .CodeMirror-selected {
-  background: rgba(78, 201, 176, 0.2);
+  background: rgba(78, 201, 176, 0.18) !important;
+}
+
+.code-block-container .CodeMirror-focused .CodeMirror-selected {
+  background: rgba(78, 201, 176, 0.25) !important;
 }
 
 /* Ocultar el textarea original */
