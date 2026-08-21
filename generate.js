@@ -1470,9 +1470,8 @@ img, svg, video, canvas, iframe, embed, object {
 }
 
 html {
-  overflow-x: hidden;
-  width: 100%;
-  max-width: 100%;
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px; /* Altura del header sticky */
 }
 
 body {
@@ -1521,19 +1520,20 @@ h3 {
   margin: 2rem 0 1rem 0;
 }
 
-/* ===== HEADER & BRANDING ===== */
 .sd-header {
   background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border-color);
   font-family: 'Inter', sans-serif;
   position: sticky;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 1000;
   width: 100%;
   box-shadow: 0 1px 2px rgba(0,0,0,0.03);
 }
-
 .sd-header-top {
   max-width: 1400px;
   margin: 0 auto;
@@ -1798,7 +1798,6 @@ h3 {
   text-align: center;
 }
 
-/* ===== MAIN LAYOUT ===== */
 .main-wrapper {
   max-width: 1400px;
   margin: 0 auto;
@@ -1806,6 +1805,7 @@ h3 {
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr) var(--aside-width);
   gap: 4rem;
   padding: 3rem 2rem;
+  align-items: start; /* Importante para que sticky funcione */
 }
 
 .article-container {
@@ -3508,18 +3508,17 @@ blockquote cite {
   margin: 0 0.5rem;
 }
 
-/* ===== SIDEBARS ===== */
 .toc-sidebar {
   position: sticky;
-  top: 100px;
+  top: 80px; /* Justo debajo del header */
   height: fit-content;
-  font-family: 'Inter', sans-serif;
-  max-height: calc(100vh - 120px);
+  max-height: calc(100vh - 100px);
   overflow-y: auto;
+  font-family: 'Inter', sans-serif;
   scrollbar-width: thin;
   padding-right: 0.5rem;
+  align-self: start; /* Importante para que sticky funcione en grid */
 }
-
 .toc-sidebar::-webkit-scrollbar {
   width: 4px;
 }
@@ -3576,12 +3575,13 @@ blockquote cite {
 
 .right-sidebar {
   position: sticky;
-  top: 100px;
-  max-height: calc(100vh - 120px);
+  top: 80px; /* Justo debajo del header */
+  max-height: calc(100vh - 100px);
   overflow-y: auto;
   font-family: 'Inter', sans-serif;
   scrollbar-width: thin;
   padding-right: 0.5rem;
+  align-self: start; /* Importante para que sticky funcione en grid */
 }
 
 .right-sidebar::-webkit-scrollbar {
@@ -3592,7 +3592,19 @@ blockquote cite {
   background: var(--border-color);
   border-radius: 3px;
 }
-
+/* ===== STICKY FIX PARA SAFARI ===== */
+@supports (-webkit-touch-callout: none) {
+  .sd-header {
+    position: -webkit-sticky;
+    position: sticky;
+  }
+  
+  .toc-sidebar,
+  .right-sidebar {
+    position: -webkit-sticky;
+    position: sticky;
+  }
+}
 /* ===== FOOTER ===== */
 .footer {
   background: #1a1a1a;
