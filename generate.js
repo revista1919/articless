@@ -1791,53 +1791,93 @@ h3 {
   font-size: 1.15rem;
   font-weight: 500;
   margin-bottom: 1.5rem;
-  line-height: 1.6;
+  line-height: 1.8;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.3rem;
+  align-items: baseline;
+  gap: 0.15rem 0.3rem;
 }
 
-.author-link {
-  color: var(--nature-blue);
-  text-decoration: none;
-  border-bottom: 1px dotted transparent;
-  transition: all 0.2s;
-}
-
-.author-link:hover {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
-
-.author-icons {
+/* Evitar que el superíndice se separe del nombre */
+.authors a,
+.authors .author-name {
+  white-space: nowrap;
   display: inline-flex;
-  gap: 0.3rem;
-  margin-left: 0.3rem;
-  vertical-align: middle;
+  align-items: baseline;
 }
 
-.author-icon {
-  display: inline-block;
-  opacity: 0.8;
-  transition: opacity 0.2s;
+/* Mantener nombre + superíndice juntos */
+.authors .author-link,
+.authors .author-name {
+  white-space: nowrap;
 }
 
-.author-icon:hover {
-  opacity: 1;
-  color: var(--accent);
-}
-
-/* ===== AUTHOR SEPARATORS & SUPERSCRIPTS ===== */
-.author-separator {
-  margin-right: 0.3rem;
-  color: var(--text-muted);
-}
-
-.author-sup {
-  font-size: 0.75em;
+.authors .author-sup {
+  white-space: nowrap;
+  display: inline;
+  font-size: 0.7em;
   vertical-align: super;
-  color: var(--text-light);
+  line-height: 1;
   margin-left: 1px;
+}
+
+/* Mantener iconos junto al nombre */
+.authors .author-icons {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  margin-left: 0.2rem;
+  gap: 0.2rem;
+}
+
+/* Separador de coma */
+.authors .author-separator {
+  white-space: normal;
+  display: inline;
+  margin-right: 0.15rem;
+}
+
+/* Para pantallas pequeñas */
+@media (max-width: 480px) {
+  .authors {
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+  
+  .authors .author-sup {
+    font-size: 0.65em;
+  }
+}
+  /* ===== SHARE BUTTON ===== */
+.share-btn-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.8rem;
+  background-color: var(--bg-soft);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  text-decoration: none;
+  font-family: 'Inter', sans-serif;
+  color: var(--text-light);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.share-btn-wrapper:hover {
+  border-color: var(--nature-blue);
+  background-color: #ffffff;
+  color: var(--nature-blue);
+  box-shadow: 0 2px 8px rgba(0, 70, 96, 0.08);
+}
+
+.share-btn-wrapper svg {
+  width: 14px;
+  height: 14px;
+  color: var(--nature-blue);
+  flex-shrink: 0;
 }
 
 /* ===== SHOW MORE / LESS & METADATA EXTENDED ===== */
@@ -3520,7 +3560,7 @@ blockquote cite {
   </div>
 </div>
 
-          <!-- ===== META BOX CORREGIDA CON DOI ===== -->
+                    <!-- ===== META BOX CORREGIDA CON DOI Y COMPARTIR ===== -->
           <div class="meta-box">
             <span>Vol. ${article.volumen}, ${isSpanish ? 'Núm.' : 'No.'} ${article.numero}</span>
             <span>pp. ${article.primeraPagina}-${article.ultimaPagina}</span>
@@ -3533,8 +3573,19 @@ blockquote cite {
               </a>
             </span>
             ` : ''}
+            
+            <!-- Botón de compartir -->
+            <button class="share-btn-wrapper" onclick="shareArticle()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="18" cy="5" r="3"></circle>
+                <circle cx="6" cy="12" r="3"></circle>
+                <circle cx="18" cy="19" r="3"></circle>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+              </svg>
+              ${isSpanish ? 'Compartir' : 'Share'}
+            </button>
           </div>
-
           <!-- Action Bar -->
           <div class="action-bar">
             <a href="${article.pdfUrl}" target="_blank" rel="noopener noreferrer" class="btn-pdf">
@@ -3940,6 +3991,45 @@ function toggleAuthorDetails() {
   } else {
     text.textContent = '${isSpanish ? 'Mostrar más' : 'Show more'}';
     arrow.style.transform = 'rotate(0deg)';
+  }
+}
+  function shareArticle() {
+  const url = window.location.href;
+  const title = document.title;
+  
+  if (navigator.share) {
+    // Usar Web Share API si está disponible (móviles)
+    navigator.share({
+      title: title,
+      url: url
+    }).catch(err => {
+      console.log('Error compartiendo:', err);
+    });
+  } else {
+    // Fallback: copiar al portapapeles
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(() => {
+        alert('${isSpanish ? '¡Enlace copiado al portapapeles!' : 'Link copied to clipboard!'}');
+      }).catch(() => {
+        // Fallback final
+        const textArea = document.createElement('textarea');
+        textArea.value = url;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        alert('${isSpanish ? '¡Enlace copiado al portapapeles!' : 'Link copied to clipboard!'}');
+      });
+    } else {
+      // Fallback para navegadores antiguos
+      const textArea = document.createElement('textarea');
+      textArea.value = url;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      alert('${isSpanish ? '¡Enlace copiado al portapapeles!' : 'Link copied to clipboard!'}');
+    }
   }
 }
 // ========== FUNCIONES PARA MENÚ MÓVIL ==========
