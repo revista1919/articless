@@ -1795,11 +1795,9 @@ h3 {
   line-height: 1.8;
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center; 
   gap: 0.15rem 0.3rem;
 }
-
-/* Enlace del autor */
 .author-link {
   color: var(--nature-blue);
   text-decoration: none;
@@ -1807,7 +1805,15 @@ h3 {
   transition: all 0.2s;
   white-space: nowrap;
   display: inline-flex;
-  align-items: baseline;
+  /* align-items: baseline; ← QUITAR ESTO */
+}
+
+.author-name {
+  color: var(--nature-blue);
+  font-weight: 500;
+  white-space: nowrap;
+  display: inline-flex;
+  /* align-items: baseline;
 }
 
 .author-link:hover {
@@ -1815,24 +1821,19 @@ h3 {
   border-bottom-color: var(--accent);
 }
 
-/* Nombre del autor sin enlace */
-.author-name {
-  color: var(--nature-blue);
-  font-weight: 500;
-  white-space: nowrap;
-  display: inline-flex;
-  align-items: baseline;
-}
+
 
 /* Superíndice (a, b, c...) */
 .author-sup {
-  font-size: 0.7em;
-  vertical-align: super;
+  font-size: 0.65em;
+  position: relative;
+  top: -0.5em;
   color: var(--text-light);
   margin-left: 1px;
   white-space: nowrap;
   display: inline;
   line-height: 1;
+  font-weight: 600;
 }
 
 /* Iconos (ORCID, email, correspondencia) */
