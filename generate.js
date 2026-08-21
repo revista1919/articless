@@ -734,7 +734,8 @@ function processAuthorsWithIcons(authors, article = null, lang = 'es') {
     // Email (azul)
     const email = (authorInfo && authorInfo.email) || author.email || author.publicEmail;
     if (email && email.trim() !== '') {
-      icons.push(`<a href="mailto:${email}" class="author-icon email-icon" title="Email">${emailSvg}</a>`);
+      const gmailUrl = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(email);
+      icons.push('<a href="' + gmailUrl + '" target="_blank" rel="noopener noreferrer" class="author-icon email-icon" title="' + (isSpanish ? 'Enviar email' : 'Send email') + '">' + emailSvg + '</a>');
     }
     
     // ICONO DE CORRESPONDENCIA (solo si isCorresponding === true)
@@ -1805,7 +1806,6 @@ h3 {
   transition: all 0.2s;
   white-space: nowrap;
   display: inline-flex;
-  /* align-items: baseline; ← QUITAR ESTO */
 }
 
 .author-name {
@@ -1813,7 +1813,7 @@ h3 {
   font-weight: 500;
   white-space: nowrap;
   display: inline-flex;
-  /* align-items: baseline;
+
 }
 
 .author-link:hover {
@@ -4346,7 +4346,7 @@ function openShareModal() {
   document.getElementById('shareFacebook').href = 'https://www.facebook.com/sharer/sharer.php?u=' + encodedUrl;
   document.getElementById('shareWhatsapp').href = 'https://wa.me/?text=' + encodedTitle + '%20' + encodedUrl;
   document.getElementById('shareLinkedin').href = 'https://www.linkedin.com/sharing/share-offsite/?url=' + encodedUrl;
-  document.getElementById('shareEmail').href = 'mailto:?subject=' + encodedTitle + '&body=' + encodedUrl;
+   document.getElementById('shareEmail').href = 'https://mail.google.com/mail/?view=cm&fs=1&su=' + encodedTitle + '&body=' + encodedUrl;
   document.getElementById('shareTelegram').href = 'https://t.me/share/url?url=' + encodedUrl + '&text=' + encodedTitle;
   document.getElementById('shareCopyLink').onclick = function(e) {
     e.preventDefault();
