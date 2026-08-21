@@ -908,8 +908,7 @@ function processTablesWithDownload($, html) {
   
   return $.html();
 }
-
-// ========== FUNCIÓN PARA PROCESAR CÓDIGOS EN HTML (CORREGIDA) ==========
+// ========== FUNCIÓN PARA PROCESAR CÓDIGOS CON CODEMIRROR ==========
 function processCodeBlocks(html) {
   if (!html) return html;
   
@@ -918,19 +917,54 @@ function processCodeBlocks(html) {
     .replace(/<!DOCTYPE[^>]*>/gi, '')
     .replace(/<html[^>]*>/gi, '')
     .replace(/<\/html>/gi, '')
-    .replace(/<head[^>]*>/gi, '')
-    .replace(/<\/head>/gi, '')
+    .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '')
     .replace(/<body[^>]*>/gi, '')
-    .replace(/<\/body>/gi, '');
+    .replace(/<\/body>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<link[^>]*>/gi, '')
+    .replace(/<meta[^>]*>/gi, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
   
   const $ = cheerio.load(cleanedHtml, { decodeEntities: false });
   let codeIndex = 0;
   
-  // Procesar SOLO bloques de código, sin afectar listas
+  // Mapa de lenguajes de Highlight.js a CodeMirror
+  const languageMap = {
+    'python': 'python',
+    'py': 'python',
+    'javascript': 'javascript',
+    'js': 'javascript',
+    'typescript': 'javascript',
+    'ts': 'javascript',
+    'html': 'htmlmixed',
+    'xml': 'xml',
+    'css': 'css',
+    'scss': 'css',
+    'bash': 'shell',
+    'sh': 'shell',
+    'shell': 'shell',
+    'r': 'r',
+    'c': 'clike',
+    'cpp': 'clike',
+    'c++': 'clike',
+    'java': 'clike',
+    'csharp': 'clike',
+    'cs': 'clike',
+    'sql': 'sql',
+    'php': 'php',
+    'yaml': 'yaml',
+    'yml': 'yaml',
+    'dockerfile': 'dockerfile',
+    'markdown': 'markdown',
+    'md': 'markdown',
+    'json': 'javascript',
+    'latex': 'stex'
+  };
+  
   $('pre').each((i, el) => {
     const $el = $(el);
     
-    // Evitar reprocesar si ya tiene wrapper
+    // Evitar reprocesar
     if ($el.parent().hasClass('code-block-wrapper')) {
       return;
     }
@@ -952,53 +986,46 @@ function processCodeBlocks(html) {
       code = $el.text();
     }
     
-    const lines = code.split('\n');
-    const lineCount = lines.length;
-    
-    // Generar números de línea
-    let lineNumbersHtml = '';
-    for (let i = 1; i <= lineCount; i++) {
-      lineNumbersHtml += `<span class="code-line-number">${i}</span>`;
-    }
+    // ESCAPAR el código para HTML
+    const escapedCode = code
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
     
     codeIndex++;
-    const codeId = `code-${codeIndex}`;
+    const codeId = 'code-' + codeIndex;
     
-    // Escapar código y envolver cada línea
-    const escapedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const wrappedLines = lines.map(line => 
-      `<span class="line">${line || ' '}</span>`
-    ).join('\n');
+    // Determinar el modo de CodeMirror
+    const cmMode = languageMap[language.toLowerCase()] || 'python';
     
-    const copySvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+    const copySvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
     
-    const codeHtml = `
-<div class="code-block-wrapper" id="${codeId}">
-  <div class="code-header">
-    <span class="code-language">${language || 'código'}</span>
-    <button class="code-copy-btn" onclick="copyCode('${codeId}', this)" title="Copiar código (Ctrl+C)">
-      ${copySvg}
-      <span class="copy-text">Copiar</span>
-    </button>
-  </div>
-  <div class="code-block-container">
-    <div class="code-line-numbers" aria-hidden="true">
-      ${lineNumbersHtml}
-    </div>
-    <pre class="code-block ${language ? `language-${language}` : ''}"><code class="${language ? `language-${language}` : ''}">${wrappedLines}</code></pre>
-  </div>
-</div>`;
+    // Construir HTML con un textarea que CodeMirror convertirá
+    const codeHtml = [
+      '<div class="code-block-wrapper" id="' + codeId + '">',
+      '  <div class="code-header">',
+      '    <span class="code-language">' + (language || 'código') + '</span>',
+      '    <button class="code-copy-btn" onclick="copyCodeFromCM(\'' + codeId + '\', this)" title="Copiar código">',
+      '      ' + copySvg,
+      '      <span class="copy-text">Copiar</span>',
+      '    </button>',
+      '  </div>',
+      '  <div class="code-block-container">',
+      '    <textarea id="' + codeId + '-textarea" class="codemirror-textarea" data-mode="' + cmMode + '">' + escapedCode + '</textarea>',
+      '  </div>',
+      '</div>'
+    ].join('\n');
     
     $el.replaceWith(codeHtml);
   });
   
   let processedHtml = $.html();
   
-  // Procesar tablas DESPUÉS del código (no antes)
+  // Procesar tablas DESPUÉS del código
   const $2 = cheerio.load(processedHtml, { decodeEntities: false });
   processedHtml = processTablesWithDownload($2, processedHtml);
   
-  // Procesar imágenes y ecuaciones
+  // Procesar imágenes
   const $3 = cheerio.load(processedHtml, { decodeEntities: false });
   
   let figureIndex = 0;
@@ -1008,10 +1035,6 @@ function processCodeBlocks(html) {
     const src = $el.attr('src') || '';
     const style = $el.attr('style') || '';
     const align = $el.attr('align') || '';
-    
-    if (src && !src.startsWith('http') && !src.startsWith('data:')) {
-      $el.attr('src', src);
-    }
     
     $el.addClass('article-image');
     
@@ -1023,25 +1046,26 @@ function processCodeBlocks(html) {
     }
     
     figureIndex++;
-    const figureId = `figure-${figureIndex}`;
+    const figureId = 'figure-' + figureIndex;
     
     if (src) {
-      $el.wrap(`<a href="${src}" target="_blank" rel="noopener noreferrer" class="image-link"></a>`);
+      $el.wrap('<a href="' + src + '" target="_blank" rel="noopener noreferrer" class="image-link"></a>');
     }
     
     if (alt) {
-      $el.parent().wrap(`<figure class="image-figure${floatClass}" id="${figureId}"></figure>`);
-      $el.parent().after(`<figcaption class="image-caption">${alt}</figcaption>`);
+      $el.parent().wrap('<figure class="image-figure' + floatClass + '" id="' + figureId + '"></figure>');
+      $el.parent().after('<figcaption class="image-caption">' + alt + '</figcaption>');
     } else {
-      $el.parent().wrap(`<figure class="image-figure${floatClass}" id="${figureId}"></figure>`);
+      $el.parent().wrap('<figure class="image-figure' + floatClass + '" id="' + figureId + '"></figure>');
     }
   });
   
+  // Procesar ecuaciones
   let equationIndex = 0;
   $3('.MathJax_Display, .math-container').each((i, el) => {
     const $el = $3(el);
     equationIndex++;
-    const equationId = `equation-${equationIndex}`;
+    const equationId = 'equation-' + equationIndex;
     $el.attr('id', equationId);
   });
   
@@ -1381,8 +1405,25 @@ const vocabularyName = article.keywords_vocabulary || article.keywords_vocabular
   <title>${title.replace(/"/g, '&quot;')} - Revista Nacional de las Ciencias para Estudiantes</title>
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,700;1,700&family=JetBrains+Mono&family=Lora:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+   <!-- CodeMirror -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+  
+  <!-- Modos de lenguaje -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/markdown/markdown.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/shell/shell.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/r/r.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/clike/clike.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/php/php.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/yaml/yaml.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/dockerfile/dockerfile.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
   <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
   <style>
@@ -2950,24 +2991,24 @@ body {
   background-color: var(--bg-soft);
 }
 
-/* ===== CODE BLOCKS (VS CODE DARK+ REFINED) ===== */
+/* ===== CODE BLOCKS (CODEMIRROR) ===== */
 .code-block-wrapper {
   margin: 2.5rem 0;
   border-radius: 8px;
-  background: var(--code-bg);
+  background: #1e1e1e;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   overflow: hidden;
-  border: 1px solid var(--code-border);
+  border: 1px solid #333333;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
 .code-header {
-  background: var(--code-header-bg);
+  background: #252526;
   padding: 0.75rem 1.25rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid var(--code-border);
+  border-bottom: 1px solid #333333;
   font-family: 'Inter', sans-serif;
 }
 
@@ -3002,52 +3043,42 @@ body {
 }
 
 .code-block-container {
-  display: flex;
   position: relative;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
-.code-line-numbers {
-  padding: 1.25rem 1rem;
-  text-align: right;
-  background: var(--code-header-bg);
+/* CodeMirror overrides */
+.code-block-container .CodeMirror {
+  height: auto;
+  max-height: 500px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  background: #1e1e1e;
+  color: #d4d4d4;
+}
+
+.code-block-container .CodeMirror-gutters {
+  background: #252526;
+  border-right: 1px solid #333333;
+}
+
+.code-block-container .CodeMirror-linenumber {
   color: #858585;
-  font-size: 0.85rem;
-  line-height: 1.6;
-  font-family: 'JetBrains Mono', monospace;
-  border-right: 1px solid var(--code-border);
-  user-select: none;
-  min-width: 45px;
+  padding: 0 8px;
 }
 
-.code-block {
-  flex: 1;
-  margin: 0;
-  padding: 1.25rem 1.5rem;
-  color: var(--code-text);
-  line-height: 1.6;
-  font-size: 0.85rem;
-  font-family: 'JetBrains Mono', monospace;
-  overflow-x: auto;
-  white-space: pre;
-  tab-size: 2;
+.code-block-container .CodeMirror-cursor {
+  border-left: 1px solid #d4d4d4;
 }
 
-/* Highlight.js colors */
-.code-block .hljs-keyword,
-.code-block .hljs-built_in { color: #569cd6; font-weight: 600; }
-.code-block .hljs-title,
-.code-block .hljs-function { color: #dcdcaa; }
-.code-block .hljs-string { color: #ce9178; }
-.code-block .hljs-number { color: #b5cea8; }
-.code-block .hljs-comment { color: #6a9955; font-style: italic; }
-.code-block .hljs-variable,
-.code-block .hljs-name { color: #9cdcfe; }
-.code-block .hljs-type { color: #4ec9b0; }
-.code-block .hljs-tag { color: #569cd6; }
-.code-block .hljs-attribute { color: #9cdcfe; }
+.code-block-container .CodeMirror-selected {
+  background: rgba(78, 201, 176, 0.2);
+}
 
+/* Ocultar el textarea original */
+.codemirror-textarea {
+  display: none;
+}
 /* ===== BLOCKQUOTES & PULL QUOTES ===== */
 blockquote {
   margin: 3rem 0;
@@ -4573,26 +4604,44 @@ function generateMobileTOC() {
   });
 }
 
-// ========== HIGHLIGHT JS ==========
+// ========== INICIALIZAR CODEMIRROR ==========
 document.addEventListener('DOMContentLoaded', () => {
-  if (window.hljs) {
-    document.querySelectorAll('pre code').forEach((block) => {
-      hljs.highlightElement(block);
+  // Inicializar CodeMirror en todos los textareas de código
+  document.querySelectorAll('.codemirror-textarea').forEach((textarea) => {
+    const mode = textarea.getAttribute('data-mode') || 'python';
+    
+    CodeMirror.fromTextArea(textarea, {
+      mode: mode,
+      theme: 'dracula',
+      readOnly: true,
+      lineNumbers: true,
+      lineWrapping: false,
+      indentUnit: 4,
+      tabSize: 4,
+      viewportMargin: Infinity,
+      autoRefresh: true
     });
-  }
+  });
 });
 
-// ========== FUNCIÓN PARA COPIAR CÓDIGO ==========
-function copyCode(codeId, btn) {
-  const codeElement = document.getElementById(codeId);
-  if (!codeElement) return;
+// ========== FUNCIÓN PARA COPIAR CÓDIGO DE CODEMIRROR ==========
+function copyCodeFromCM(codeId, btn) {
+  const wrapper = document.getElementById(codeId);
+  if (!wrapper) return;
   
-  const code = codeElement.textContent || codeElement.innerText;
+  // Obtener la instancia de CodeMirror
+  const textarea = wrapper.querySelector('.codemirror-textarea');
+  const cmInstance = textarea && textarea.CodeMirror;
+  
+  let code = '';
+  if (cmInstance) {
+    code = cmInstance.getValue();
+  } else {
+    code = textarea ? textarea.value : '';
+  }
   
   navigator.clipboard.writeText(code).then(() => {
-    const originalText = btn.innerText;
     const originalHtml = btn.innerHTML;
-    
     btn.innerHTML = '✓ Copiado';
     btn.style.background = '#22c55e';
     btn.style.color = 'white';
@@ -4609,7 +4658,6 @@ function copyCode(codeId, btn) {
     alert('No se pudo copiar el código');
   });
 }
-
 // ========== TAB SWITCHING ==========
 function switchTab(device, tabName) {
   if (device === 'desktop') {
