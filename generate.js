@@ -1786,11 +1786,12 @@ h3 {
   display: block;
 }
 
+/* ===== AUTHORS SECTION ===== */
 .authors {
   font-family: 'Inter', sans-serif;
   font-size: 1.15rem;
   font-weight: 500;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
   line-height: 1.8;
   display: flex;
   flex-wrap: wrap;
@@ -1798,43 +1799,80 @@ h3 {
   gap: 0.15rem 0.3rem;
 }
 
-/* Evitar que el superíndice se separe del nombre */
-.authors a,
-.authors .author-name {
+/* Enlace del autor */
+.author-link {
+  color: var(--nature-blue);
+  text-decoration: none;
+  border-bottom: 1px dotted transparent;
+  transition: all 0.2s;
   white-space: nowrap;
   display: inline-flex;
   align-items: baseline;
 }
 
-/* Mantener nombre + superíndice juntos */
-.authors .author-link,
-.authors .author-name {
-  white-space: nowrap;
+.author-link:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
 }
 
-.authors .author-sup {
+/* Nombre del autor sin enlace */
+.author-name {
+  color: var(--nature-blue);
+  font-weight: 500;
   white-space: nowrap;
-  display: inline;
+  display: inline-flex;
+  align-items: baseline;
+}
+
+/* Superíndice (a, b, c...) */
+.author-sup {
   font-size: 0.7em;
   vertical-align: super;
-  line-height: 1;
+  color: var(--text-light);
   margin-left: 1px;
+  white-space: nowrap;
+  display: inline;
+  line-height: 1;
 }
 
-/* Mantener iconos junto al nombre */
-.authors .author-icons {
+/* Iconos (ORCID, email, correspondencia) */
+.author-icons {
   display: inline-flex;
   align-items: center;
-  white-space: nowrap;
-  margin-left: 0.2rem;
   gap: 0.2rem;
+  margin-left: 0.2rem;
+  vertical-align: middle;
+  white-space: nowrap;
 }
 
-/* Separador de coma */
-.authors .author-separator {
+.author-icon {
+  display: inline-block;
+  opacity: 0.8;
+  transition: all 0.2s;
+  color: var(--nature-blue);
+}
+
+.author-icon:hover {
+  opacity: 1;
+  color: var(--accent);
+}
+
+/* Separador de coma entre autores */
+.author-separator {
+  margin-right: 0.15rem;
+  color: var(--text-muted);
   white-space: normal;
   display: inline;
-  margin-right: 0.15rem;
+}
+
+/* Icono de correspondencia (persona delineada) */
+.author-icon.corresponding-icon {
+  color: var(--nature-blue);
+  cursor: help;
+}
+
+.author-icon.corresponding-icon:hover {
+  color: var(--accent);
 }
 
 /* Para pantallas pequeñas */
@@ -1844,8 +1882,13 @@ h3 {
     line-height: 1.6;
   }
   
-  .authors .author-sup {
+  .author-sup {
     font-size: 0.65em;
+  }
+  
+  .author-icon svg {
+    width: 12px;
+    height: 12px;
   }
 }
   /* ===== SHARE MODAL ===== */
