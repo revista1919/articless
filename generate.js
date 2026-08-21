@@ -3721,6 +3721,80 @@ blockquote cite {
   letter-spacing: 4px;
   padding-top: 30px;
 }
+  .footer-bottom {
+  text-align: center;
+  font-size: 9px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 4px;
+  padding-top: 30px;
+}
+
+/* ===== FOOTER LEGAL LINKS ===== */
+.footer-links {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  letter-spacing: 1px;
+}
+
+.footer-links a {
+  color: #999;
+  text-decoration: none;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.footer-links a:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+.footer-links span {
+  color: #555;
+  font-size: 0.7rem;
+  user-select: none;
+}
+
+/* Copyright */
+.footer-bottom p {
+  margin: 0;
+  padding: 0;
+  color: #555;
+  font-size: 0.7rem;
+  letter-spacing: 2px;
+  line-height: 1.6;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .footer-links {
+    gap: 0.5rem;
+  }
+  
+  .footer-links a {
+    font-size: 0.65rem;
+    padding: 0.2rem 0.4rem;
+  }
+  
+  .footer-links span {
+    font-size: 0.6rem;
+  }
+  
+  .footer-bottom p {
+    font-size: 0.6rem;
+    letter-spacing: 1px;
+  }
+}
 /* ===== DOI EN SIDEBAR (metadata-item) ===== */
 .metadata-doi-item {
   display: flex;
