@@ -2614,35 +2614,36 @@ body {
     gap: 0.25rem;
   }
 }
-/* ===== REFERENCE BACKLINKS (Flechitas de volver) - SIN CÍRCULO ===== */
+/* ===== REFERENCE BACKLINKS (Flechitas de volver) - SEPARACIÓN GARANTIZADA ===== */
 .reference-item a[href="javascript:void(0)"] {
   text-decoration: none;
   color: #002147;
-  font-size: 1.1em;
-  margin-left: 0.6em;
+  font-size: 1em;
+  margin-left: 1.2em; /* Separación amplia del texto */
   transition: all 0.2s ease;
   display: inline-block;
   vertical-align: middle;
   position: relative;
-  top: -2px;
-  opacity: 0.7;
+  top: -1px;
+  opacity: 0.75;
+  padding: 0.2em 0.4em; /* Área clickeable más grande */
 }
 
 .reference-item a[href="javascript:void(0)"]::before {
   content: "↩";
-  font-size: 1em;
+  font-size: 1.1em;
   line-height: 1;
+  display: inline-block;
 }
 
 .reference-item a[href="javascript:void(0)"]:hover {
   color: #FF6C0C;
   opacity: 1;
-  transform: translateX(2px);
-  text-shadow: 0 0 8px rgba(255, 108, 12, 0.3);
+  transform: translateX(3px);
 }
 
 .reference-item a[href="javascript:void(0)"]:active {
-  transform: translateX(1px) scale(0.95);
+  transform: translateX(2px) scale(0.95);
 }
 /* ===== CITATION PICKER MODAL ===== */
 .citation-picker-overlay {
