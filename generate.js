@@ -5513,7 +5513,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 });
-
+</script>
 <script>
 // ========== DETECCIÓN DE ELEMENTOS ESPECIALES (AHORA DESPUÉS DE QUE EL DOM EXISTE) ==========
 window.__SPECIAL_ELEMENTS__ = (function() {
