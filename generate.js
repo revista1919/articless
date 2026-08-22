@@ -2614,13 +2614,12 @@ body {
     gap: 0.25rem;
   }
 }
-/* Versión alternativa con position absolute */
+/* ===== REFERENCE BACKLINKS (Flechitas de volver) - CORREGIDO ===== */
 .reference-item a[href="javascript:void(0)"] {
   display: inline-block;
-  position: relative;
-  width: 1.5em;
-  height: 1.5em;
-  line-height: 1.5em; /* Esto es crucial */
+  width: 1.8em;
+  height: 1.8em;
+  line-height: 1.8em;
   text-align: center;
   border-radius: 50%;
   background: #f8fafc;
@@ -2630,24 +2629,18 @@ body {
   font-size: 0.8em;
   margin-left: 0.15rem;
   vertical-align: middle;
+  position: relative;
   top: -1px;
   transition: all 0.2s ease;
   cursor: pointer;
   overflow: hidden;
-  box-sizing: border-box;
 }
 
 .reference-item a[href="javascript:void(0)"]::before {
   content: "↩";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 0.75em;
-  line-height: 1;
-  display: block;
-  margin: 0;
-  padding: 0;
+  font-size: 0.9em;
+  line-height: inherit;
+  display: inline;
 }
 
 .reference-item a[href="javascript:void(0)"]:hover {
