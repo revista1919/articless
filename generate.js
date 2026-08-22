@@ -2616,10 +2616,12 @@ body {
 }
   /* ===== REFERENCE BACKLINKS (Flechitas de volver) ===== */
 .reference-item a[href^="#ref-"]:not([href*="http"]) {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 1.5em;
   height: 1.5em;
-  line-height: 1.5em;
+  line-height: 1;
   text-align: center;
   border-radius: 50%;
   background: #f8fafc;
@@ -2632,12 +2634,15 @@ body {
   position: relative;
   top: -1px;
   transition: all 0.2s ease;
+  cursor: pointer;
 }
 
 /* El símbolo ↩ se agrega con ::before, NO en el HTML */
 .reference-item a[href^="#ref-"]:not([href*="http"])::before {
   content: "↩";
-  font-size: 0.9em;
+  font-size: 0.85em;
+  line-height: 1;
+  display: inline-block;
 }
 
 .reference-item a[href^="#ref-"]:not([href*="http"]):hover {
@@ -2646,7 +2651,6 @@ body {
   background: #fff;
   transform: translateY(-1px);
 }
-
 /* ===== CITATION PICKER MODAL ===== */
 .citation-picker-overlay {
   display: none;
@@ -5509,7 +5513,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 });
-</script>
+.reference-item a[href^="#ref-"]:not([href*="http"]) {
 <script>
 // ========== DETECCIÓN DE ELEMENTOS ESPECIALES (AHORA DESPUÉS DE QUE EL DOM EXISTE) ==========
 window.__SPECIAL_ELEMENTS__ = (function() {
