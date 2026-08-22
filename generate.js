@@ -2537,6 +2537,83 @@ body {
   border-top: 1px solid #cbd5e1;
   transform: rotate(45deg);
 }
+  /* ===== QUOTE FOOTNOTE (Nota especial debajo de blockquote) ===== */
+.quote-footnote {
+  margin-top: 0.75rem;
+  margin-bottom: 2rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-soft);
+  border-left: 3px solid var(--nature-blue);
+  border-radius: 0 6px 6px 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8rem;
+  color: var(--text-light);
+  line-height: 1.6;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.quote-footnote .footnote-link {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+  font-size: 0.7em;
+  padding: 0.1em 0.35em;
+  vertical-align: baseline;
+  position: relative;
+  top: 0;
+  counter-increment: none; /* No usar el contador numérico */
+}
+
+.quote-footnote .footnote-link::after {
+  content: "a"; /* Letra especial para nota de cita */
+  font-weight: 700;
+  line-height: 1;
+}
+
+.quote-footnote-text {
+  flex: 1;
+}
+
+.quote-footnote-text .footnote-backlink {
+  color: var(--nature-blue);
+  text-decoration: none;
+  font-size: 0.9em;
+  margin-left: 0.25rem;
+  display: inline-block;
+  width: 1.5em;
+  height: 1.5em;
+  line-height: 1.5em;
+  text-align: center;
+  border-radius: 50%;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-color);
+  transition: all 0.2s;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+
+.quote-footnote-text .footnote-backlink::before {
+  content: "↩";
+  font-size: 0.9em;
+}
+
+.quote-footnote-text .footnote-backlink:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: #fff;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .quote-footnote {
+    font-size: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+}
 @media (max-width: 768px) {
   /* ===== PREVENIR DESBORDAMIENTO HORIZONTAL ===== */
   html, body {
