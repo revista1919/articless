@@ -2615,7 +2615,7 @@ body {
   }
 }
   /* ===== REFERENCE BACKLINKS (Flechitas de volver) ===== */
-.reference-item a[href^="#cite-ref-"] {
+.reference-item a[href^="#ref-"]:not([href*="http"]) {
   display: inline-block;
   width: 1.5em;
   height: 1.5em;
@@ -2634,16 +2634,17 @@ body {
   transition: all 0.2s ease;
 }
 
-.reference-item a[href^="#cite-ref-"]:hover {
+/* El símbolo ↩ se agrega con ::before, NO en el HTML */
+.reference-item a[href^="#ref-"]:not([href*="http"])::before {
+  content: "↩";
+  font-size: 0.9em;
+}
+
+.reference-item a[href^="#ref-"]:not([href*="http"]):hover {
   color: #FF6C0C;
   border-color: #FF6C0C;
   background: #fff;
   transform: translateY(-1px);
-}
-
-/* Múltiples flechitas */
-.reference-item a[href^="#cite-ref-"] + a[href^="#cite-ref-"] {
-  margin-left: 0.25rem;
 }
 
 /* ===== CITATION PICKER MODAL ===== */
@@ -5620,7 +5621,6 @@ window.__SPECIAL_ELEMENTS__ = (function() {
       });
     });
   });
-</script>
 </script>
 
 <!-- Citation Picker Modal -->
