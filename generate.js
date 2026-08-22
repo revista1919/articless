@@ -2614,36 +2614,41 @@ body {
     gap: 0.25rem;
   }
 }
-/* ===== REFERENCE BACKLINKS (Flechitas de volver) - SEPARACIÓN GARANTIZADA ===== */
+/* ===== REFERENCE BACKLINKS - SOLUCIÓN DEFINITIVA ===== */
+.reference-item {
+  position: relative; /* Establecer contexto de posicionamiento */
+  padding-right: 3rem; /* Espacio reservado para la flecha */
+}
+
 .reference-item a[href="javascript:void(0)"] {
+  position: absolute;
+  right: 0;
+  top: 0.3em; /* Alineado con la primera línea */
   text-decoration: none;
   color: #002147;
   font-size: 1em;
-  margin-left: 1.2em; /* Separación amplia del texto */
   transition: all 0.2s ease;
+  opacity: 0.7;
   display: inline-block;
-  vertical-align: middle;
-  position: relative;
-  top: -1px;
-  opacity: 0.75;
-  padding: 0.2em 0.4em; /* Área clickeable más grande */
+  width: 1.5rem;
+  height: 1.5rem;
+  text-align: center;
+  line-height: 1.5rem;
 }
 
 .reference-item a[href="javascript:void(0)"]::before {
   content: "↩";
   font-size: 1.1em;
-  line-height: 1;
-  display: inline-block;
+  line-height: 1.5rem;
 }
 
 .reference-item a[href="javascript:void(0)"]:hover {
   color: #FF6C0C;
   opacity: 1;
-  transform: translateX(3px);
 }
 
 .reference-item a[href="javascript:void(0)"]:active {
-  transform: translateX(2px) scale(0.95);
+  transform: scale(0.9);
 }
 /* ===== CITATION PICKER MODAL ===== */
 .citation-picker-overlay {
