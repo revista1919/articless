@@ -2614,6 +2614,144 @@ body {
     gap: 0.25rem;
   }
 }
+  /* ===== REFERENCE BACKLINKS (Flechitas de volver) ===== */
+.reference-item a[href^="#cite-ref-"] {
+  display: inline-block;
+  width: 1.5em;
+  height: 1.5em;
+  line-height: 1.5em;
+  text-align: center;
+  border-radius: 50%;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #002147;
+  text-decoration: none;
+  font-size: 0.8em;
+  margin-left: 0.15rem;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+  transition: all 0.2s ease;
+}
+
+.reference-item a[href^="#cite-ref-"]:hover {
+  color: #FF6C0C;
+  border-color: #FF6C0C;
+  background: #fff;
+  transform: translateY(-1px);
+}
+
+/* Múltiples flechitas */
+.reference-item a[href^="#cite-ref-"] + a[href^="#cite-ref-"] {
+  margin-left: 0.25rem;
+}
+
+/* ===== CITATION PICKER MODAL ===== */
+.citation-picker-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 28, 45, 0.5);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  z-index: 9998;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  align-items: center;
+  justify-content: center;
+}
+
+.citation-picker-overlay.active {
+  display: flex;
+  opacity: 1;
+}
+
+.citation-picker-modal {
+  background: #ffffff;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 320px;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  font-family: 'Inter', sans-serif;
+  transform: scale(0.95);
+  transition: transform 0.2s ease;
+}
+
+.citation-picker-overlay.active .citation-picker-modal {
+  transform: scale(1);
+}
+
+.citation-picker-header {
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-soft);
+}
+
+.citation-picker-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--nature-black);
+  letter-spacing: -0.01em;
+}
+
+.citation-picker-body {
+  padding: 0.5rem;
+}
+
+.citation-picker-option {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--text-main);
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  border: none;
+  background: none;
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+}
+
+.citation-picker-option:hover {
+  background: var(--bg-hover);
+  color: var(--nature-blue);
+}
+
+.citation-picker-option .citation-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5em;
+  height: 1.5em;
+  border-radius: 50%;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  font-size: 0.75em;
+  font-weight: 700;
+  color: #002147;
+  flex-shrink: 0;
+}
+
+.citation-picker-option:hover .citation-number {
+  background: #fff;
+  border-color: var(--nature-blue);
+  color: var(--nature-blue);
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .citation-picker-modal {
+    width: 85%;
+  }
+}
 @media (max-width: 768px) {
   /* ===== PREVENIR DESBORDAMIENTO HORIZONTAL ===== */
   html, body {
@@ -4744,7 +4882,85 @@ function toggleAuthorDetails() {
   function shareArticle() {
   openShareModal();
 }
+// ========== CITATION PICKER MODAL ==========
+function openCitationPicker(event, referenceId) {
+  event.preventDefault();
+  
+  // Buscar todas las citas que apuntan a esta referencia
+  var citations = document.querySelectorAll('a[href="#' + referenceId + '"][id^="cite-ref-"]');
+  
+  if (citations.length === 0) return;
+  
+  // Si solo hay una cita, ir directamente
+  if (citations.length === 1) {
+    var target = document.getElementById(citations[0].id);
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Resaltar temporalmente
+      target.style.backgroundColor = 'rgba(78, 201, 176, 0.3)';
+      setTimeout(function() {
+        target.style.backgroundColor = '';
+      }, 2000);
+    }
+    return;
+  }
+  
+  // Si hay múltiples citas, mostrar modal
+  var overlay = document.getElementById('citationPickerOverlay');
+  var body = document.getElementById('citationPickerBody');
+  
+  if (!overlay || !body) return;
+  
+  // Limpiar
+  body.innerHTML = '';
+  
+  // Añadir opciones
+  citations.forEach(function(citation, index) {
+    var btn = document.createElement('button');
+    btn.className = 'citation-picker-option';
+    btn.innerHTML = '<span class="citation-number">' + (index + 1) + '</span> Volver a la cita ' + (index + 1);
+    btn.onclick = function() {
+      closeCitationPicker();
+      var target = document.getElementById(citation.id);
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Resaltar temporalmente
+        target.style.backgroundColor = 'rgba(78, 201, 176, 0.3)';
+        setTimeout(function() {
+          target.style.backgroundColor = '';
+        }, 2000);
+      }
+    };
+    body.appendChild(btn);
+  });
+  
+  // Mostrar modal
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
 
+function closeCitationPicker() {
+  var overlay = document.getElementById('citationPickerOverlay');
+  if (overlay) {
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+}
+
+// Cerrar con Escape
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    closeCitationPicker();
+  }
+});
+
+// Cerrar al hacer clic fuera
+document.addEventListener('click', function(e) {
+  var overlay = document.getElementById('citationPickerOverlay');
+  if (overlay && e.target === overlay) {
+    closeCitationPicker();
+  }
+});
 function openShareModal() {
   var overlay = document.getElementById('shareModalOverlay');
   var url = window.location.href;
@@ -5405,6 +5621,20 @@ window.__SPECIAL_ELEMENTS__ = (function() {
     });
   });
 </script>
+</script>
+
+<!-- Citation Picker Modal -->
+<div class="citation-picker-overlay" id="citationPickerOverlay" onclick="closeCitationPicker()">
+  <div class="citation-picker-modal" onclick="event.stopPropagation()">
+    <div class="citation-picker-header">
+      <span class="citation-picker-title">Volver a la cita</span>
+    </div>
+    <div class="citation-picker-body" id="citationPickerBody">
+      <!-- Opciones generadas dinámicamente -->
+    </div>
+  </div>
+</div>
+
 </body>
 </html>`;
 }
