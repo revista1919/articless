@@ -2614,14 +2614,13 @@ body {
     gap: 0.25rem;
   }
 }
-/* ===== REFERENCE BACKLINKS (Flechitas de volver) ===== */
+/* Versión alternativa con position absolute */
 .reference-item a[href="javascript:void(0)"] {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: inline-block;
+  position: relative;
   width: 1.5em;
   height: 1.5em;
-  line-height: 1 !important; /* Forzar line-height */
+  line-height: 1.5em; /* Esto es crucial */
   text-align: center;
   border-radius: 50%;
   background: #f8fafc;
@@ -2631,26 +2630,24 @@ body {
   font-size: 0.8em;
   margin-left: 0.15rem;
   vertical-align: middle;
-  position: relative;
   top: -1px;
   transition: all 0.2s ease;
   cursor: pointer;
-  overflow: hidden; /* Evitar desbordamiento */
-  box-sizing: border-box; /* Asegurar que el padding no afecte el tamaño */
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .reference-item a[href="javascript:void(0)"]::before {
   content: "↩";
-  font-size: 0.8em; /* Reducir ligeramente el tamaño */
-  line-height: 1 !important; /* Forzar line-height */
-  display: inline-block;
-  text-align: center;
-  vertical-align: middle;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.75em;
+  line-height: 1;
+  display: block;
   margin: 0;
   padding: 0;
-  position: relative;
-  top: -0.05em; /* Ajuste fino para centrar */
-  font-weight: normal;
 }
 
 .reference-item a[href="javascript:void(0)"]:hover {
