@@ -2614,8 +2614,8 @@ body {
     gap: 0.25rem;
   }
 }
-  /* ===== REFERENCE BACKLINKS (Flechitas de volver) ===== */
-.reference-item a[href^="#ref-"]:not([href*="http"]) {
+ /* ===== REFERENCE BACKLINKS (Flechitas de volver) ===== */
+.reference-item a[href="javascript:void(0)"] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2637,15 +2637,14 @@ body {
   cursor: pointer;
 }
 
-/* El símbolo ↩ se agrega con ::before, NO en el HTML */
-.reference-item a[href^="#ref-"]:not([href*="http"])::before {
+.reference-item a[href="javascript:void(0)"]::before {
   content: "↩";
   font-size: 0.85em;
   line-height: 1;
   display: inline-block;
 }
 
-.reference-item a[href^="#ref-"]:not([href*="http"]):hover {
+.reference-item a[href="javascript:void(0)"]:hover {
   color: #FF6C0C;
   border-color: #FF6C0C;
   background: #fff;
