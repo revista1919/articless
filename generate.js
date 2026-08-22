@@ -2614,8 +2614,13 @@ body {
     gap: 0.25rem;
   }
 }
-/* ===== REFERENCE BACKLINKS (Flechitas de volver) - CORREGIDO ===== */
+/* ===== REFERENCE BACKLINKS (Flechitas de volver) ===== */
 .reference-item a[href="javascript:void(0)"] {
+  text-decoration: none;
+  color: #002147;
+  font-size: 0.9em;
+  margin-left: 0.5em;
+  transition: all 0.2s;
   display: inline-block;
   width: 1.8em;
   height: 1.8em;
@@ -2624,30 +2629,20 @@ body {
   border-radius: 50%;
   background: #f8fafc;
   border: 1px solid #cbd5e1;
-  color: #002147;
-  text-decoration: none;
-  font-size: 0.8em;
-  margin-left: 0.15rem;
   vertical-align: middle;
   position: relative;
   top: -1px;
-  transition: all 0.2s ease;
-  cursor: pointer;
-  overflow: hidden;
 }
 
 .reference-item a[href="javascript:void(0)"]::before {
   content: "↩";
   font-size: 0.9em;
-  line-height: inherit;
-  display: inline;
 }
 
 .reference-item a[href="javascript:void(0)"]:hover {
   color: #FF6C0C;
   border-color: #FF6C0C;
   background: #fff;
-  transform: translateY(-1px);
 }
 /* ===== CITATION PICKER MODAL ===== */
 .citation-picker-overlay {
