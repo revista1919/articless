@@ -2614,30 +2614,43 @@ body {
     gap: 0.25rem;
   }
 }
-  <h2>Referencias</h2>
-<div class="references-list">
+  /* ===== REFERENCE BACKLINKS (Flechitas de volver) ===== */
+.reference-item a[href^="#ref-"]:not([href*="http"]) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5em;
+  height: 1.5em;
+  line-height: 1;
+  text-align: center;
+  border-radius: 50%;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #002147;
+  text-decoration: none;
+  font-size: 0.8em;
+  margin-left: 0.15rem;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
 
-<div class="reference-item" id="ref-iesterradesoneira2026">
-Instituto de Educación Secundaria Terra de Soneira. “Platón.” Accedido el 6 de junio de 2026. <a href="https://www.edu.xunta.gal/centros/iesterradesoneira/system/files/platon.pdf" target="_blank" rel="noopener">https://www.edu.xunta.gal/centros/iesterradesoneira/system/files/platon.pdf</a>. <a href="javascript:void(0)" onclick="openCitationPicker(event, 'ref-iesterradesoneira2026')" title="Volver a las citas"></a>
-</div>
+/* El símbolo ↩ se agrega con ::before, NO en el HTML */
+.reference-item a[href^="#ref-"]:not([href*="http"])::before {
+  content: "↩";
+  font-size: 0.85em;
+  line-height: 1;
+  display: inline-block;
+}
 
-<div class="reference-item" id="ref-dellarocca2024">
-Della Rocca, Michael. “Spinoza.” En <em>The Stanford Encyclopedia of Philosophy</em>, editado por Edward N. Zalta y Uri Nodelman, edición Otoño 2024. Accedido el 6 de junio de 2026. <a href="https://plato.stanford.edu/entries/spinoza/" target="_blank" rel="noopener">https://plato.stanford.edu/entries/spinoza/</a>. <a href="javascript:void(0)" onclick="openCitationPicker(event, 'ref-dellarocca2024')" title="Volver a la cita"></a>
-</div>
-
-<div class="reference-item" id="ref-klarreich2018">
-Klarreich, Erica. “In Search of God's Perfect Proofs.” <em>Quanta Magazine</em>, 19 de marzo de 2018. <a href="https://www.quantamagazine.org/gunter-ziegler-and-martin-aigner-seek-gods-perfect-math-proofs-20180319/" target="_blank" rel="noopener">https://www.quantamagazine.org/gunter-ziegler-and-martin-aigner-seek-gods-perfect-math-proofs-20180319/</a>. <a href="javascript:void(0)" onclick="openCitationPicker(event, 'ref-klarreich2018')" title="Volver a las citas"></a>
-</div>
-
-<div class="reference-item" id="ref-mcinerny2026">
-McInerny, Ralph, y John O'Callaghan. “Saint Thomas Aquinas.” <em>Internet Encyclopedia of Philosophy</em>. Accedido el 6 de junio de 2026. <a href="https://iep.utm.edu/thomas-aquinas/" target="_blank" rel="noopener">https://iep.utm.edu/thomas-aquinas/</a>. <a href="javascript:void(0)" onclick="openCitationPicker(event, 'ref-mcinerny2026')" title="Volver a las citas"></a>
-</div>
-
-<div class="reference-item" id="ref-planetary2026">
-The Planetary Society. “Pale Blue Dot.” Accedido el 6 de junio de 2026. <a href="https://www.planetary.org/worlds/pale-blue-dot" target="_blank" rel="noopener">https://www.planetary.org/worlds/pale-blue-dot</a>. <a href="javascript:void(0)" onclick="openCitationPicker(event, 'ref-planetary2026')" title="Volver a la cita"></a>
-</div>
-
-</div>
+.reference-item a[href^="#ref-"]:not([href*="http"]):hover {
+  color: #FF6C0C;
+  border-color: #FF6C0C;
+  background: #fff;
+  transform: translateY(-1px);
+}
 /* ===== CITATION PICKER MODAL ===== */
 .citation-picker-overlay {
   display: none;
