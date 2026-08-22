@@ -2614,35 +2614,35 @@ body {
     gap: 0.25rem;
   }
 }
-/* ===== REFERENCE BACKLINKS (Flechitas de volver) ===== */
+/* ===== REFERENCE BACKLINKS (Flechitas de volver) - SIN CÍRCULO ===== */
 .reference-item a[href="javascript:void(0)"] {
   text-decoration: none;
   color: #002147;
-  font-size: 0.9em;
-  margin-left: 0.5em;
-  transition: all 0.2s;
+  font-size: 1.1em;
+  margin-left: 0.6em;
+  transition: all 0.2s ease;
   display: inline-block;
-  width: 1.8em;
-  height: 1.8em;
-  line-height: 1.8em;
-  text-align: center;
-  border-radius: 50%;
-  background: #f8fafc;
-  border: 1px solid #cbd5e1;
   vertical-align: middle;
   position: relative;
-  top: -1px;
+  top: -2px;
+  opacity: 0.7;
 }
 
 .reference-item a[href="javascript:void(0)"]::before {
   content: "↩";
-  font-size: 0.9em;
+  font-size: 1em;
+  line-height: 1;
 }
 
 .reference-item a[href="javascript:void(0)"]:hover {
   color: #FF6C0C;
-  border-color: #FF6C0C;
-  background: #fff;
+  opacity: 1;
+  transform: translateX(2px);
+  text-shadow: 0 0 8px rgba(255, 108, 12, 0.3);
+}
+
+.reference-item a[href="javascript:void(0)"]:active {
+  transform: translateX(1px) scale(0.95);
 }
 /* ===== CITATION PICKER MODAL ===== */
 .citation-picker-overlay {
