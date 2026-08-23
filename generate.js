@@ -4619,17 +4619,39 @@ blockquote cite {
           <p>${conflicts}</p>
         </section>
 
-        <!-- PDF Preview Section -->
-        ${article.pdfUrl ? `
-        <section id="pdf-preview">
-          <h2>${t.pdfPreview}</h2>
-          <embed src="${article.pdfUrl}" type="application/pdf" class="pdf-preview" />
-          <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-            <a href="${article.pdfUrl}" target="_blank" class="btn-pdf">${t.viewFullScreen}</a>
-            <a href="${article.pdfUrl}" download class="btn-pdf" style="background: var(--text-light);">${t.downloadPDF}</a>
-          </div>
-        </section>
-        ` : ''}
+<!-- PDF Preview Section -->
+${article.pdfUrl ? `
+<section id="pdf-preview">
+  <h2>${t.pdfPreview}</h2>
+  
+  <!-- Contenedor del visor PDF.js -->
+  <div id="pdf-container" data-pdf-url="${article.pdfUrl}" style="width: 100%; min-height: 600px; border: 1px solid var(--border-color); border-radius: 8px; overflow: auto; background: #525659; padding: 20px;">
+    <!-- Indicador de carga -->
+    <div id="pdf-loading" style="display: flex; justify-content: center; align-items: center; min-height: 600px; color: white; font-family: 'Inter', sans-serif;">
+      <div style="text-align: center;">
+        <div style="font-size: 1.2rem; margin-bottom: 1rem;">${isSpanish ? 'Cargando PDF...' : 'Loading PDF...'}</div>
+        <div style="width: 50px; height: 50px; border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto;"></div>
+      </div>
+    </div>
+    
+    <!-- Canvas donde se renderiza el PDF -->
+    <canvas id="pdf-canvas" style="display: block; margin: 0 auto;"></canvas>
+  </div>
+  
+  <!-- Botones y controles -->
+  <div style="display: flex; gap: 1rem; margin-top: 1rem; align-items: center; flex-wrap: wrap;">
+    <a href="${article.pdfUrl}" target="_blank" class="btn-pdf">${t.viewFullScreen}</a>
+    <a href="${article.pdfUrl}" download class="btn-pdf" style="background: var(--text-light);">${t.downloadPDF}</a>
+    
+    <!-- Controles de navegación -->
+    <div id="pdf-controls" style="display: none; align-items: center; gap: 0.5rem; margin-left: auto; font-family: 'Inter', sans-serif;">
+      <button id="pdf-prev" class="btn-pdf" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">← ${isSpanish ? 'Anterior' : 'Previous'}</button>
+      <span id="pdf-page-info" style="color: var(--text-light); font-size: 0.9rem; min-width: 100px; text-align: center;">${isSpanish ? 'Página 1 de 3' : 'Page 1 of 3'}</span>
+      <button id="pdf-next" class="btn-pdf" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">${isSpanish ? 'Siguiente' : 'Next'} →</button>
+    </div>
+  </div>
+</section>
+` : ''}
 
       <!-- License Section -->
 <section id="license" class="license-section">
@@ -5757,6 +5779,163 @@ window.__SPECIAL_ELEMENTS__ = (function() {
     </div>
   </div>
 </div>
+
+<!-- PDF.js Library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+<!-- PDF.js Viewer Script -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Solo inicializar si existe el contenedor del PDF
+  const pdfContainer = document.getElementById('pdf-container');
+  if (!pdfContainer) return;
+  
+  const pdfUrl = pdfContainer.getAttribute('data-pdf-url');
+  if (!pdfUrl) return;
+  
+  const canvas = document.getElementById('pdf-canvas');
+  const loading = document.getElementById('pdf-loading');
+  const controls = document.getElementById('pdf-controls');
+  const prevBtn = document.getElementById('pdf-prev');
+  const nextBtn = document.getElementById('pdf-next');
+  const pageInfo = document.getElementById('pdf-page-info');
+  
+  let pdfDoc = null;
+  let pageNum = 1;
+  let pageRendering = false;
+  let pageNumPending = null;
+  let currentScale = 1.2;
+  
+  // Configurar PDF.js worker
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  
+  // Cargar el PDF
+  pdfjsLib.getDocument(pdfUrl).promise.then(function(pdf) {
+    pdfDoc = pdf;
+    loading.style.display = 'none';
+    controls.style.display = 'flex';
+    renderPage(pageNum);
+  }).catch(function(error) {
+    loading.innerHTML = '<div style="text-align: center; padding: 2rem; color: white;">' +
+      'Error al cargar el PDF: ' + error.message + '</div>';
+    console.error('Error loading PDF:', error);
+  });
+  
+  function renderPage(num) {
+    pageRendering = true;
+    
+    pdfDoc.getPage(num).then(function(page) {
+      // Calcular escala responsiva
+      const containerWidth = pdfContainer.clientWidth - 20;
+      const baseViewport = page.getViewport({ scale: 1 });
+      const responsiveScale = Math.min(currentScale, containerWidth / baseViewport.width);
+      
+      const viewport = page.getViewport({ scale: responsiveScale });
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+      
+      const renderContext = {
+        canvasContext: canvas.getContext('2d'),
+        viewport: viewport
+      };
+      
+      const renderTask = page.render(renderContext);
+      renderTask.promise.then(function() {
+        pageRendering = false;
+        pageInfo.textContent = '${isSpanish ? 'Página' : 'Page'} ' + num + ' ${isSpanish ? 'de' : 'of'} ' + pdfDoc.numPages;
+        
+        if (pageNumPending !== null) {
+          renderPage(pageNumPending);
+          pageNumPending = null;
+        }
+      });
+    });
+    
+    // Actualizar estado de botones
+    prevBtn.disabled = (num <= 1);
+    nextBtn.disabled = (num >= pdfDoc.numPages);
+  }
+  
+  function queueRenderPage(num) {
+    if (pageRendering) {
+      pageNumPending = num;
+    } else {
+      renderPage(num);
+    }
+  }
+  
+  prevBtn.addEventListener('click', function() {
+    if (pageNum <= 1) return;
+    pageNum--;
+    queueRenderPage(pageNum);
+  });
+  
+  nextBtn.addEventListener('click', function() {
+    if (pageNum >= pdfDoc.numPages) return;
+    pageNum++;
+    queueRenderPage(pageNum);
+  });
+  
+  // Responsive
+  window.addEventListener('resize', debounce(function() {
+    if (pdfDoc && canvas) {
+      renderPage(pageNum);
+    }
+  }, 250));
+  
+  function debounce(func, wait) {
+    let timeout;
+    return function() {
+      clearTimeout(timeout);
+      timeout = setTimeout(func, wait);
+    };
+  }
+});
+</script>
+
+<style>
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+#pdf-container {
+  position: relative;
+}
+
+#pdf-canvas {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+#pdf-prev:disabled,
+#pdf-next:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+/* Responsive para PDF.js viewer */
+@media (max-width: 768px) {
+  #pdf-container {
+    min-height: 400px !important;
+    padding: 10px !important;
+  }
+  
+  #pdf-loading {
+    min-height: 400px !important;
+  }
+  
+  #pdf-controls {
+    width: 100%;
+    justify-content: center;
+    margin-left: 0 !important;
+    order: 3;
+  }
+  
+  #pdf-prev, #pdf-next {
+    flex: 1;
+    text-align: center;
+  }
+}
+</style>
 
 </body>
 </html>`;
