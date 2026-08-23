@@ -1307,9 +1307,9 @@ async function generateArticleHtml(article) {
   } else if (Array.isArray(article.autores)) {
     authorsList = article.autores.map(a => formatAuthorForCitation(a));
   }
-   if (article.pdfUrl && article.pdfUrl.includes('revista1919.github.io')) {
-    article.pdfUrl = article.pdfUrl.replace('revista1919.github.io', 'www.revistacienciasestudiantes.com');
-  }
+if (article.pdfUrl && article.pdfUrl.includes('revista1919.github.io')) {
+  article.pdfUrl = article.pdfUrl.replace('revista1919.github.io', 'revistacienciasestudiantes.com');
+}
   const authorMetaTags = authorsList.map(author => `<meta name="citation_author" content="${author}">`).join('\n');
   
   const articleSlug = article.permalink || `${generateSlug(article.titulo)}-${article.numeroArticulo}`;
@@ -4433,25 +4433,30 @@ blockquote cite {
  <!-- Script de normalización automática de URLs -->
 <script>
 (function() {
-  function normalizeUrl(url) {
-    if (!url) return url;
-    
-    const currentHost = window.location.hostname;
-    const equivalentDomains = [
-      'revista1919.github.io',
-      'revistacienciasestudiantes.com',
-      'www.revistacienciasestudiantes.com'
-    ];
-    
-    for (const domain of equivalentDomains) {
-      if (url.includes(domain)) {
-        url = url.replace(domain, currentHost);
-        break;
-      }
+ function normalizeUrl(url) {
+  if (!url) return url;
+  
+  const currentHost = window.location.hostname;
+  
+  // Eliminar www. del host actual para comparar
+  const hostWithoutWww = currentHost.replace(/^www\./, '');
+  
+  // Dominios equivalentes (sin www)
+  const equivalentDomains = [
+    'revista1919.github.io',
+    'revistacienciasestudiantes.com'
+  ];
+  
+  for (const domain of equivalentDomains) {
+    if (url.includes(domain)) {
+      // Usar el host actual tal como está (con o sin www)
+      url = url.replace(domain, hostWithoutWww);
+      break;
     }
-    
-    return url;
   }
+  
+  return url;
+}
   
   // Normalizar cuando el DOM esté listo
   document.addEventListener('DOMContentLoaded', function() {
