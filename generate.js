@@ -878,6 +878,83 @@ function processAuthorsWithIcons(authors, article = null, lang = 'es') {
   console.log(`\n📝 Resultado HTML: ${result}\n`);
   return result;
 }
+// ========== FUNCIÓN GLOBAL PARA NORMALIZAR URLs ==========
+function normalizeUrl(url) {
+  if (!url) return url;
+  
+  // Dominios equivalentes
+  const domainMap = {
+    'revista1919.github.io': 'www.revistacienciasestudiantes.com',
+    'www.revistacienciasestudiantes.com': 'revista1919.github.io',
+    'revistacienciasestudiantes.com': 'www.revistacienciasestudiantes.com'
+  };
+  
+  // Detectar el dominio actual
+  const currentHost = window.location ? window.location.hostname : 'www.revistacienciasestudiantes.com';
+  
+  // Normalizar el dominio actual (quitar www si es necesario)
+  const normalizedCurrent = currentHost.replace(/^www\./, '');
+  
+  // Si la URL contiene alguno de los dominios equivalentes
+  for (const [fromDomain, toDomain] of Object.entries(domainMap)) {
+    if (url.includes(fromDomain)) {
+      // Determinar qué dominio usar basado en el actual
+      let targetDomain;
+      
+      if (normalizedCurrent === 'revistacienciasestudiantes.com' || 
+          normalizedCurrent === 'revista1919.github.io') {
+        // Ambos dominios son equivalentes, usar el actual
+        targetDomain = currentHost;
+      } else {
+        // Para localhost u otros, usar el dominio principal
+        targetDomain = 'www.revistacienciasestudiantes.com';
+      }
+      
+      // Reemplazar el dominio
+      url = url.replace(fromDomain, targetDomain);
+      break;
+    }
+  }
+  
+  return url;
+}
+
+// ========== FUNCIÓN PARA APLICAR A TODAS LAS URLs ==========
+function normalizeAllUrls() {
+  // Normalizar URLs en el objeto article
+  if (typeof article !== 'undefined' && article) {
+    if (article.pdfUrl) {
+      article.pdfUrl = normalizeUrl(article.pdfUrl);
+    }
+  }
+  
+  // Normalizar URLs en todos los atributos href y src del DOM
+  document.querySelectorAll('[href], [src], [data-pdf-url]').forEach(el => {
+    // Normalizar href
+    if (el.hasAttribute('href')) {
+      const href = el.getAttribute('href');
+      if (href && href.startsWith('http')) {
+        el.setAttribute('href', normalizeUrl(href));
+      }
+    }
+    
+    // Normalizar src
+    if (el.hasAttribute('src')) {
+      const src = el.getAttribute('src');
+      if (src && src.startsWith('http')) {
+        el.setAttribute('src', normalizeUrl(src));
+      }
+    }
+    
+    // Normalizar data-pdf-url
+    if (el.hasAttribute('data-pdf-url')) {
+      const pdfUrl = el.getAttribute('data-pdf-url');
+      if (pdfUrl && pdfUrl.startsWith('http')) {
+        el.setAttribute('data-pdf-url', normalizeUrl(pdfUrl));
+      }
+    }
+  });
+}
 function generateInstitutionsList(autores, lang) {
   let authorsArray;
   if (typeof autores === 'string') {
@@ -1194,7 +1271,7 @@ function processCodeBlocks(html) {
 // ========== FUNCIÓN PRINCIPAL ==========
 async function generateAll() {
   console.log('🚀 Iniciando generación de artículos estáticos...');
-  
+    normalizeAllUrls();
   try {
     // 1. Leer articles.json
     if (!fs.existsSync(ARTICLES_JSON)) {
@@ -1231,6 +1308,9 @@ async function generateArticleHtml(article) {
   } else if (Array.isArray(article.autores)) {
     authorsList = article.autores.map(a => formatAuthorForCitation(a));
   }
+   if (article.pdfUrl) {
+    article.pdfUrl = normalizeUrl(article.pdfUrl);
+  }
   const authorMetaTags = authorsList.map(author => `<meta name="citation_author" content="${author}">`).join('\n');
   
   const articleSlug = article.permalink || `${generateSlug(article.titulo)}-${article.numeroArticulo}`;
@@ -1257,7 +1337,7 @@ async function generateArticleHtml(article) {
   // Procesar HTML del artículo (con bloques de código, tablas, etc.)
   const processedHtmlEs = processCodeBlocks(article.html_es || '');
   const processedHtmlEn = processCodeBlocks(article.html_en || '');
-
+  
   // Procesar referencias
   const referencesHtml = (() => {
     if (!article.referencias) return '<p>No hay referencias disponibles.</p>';
@@ -1526,11 +1606,12 @@ const vocabularyName = article.keywords_vocabulary || article.keywords_vocabular
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,700;1,700&family=JetBrains+Mono&family=Lora:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
    <!-- CodeMirror -->
-   <!-- CodeMirror Simple Mode Addon -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/mode/simple.min.js"></script>
+  
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+  <!-- CodeMirror Simple Mode Addon -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/mode/simple.min.js"></script>
   
   <!-- Modos de lenguaje -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
@@ -4350,7 +4431,59 @@ blockquote cite {
 }
 
   </style>
- 
+ <!-- Script de normalización automática de URLs -->
+<script>
+(function() {
+  function normalizeUrl(url) {
+    if (!url) return url;
+    
+    const currentHost = window.location.hostname;
+    const equivalentDomains = [
+      'revista1919.github.io',
+      'revistacienciasestudiantes.com',
+      'www.revistacienciasestudiantes.com'
+    ];
+    
+    for (const domain of equivalentDomains) {
+      if (url.includes(domain)) {
+        url = url.replace(domain, currentHost);
+        break;
+      }
+    }
+    
+    return url;
+  }
+  
+  // Normalizar cuando el DOM esté listo
+  document.addEventListener('DOMContentLoaded', function() {
+    // Normalizar data-pdf-url
+    const pdfContainer = document.getElementById('pdf-container');
+    if (pdfContainer) {
+      const pdfUrl = pdfContainer.getAttribute('data-pdf-url');
+      if (pdfUrl) {
+        pdfContainer.setAttribute('data-pdf-url', normalizeUrl(pdfUrl));
+      }
+    }
+    
+    // Normalizar todos los enlaces
+    document.querySelectorAll('[href], [src]').forEach(el => {
+      if (el.hasAttribute('href')) {
+        const href = el.getAttribute('href');
+        if (href && href.startsWith('http')) {
+          el.setAttribute('href', normalizeUrl(href));
+        }
+      }
+      
+      if (el.hasAttribute('src')) {
+        const src = el.getAttribute('src');
+        if (src && src.startsWith('http')) {
+          el.setAttribute('src', normalizeUrl(src));
+        }
+      }
+    });
+  });
+})();
+</script>
 </head>
 <body>
   <header class="sd-header">
@@ -4648,7 +4781,7 @@ ${article.pdfUrl ? `
     <!-- Controles de navegación -->
     <div id="pdf-controls" style="display: none; align-items: center; gap: 0.5rem; margin-left: auto; font-family: 'Inter', sans-serif;">
       <button id="pdf-prev" class="btn-pdf" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">← ${isSpanish ? 'Anterior' : 'Previous'}</button>
-      <span id="pdf-page-info" style="color: var(--text-light); font-size: 0.9rem; min-width: 100px; text-align: center;">${isSpanish ? 'Página 1 de 3' : 'Page 1 of 3'}</span>
+      <span id="pdf-page-info" style="color: var(--text-light); font-size: 0.9rem; min-width: 100px; text-align: center;"></span>
       <button id="pdf-next" class="btn-pdf" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">${isSpanish ? 'Siguiente' : 'Next'} →</button>
     </div>
   </div>
@@ -5781,22 +5914,17 @@ window.__SPECIAL_ELEMENTS__ = (function() {
     </div>
   </div>
 </div>
-
 <!-- PDF.js Library -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
 <!-- PDF.js Viewer Script -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  // Solo inicializar si existe el contenedor del PDF
   const pdfContainer = document.getElementById('pdf-container');
   if (!pdfContainer) return;
   
-  let pdfUrl = pdfContainer.getAttribute('data-pdf-url');
-// Agregar proxy CORS solo si es de otro dominio
-if (pdfUrl.includes('revista1919.github.io')) {
-  pdfUrl = 'https://cors-anywhere.herokuapp.com/' + pdfUrl;
-}
+  // La URL ya está normalizada por el script global
+  const pdfUrl = pdfContainer.getAttribute('data-pdf-url');
   if (!pdfUrl) return;
   
   const canvas = document.getElementById('pdf-canvas');
@@ -5810,9 +5938,8 @@ if (pdfUrl.includes('revista1919.github.io')) {
   let pageNum = 1;
   let pageRendering = false;
   let pageNumPending = null;
-  let currentScale = 1.2;
   
-  // Configurar PDF.js worker
+  // Configurar PDF.js
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   
   // Cargar el PDF
@@ -5822,19 +5949,31 @@ if (pdfUrl.includes('revista1919.github.io')) {
     controls.style.display = 'flex';
     renderPage(pageNum);
   }).catch(function(error) {
+    console.error('Error loading PDF with PDF.js:', error);
+    
+    // Fallback: Mostrar mensaje de error con enlace directo
     loading.innerHTML = '<div style="text-align: center; padding: 2rem; color: white;">' +
-      'Error al cargar el PDF: ' + error.message + '</div>';
-    console.error('Error loading PDF:', error);
+      '<div style="font-size: 3rem; margin-bottom: 1rem;">📄</div>' +
+      '<div style="font-size: 1.2rem; margin-bottom: 1rem;">' + 
+      (document.documentElement.lang === 'es' ? 
+        'No se pudo cargar el visor de PDF' : 
+        'PDF viewer could not be loaded') + 
+      '</div>' +
+      '<a href="' + pdfUrl + '" target="_blank" style="color: #3498db; text-decoration: underline; font-size: 1rem;">' +
+      (document.documentElement.lang === 'es' ? 
+        'Abrir PDF en una nueva pestaña' : 
+        'Open PDF in a new tab') + 
+      '</a>' +
+      '</div>';
   });
   
   function renderPage(num) {
     pageRendering = true;
     
     pdfDoc.getPage(num).then(function(page) {
-      // Calcular escala responsiva
-      const containerWidth = pdfContainer.clientWidth - 20;
+      const containerWidth = pdfContainer.clientWidth - 40;
       const baseViewport = page.getViewport({ scale: 1 });
-      const responsiveScale = Math.min(currentScale, containerWidth / baseViewport.width);
+      const responsiveScale = Math.min(1.2, containerWidth / baseViewport.width);
       
       const viewport = page.getViewport({ scale: responsiveScale });
       canvas.height = viewport.height;
@@ -5848,7 +5987,11 @@ if (pdfUrl.includes('revista1919.github.io')) {
       const renderTask = page.render(renderContext);
       renderTask.promise.then(function() {
         pageRendering = false;
-        pageInfo.textContent = '${isSpanish ? 'Página' : 'Page'} ' + num + ' ${isSpanish ? 'de' : 'of'} ' + pdfDoc.numPages;
+        pageInfo.textContent = 
+          (document.documentElement.lang === 'es' ? 'Página ' : 'Page ') + 
+          num + 
+          (document.documentElement.lang === 'es' ? ' de ' : ' of ') + 
+          pdfDoc.numPages;
         
         if (pageNumPending !== null) {
           renderPage(pageNumPending);
@@ -5857,7 +6000,6 @@ if (pdfUrl.includes('revista1919.github.io')) {
       });
     });
     
-    // Actualizar estado de botones
     prevBtn.disabled = (num <= 1);
     nextBtn.disabled = (num >= pdfDoc.numPages);
   }
@@ -5882,7 +6024,6 @@ if (pdfUrl.includes('revista1919.github.io')) {
     queueRenderPage(pageNum);
   });
   
-  // Responsive
   window.addEventListener('resize', debounce(function() {
     if (pdfDoc && canvas) {
       renderPage(pageNum);
@@ -5918,7 +6059,7 @@ if (pdfUrl.includes('revista1919.github.io')) {
   opacity: 0.5;
   cursor: not-allowed;
 }
-/* Responsive para PDF.js viewer */
+
 @media (max-width: 768px) {
   #pdf-container {
     min-height: 400px !important;
@@ -5942,7 +6083,6 @@ if (pdfUrl.includes('revista1919.github.io')) {
   }
 }
 </style>
-
 </body>
 </html>`;
 }
