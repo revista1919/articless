@@ -1526,6 +1526,8 @@ const vocabularyName = article.keywords_vocabulary || article.keywords_vocabular
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,700;1,700&family=JetBrains+Mono&family=Lora:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
    <!-- CodeMirror -->
+   <!-- CodeMirror Simple Mode Addon -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/mode/simple.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
@@ -5790,7 +5792,11 @@ document.addEventListener('DOMContentLoaded', function() {
   const pdfContainer = document.getElementById('pdf-container');
   if (!pdfContainer) return;
   
-  const pdfUrl = pdfContainer.getAttribute('data-pdf-url');
+  let pdfUrl = pdfContainer.getAttribute('data-pdf-url');
+// Agregar proxy CORS solo si es de otro dominio
+if (pdfUrl.includes('revista1919.github.io')) {
+  pdfUrl = 'https://cors-anywhere.herokuapp.com/' + pdfUrl;
+}
   if (!pdfUrl) return;
   
   const canvas = document.getElementById('pdf-canvas');
