@@ -461,10 +461,13 @@ const socialLinks = {
   tiktok: 'https://www.tiktok.com/@revistacienciaestudiante',
   spotify: 'https://open.spotify.com/show/6amsgUkNXgUTD219XpuqOe?si=LPzCNpusQjSLGBq_pPrVTw'
 };
+
 // ========== CARGA DE TEAM.JSON CON MATCHING ROBUSTO ==========
 let authorMap = {}; // Mapa por uid
 let authorByNameMap = {}; // Mapa por nombre normalizado
 let authorBySlugMap = {}; // Mapa por slug
+let authorByEmailMap = {}; // Mapa por email
+let authorByOrcidMap = {}; // Mapa por ORCID
 
 async function loadTeamData() {
   try {
@@ -480,87 +483,107 @@ async function loadTeamData() {
 
     if (Array.isArray(team)) {
       team.forEach(member => {
-        // Guardar por UID (para matching exacto)
+        // Crear objeto base del autor
+        const authorInfo = {
+          uid: member.uid,
+          displayName: member.displayName,
+          slug: member.slug,
+          orcid: member.orcid,
+          email: member.publicEmail,
+          firstName: member.firstName,
+          lastName: member.lastName,
+          institution: member.institution,
+          imageUrl: member.imageUrl
+        };
+        
+        // Guardar por UID (matching exacto)
         if (member.uid) {
-          authorMap[member.uid] = {
-            uid: member.uid,
-            displayName: member.displayName,
-            slug: member.slug,
-            orcid: member.orcid,
-            email: member.publicEmail,
-            firstName: member.firstName,
-            lastName: member.lastName,
-            institution: member.institution,
-            imageUrl: member.imageUrl
-          };
+          authorMap[member.uid] = authorInfo;
+          // También guardar UID sin espacios
+          authorMap[member.uid.trim()] = authorInfo;
+          // Y UID en minúsculas
+          authorMap[member.uid.toLowerCase()] = authorInfo;
         }
         
         // Guardar por slug
         if (member.slug) {
-          authorBySlugMap[member.slug] = {
-            ...authorMap[member.uid],
-            uid: member.uid,
-            displayName: member.displayName,
-            slug: member.slug,
-            orcid: member.orcid,
-            email: member.publicEmail
-          };
+          authorBySlugMap[member.slug] = authorInfo;
+          // También guardar slug sin espacios y en minúsculas
+          authorBySlugMap[member.slug.trim()] = authorInfo;
+          authorBySlugMap[member.slug.toLowerCase()] = authorInfo;
+        }
+        
+        // Guardar por email
+        if (member.publicEmail) {
+          authorByEmailMap[member.publicEmail.toLowerCase().trim()] = authorInfo;
+        }
+        
+        // Guardar por ORCID
+        if (member.orcid) {
+          authorByOrcidMap[member.orcid.replace('https://orcid.org/', '').trim()] = authorInfo;
         }
         
         // Guardar por displayName (nombre exacto)
         if (member.displayName) {
-          authorByNameMap[member.displayName] = {
-            ...authorMap[member.uid],
-            uid: member.uid,
-            displayName: member.displayName,
-            slug: member.slug,
-            orcid: member.orcid,
-            email: member.publicEmail
-          };
+          const cleanDisplayName = member.displayName.trim();
+          authorByNameMap[cleanDisplayName] = authorInfo;
+          authorByNameMap[cleanDisplayName.toLowerCase()] = authorInfo;
         }
         
-        // También guardar versiones normalizadas del nombre para matching fuzzy
-        // (sin tildes, minúsculas, etc.)
+        // Guardar versiones normalizadas del nombre
         const normalizedName = member.displayName ? 
           member.displayName.toLowerCase()
-            .normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/\d+$/, '')
+            .trim() : '';
         
-        if (normalizedName && !authorByNameMap[normalizedName]) {
-          authorByNameMap[normalizedName] = {
-            ...authorMap[member.uid],
-            uid: member.uid,
-            displayName: member.displayName,
-            slug: member.slug,
-            orcid: member.orcid,
-            email: member.publicEmail,
-            normalizedName
-          };
+        if (normalizedName) {
+          authorByNameMap[normalizedName] = authorInfo;
         }
         
         // Guardar por combinación de nombre y apellido
         if (member.firstName || member.lastName) {
           const fullName = `${member.firstName || ''} ${member.lastName || ''}`.trim();
-          if (fullName && !authorByNameMap[fullName]) {
-            authorByNameMap[fullName] = {
-              ...authorMap[member.uid],
-              uid: member.uid,
-              displayName: member.displayName,
-              slug: member.slug,
-              orcid: member.orcid,
-              email: member.publicEmail
-            };
+          authorByNameMap[fullName] = authorInfo;
+          authorByNameMap[fullName.toLowerCase()] = authorInfo;
+          
+          // Versión normalizada
+          const normalizedFullName = fullName.toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/\d+$/, '')
+            .trim();
+          
+          if (normalizedFullName) {
+            authorByNameMap[normalizedFullName] = authorInfo;
+          }
+        }
+        
+        // Guardar solo por apellido
+        if (member.lastName) {
+          const lastNameLower = member.lastName.toLowerCase().trim();
+          if (!authorByNameMap[lastNameLower]) {
+            authorByNameMap[lastNameLower] = authorInfo;
           }
         }
       });
       
-      console.log(`📚 ${Object.keys(authorMap).length} autores cargados por UID`);
+      console.log(`📚 ${Object.keys(authorMap).length} UIDs cargados`);
       console.log(`📚 ${Object.keys(authorByNameMap).length} variantes de nombres indexadas`);
+      console.log(`📚 ${Object.keys(authorBySlugMap).length} slugs indexados`);
+      console.log(`📚 ${Object.keys(authorByEmailMap).length} emails indexados`);
+      console.log(`📚 ${Object.keys(authorByOrcidMap).length} ORCIDs indexados`);
+      
+      // Debug: mostrar todos los autores cargados
+      console.log('👥 Autores cargados:');
+      team.forEach(member => {
+        console.log(`  - UID: ${member.uid}, Nombre: ${member.displayName}, Slug: ${member.slug}`);
+      });
     } else {
       console.log('⚠️ El JSON cargado no es un array.');
     }
 
   } catch (e) {
-    console.log('⚠️ No se pudo cargar Team.json desde la URL, los autores no tendrán enlaces. Error:', e.message);
+    console.log('⚠️ No se pudo cargar Team.json desde la URL. Error:', e.message);
   }
 }
 
@@ -570,93 +593,174 @@ function findAuthorInfo(author, articleAuthorId = null) {
   
   // Obtener el nombre para mostrar
   let displayName = '';
+  let authorEmail = '';
+  let authorOrcid = '';
+  let authorSlug = '';
+  
   if (typeof author === 'string') {
     displayName = author;
-  } else if (author.name) {
-    displayName = author.name;
-  } else if (author.firstName || author.lastName) {
-    displayName = `${author.firstName || ''} ${author.lastName || ''}`.trim();
   } else {
-    return null;
+    displayName = author.name || `${author.firstName || ''} ${author.lastName || ''}`.trim();
+    authorEmail = author.email || author.publicEmail || '';
+    authorOrcid = author.orcid || '';
+    authorSlug = author.slug || '';
   }
   
-  // 1. INTENTAR POR UID (matching más exacto)
-  if (articleAuthorId && authorMap[articleAuthorId]) {
-    console.log(`✅ Match por UID: ${articleAuthorId} -> ${authorMap[articleAuthorId].displayName}`);
-    return authorMap[articleAuthorId];
-  }
+  console.log(`🔍 Buscando autor: "${displayName}"`);
+  console.log(`   Article AuthorID: ${articleAuthorId || 'no proporcionado'}`);
+  console.log(`   Email del artículo: ${authorEmail || 'no proporcionado'}`);
+  console.log(`   ORCID del artículo: ${authorOrcid || 'no proporcionado'}`);
+  console.log(`   Slug del artículo: ${authorSlug || 'no proporcionado'}`);
   
-  // 2. INTENTAR POR NOMBRE EXACTO
-  if (authorByNameMap[displayName]) {
-    console.log(`✅ Match por nombre exacto: ${displayName}`);
-    return authorByNameMap[displayName];
-  }
-  
-  // 3. INTENTAR POR SLUG (si el autor tiene slug en el artículo)
-  if (author.slug && authorBySlugMap[author.slug]) {
-    console.log(`✅ Match por slug: ${author.slug}`);
-    return authorBySlugMap[author.slug];
-  }
-  
-  // 4. INTENTAR MATCHING INTELIGENTE PARA NOMBRES CON NÚMEROS (ej: "nombre-apellido2")
-  // Esto maneja casos donde hay duplicados como "Juan Pérez" y "Juan Pérez2"
-  const baseNameMatch = displayName.replace(/\d+$/, '').trim(); // Quita números al final
-  if (baseNameMatch !== displayName) {
-    // Buscar el nombre base en el mapa
-    for (const [key, value] of Object.entries(authorByNameMap)) {
-      if (key.startsWith(baseNameMatch) || baseNameMatch.startsWith(key)) {
-        console.log(`✅ Match por nombre base: ${displayName} -> ${key}`);
-        return value;
+  // 1. INTENTAR POR UID DEL ARTÍCULO (matching más exacto)
+  if (articleAuthorId) {
+    // Intentar con el ID exacto
+    if (authorMap[articleAuthorId]) {
+      console.log(`✅ Match por UID exacto: ${articleAuthorId} -> ${authorMap[articleAuthorId].displayName}`);
+      return authorMap[articleAuthorId];
+    }
+    
+    // Intentar con el ID sin espacios
+    const cleanId = articleAuthorId.trim();
+    if (cleanId !== articleAuthorId && authorMap[cleanId]) {
+      console.log(`✅ Match por UID sin espacios: ${cleanId}`);
+      return authorMap[cleanId];
+    }
+    
+    // Intentar con el ID en minúsculas
+    const lowerId = cleanId.toLowerCase();
+    if (lowerId !== cleanId && authorMap[lowerId]) {
+      console.log(`✅ Match por UID en minúsculas: ${lowerId}`);
+      return authorMap[lowerId];
+    }
+    
+    // Buscar coincidencia parcial del UID
+    for (const [uid, info] of Object.entries(authorMap)) {
+      if (uid.includes(cleanId) || cleanId.includes(uid)) {
+        console.log(`✅ Match por UID parcial: ${articleAuthorId} -> ${uid}`);
+        return info;
       }
     }
   }
   
-  // 5. INTENTAR NORMALIZACIÓN AVANZADA
-  const normalized = displayName.toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]/g, '');
-  
-  const normalizedWithoutNumbers = normalized.replace(/\d+/g, '');
-  
-  for (const [key, value] of Object.entries(authorByNameMap)) {
-    const keyNormalized = key.toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]/g, '');
-    
-    const keyWithoutNumbers = keyNormalized.replace(/\d+/g, '');
-    
-    // Comparar versiones normalizadas
-    if (keyNormalized === normalized || 
-        keyWithoutNumbers === normalizedWithoutNumbers ||
-        keyNormalized.includes(normalized) || 
-        normalized.includes(keyNormalized)) {
-      console.log(`✅ Match por normalización: ${displayName} -> ${key}`);
-      return value;
+  // 2. INTENTAR POR EMAIL
+  if (authorEmail) {
+    const cleanEmail = authorEmail.toLowerCase().trim();
+    if (authorByEmailMap[cleanEmail]) {
+      console.log(`✅ Match por email: ${cleanEmail}`);
+      return authorByEmailMap[cleanEmail];
     }
   }
   
-  // 6. ÚLTIMO RECURSO: Intentar por apellido si es que tenemos firstName/lastName
-  if (typeof author !== 'string' && (author.firstName || author.lastName)) {
-    const lastName = author.lastName || '';
-    const firstName = author.firstName || '';
+  // 3. INTENTAR POR ORCID
+  if (authorOrcid) {
+    const cleanOrcid = authorOrcid.replace('https://orcid.org/', '').trim();
+    if (authorByOrcidMap[cleanOrcid]) {
+      console.log(`✅ Match por ORCID: ${cleanOrcid}`);
+      return authorByOrcidMap[cleanOrcid];
+    }
+  }
+  
+  // 4. INTENTAR POR SLUG DEL ARTÍCULO
+  if (authorSlug) {
+    if (authorBySlugMap[authorSlug]) {
+      console.log(`✅ Match por slug del artículo: ${authorSlug}`);
+      return authorBySlugMap[authorSlug];
+    }
     
-    for (const [key, value] of Object.entries(authorMap)) {
-      if (value.lastName && value.lastName.toLowerCase() === lastName.toLowerCase()) {
-        // Coincidencia por apellido
-        if (value.firstName && value.firstName.toLowerCase().startsWith(firstName.toLowerCase().charAt(0))) {
-          console.log(`✅ Match por apellido + inicial: ${displayName}`);
+    // Intentar con slug normalizado
+    const normalizedSlug = authorSlug.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+    
+    if (authorBySlugMap[normalizedSlug]) {
+      console.log(`✅ Match por slug normalizado: ${normalizedSlug}`);
+      return authorBySlugMap[normalizedSlug];
+    }
+  }
+  
+  // 5. INTENTAR POR NOMBRE EXACTO
+  const cleanDisplayName = displayName.trim();
+  if (authorByNameMap[cleanDisplayName]) {
+    console.log(`✅ Match por nombre exacto: ${cleanDisplayName}`);
+    return authorByNameMap[cleanDisplayName];
+  }
+  
+  // 6. INTENTAR POR NOMBRE SIN NÚMEROS
+  const displayNameWithoutNumbers = cleanDisplayName.replace(/\d+$/, '').trim();
+  if (displayNameWithoutNumbers !== cleanDisplayName && authorByNameMap[displayNameWithoutNumbers]) {
+    console.log(`✅ Match por nombre sin números: ${displayNameWithoutNumbers}`);
+    return authorByNameMap[displayNameWithoutNumbers];
+  }
+  
+  // 7. INTENTAR POR NORMALIZACIÓN EXACTA
+  const normalized = cleanDisplayName.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '')
+    .replace(/\d+$/, '');
+  
+  if (normalized && authorByNameMap[normalized]) {
+    console.log(`✅ Match por normalización exacta: ${normalized}`);
+    return authorByNameMap[normalized];
+  }
+  
+  // 8. INTENTAR POR COINCIDENCIA PARCIAL
+  for (const [key, value] of Object.entries(authorByNameMap)) {
+    const cleanKey = key.replace(/\d+$/, '').trim();
+    const keyNormalized = cleanKey.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '');
+    
+    if (normalized && keyNormalized) {
+      if (normalized.includes(keyNormalized) || keyNormalized.includes(normalized)) {
+        const minLength = Math.min(normalized.length, keyNormalized.length);
+        if (minLength >= 5) {
+          console.log(`✅ Match parcial: ${displayName} -> ${key}`);
           return value;
         }
       }
     }
   }
   
+  // 9. INTENTAR POR APELLIDO
+  const authorLastName = typeof author !== 'string' ? (author.lastName || '') : '';
+  if (authorLastName) {
+    const lastNameLower = authorLastName.toLowerCase().trim();
+    if (authorByNameMap[lastNameLower]) {
+      console.log(`✅ Match por apellido: ${lastNameLower}`);
+      return authorByNameMap[lastNameLower];
+    }
+    
+    // Buscar coincidencia de apellido en todos los autores
+    for (const [uid, info] of Object.entries(authorMap)) {
+      if (info.lastName && info.lastName.toLowerCase().trim() === lastNameLower) {
+        console.log(`✅ Match por apellido en UID map: ${uid}`);
+        return info;
+      }
+    }
+  }
+  
+  // 10. GENERAR SLUG A PARTIR DEL NOMBRE Y BUSCAR
+  const generatedSlug = cleanDisplayName.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  
+  if (generatedSlug && authorBySlugMap[generatedSlug]) {
+    console.log(`✅ Match por slug generado: ${generatedSlug}`);
+    return authorBySlugMap[generatedSlug];
+  }
+  
   console.log(`❌ No se encontró match para: ${displayName}`);
   return null;
 }
-
 // ========== FUNCIÓN PARA PROCESAR AUTORES CON ICONOS (MEJORADA) ==========
 // ========== FUNCIÓN PARA PROCESAR AUTORES CON ICONOS (MEJORADA CON IDIOMA Y CORRESPONDENCIA) ==========
+// ========== FUNCIÓN PARA PROCESAR AUTORES CON ICONOS ==========
 function processAuthorsWithIcons(authors, article = null, lang = 'es') {
   if (!authors) return 'Autor desconocido';
   
@@ -666,9 +770,13 @@ function processAuthorsWithIcons(authors, article = null, lang = 'es') {
   } else if (Array.isArray(authors)) {
     authorsArray = authors.map(a => {
       if (typeof a === 'string') return { name: a };
-      return a; // ya es objeto
+      return a;
     });
   }
+  
+  console.log(`\n📝 Procesando ${authorsArray.length} autores para el artículo:`);
+  console.log(`   Autores del artículo:`, authorsArray);
+  console.log(`   AuthorIds del artículo:`, article?.authorIds || 'no proporcionados');
   
   const isSpanish = lang === 'es';
   const superindices = 'abcdefghijklmnopqrstuvwxyz';
@@ -686,21 +794,32 @@ function processAuthorsWithIcons(authors, article = null, lang = 'es') {
       displayName = 'Autor';
     }
     
-    // Obtener el authorId del artículo si existe
-    const articleAuthorId = article && article.authorIds ? article.authorIds[index] : null;
+    // Obtener el authorId del artículo
+    const articleAuthorId = article?.authorIds?.[index] || null;
     
-    // Buscar información del autor usando nuestra función de matching
+    console.log(`\n👤 Procesando autor ${index + 1}: ${displayName}`);
+    console.log(`   AuthorID del artículo: ${articleAuthorId || 'null'}`);
+    
+    // Buscar información del autor
     const authorInfo = findAuthorInfo(author, articleAuthorId);
+    
+    if (authorInfo) {
+      console.log(`   ✅ Encontrado: ${authorInfo.displayName}`);
+      console.log(`   Slug: ${authorInfo.slug}`);
+      console.log(`   UID: ${authorInfo.uid}`);
+    } else {
+      console.log(`   ❌ No encontrado en Team.json`);
+    }
     
     // Construir HTML del autor
     let authorHtml = '';
     
     if (authorInfo && authorInfo.slug) {
-      // Tiene slug, crear enlace - ¡VERSIÓN CORREGIDA PARA IDIOMA!
       const authorFile = isSpanish ? `${authorInfo.slug}.html` : `${authorInfo.slug}.EN.html`;
+      console.log(`   🔗 Creando enlace: /team/${authorFile}`);
+      
       authorHtml += `<a href="/team/${authorFile}" class="author-link"`;
       
-      // Añadir atributos de datos para metadata
       if (authorInfo.uid) {
         authorHtml += ` data-author-uid="${authorInfo.uid}"`;
       }
@@ -710,37 +829,36 @@ function processAuthorsWithIcons(authors, article = null, lang = 'es') {
       
       authorHtml += `>${displayName}</a>`;
     } else {
-      // No tiene slug, solo texto
+      console.log(`   ⚠️ Sin slug, mostrando solo texto`);
       authorHtml += `<span class="author-name"`;
-      if (authorInfo && authorInfo.uid) {
+      if (authorInfo?.uid) {
         authorHtml += ` data-author-uid="${authorInfo.uid}"`;
       }
       authorHtml += `>${displayName}</span>`;
     }
     
-    // AÑADIR SUPERÍNDICE (a, b, c, etc.)
+    // Añadir superíndice
     const supLetter = superindices[index] || String(index + 1);
     authorHtml += `<sup class="author-sup">${supLetter}</sup>`;
     
     // Añadir iconos
     const icons = [];
     
-    // ORCID (verde) - Priorizar información del team.json
-    const orcid = (authorInfo && authorInfo.orcid) || author.orcid;
+    // ORCID
+    const orcid = (authorInfo?.orcid) || author.orcid;
     if (orcid && orcid.trim() !== '') {
       icons.push(`<a href="https://orcid.org/${orcid}" target="_blank" rel="noopener noreferrer" class="author-icon orcid-icon" title="ORCID">${orcidSvg}</a>`);
     }
     
-    // Email (azul)
-    const email = (authorInfo && authorInfo.email) || author.email || author.publicEmail;
+    // Email
+    const email = (authorInfo?.email) || author.email || author.publicEmail;
     if (email && email.trim() !== '') {
       const gmailUrl = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(email);
       icons.push('<a href="' + gmailUrl + '" target="_blank" rel="noopener noreferrer" class="author-icon email-icon" title="' + (isSpanish ? 'Enviar email' : 'Send email') + '">' + emailSvg + '</a>');
     }
     
-    // ICONO DE CORRESPONDENCIA (solo si isCorresponding === true)
-    const isCorresponding = author.isCorresponding === true || (authorInfo && authorInfo.isCorresponding === true);
-    if (isCorresponding) {
+    // Icono de correspondencia
+    if (author.isCorresponding === true || authorInfo?.isCorresponding === true) {
       icons.push(`<span class="author-icon corresponding-icon" title="${isSpanish ? 'Autor de correspondencia' : 'Corresponding author'}">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
@@ -756,7 +874,9 @@ function processAuthorsWithIcons(authors, article = null, lang = 'es') {
     return authorHtml;
   });
   
-  return authorElements.join('<span class="author-separator">, </span>');
+  const result = authorElements.join('<span class="author-separator">, </span>');
+  console.log(`\n📝 Resultado HTML: ${result}\n`);
+  return result;
 }
 function generateInstitutionsList(autores, lang) {
   let authorsArray;
