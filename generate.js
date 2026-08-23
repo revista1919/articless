@@ -918,14 +918,11 @@ function normalizeUrl(url) {
   
   return url;
 }
-
-// ========== FUNCIÓN PARA APLICAR A TODAS LAS URLs ==========
+// ========== FUNCIÓN PARA NORMALIZAR URLs (válida para Node.js) ==========
 function normalizeAllUrls() {
-  // Normalizar URLs en el objeto article
-  if (typeof article !== 'undefined' && article) {
-    if (article.pdfUrl) {
-      article.pdfUrl = normalizeUrl(article.pdfUrl);
-    }
+  if (typeof document === 'undefined') {
+    // Estamos en Node.js - no usar document
+    return;
   }
   
   // Normalizar URLs en todos los atributos href y src del DOM
@@ -1271,7 +1268,9 @@ function processCodeBlocks(html) {
 // ========== FUNCIÓN PRINCIPAL ==========
 async function generateAll() {
   console.log('🚀 Iniciando generación de artículos estáticos...');
+   if (typeof document !== 'undefined') {
     normalizeAllUrls();
+  }
   try {
     // 1. Leer articles.json
     if (!fs.existsSync(ARTICLES_JSON)) {
@@ -1308,8 +1307,8 @@ async function generateArticleHtml(article) {
   } else if (Array.isArray(article.autores)) {
     authorsList = article.autores.map(a => formatAuthorForCitation(a));
   }
-   if (article.pdfUrl) {
-    article.pdfUrl = normalizeUrl(article.pdfUrl);
+   if (article.pdfUrl && article.pdfUrl.includes('revista1919.github.io')) {
+    article.pdfUrl = article.pdfUrl.replace('revista1919.github.io', 'www.revistacienciasestudiantes.com');
   }
   const authorMetaTags = authorsList.map(author => `<meta name="citation_author" content="${author}">`).join('\n');
   
