@@ -4436,21 +4436,19 @@ blockquote cite {
  function normalizeUrl(url) {
   if (!url) return url;
   
-  const currentHost = window.location.hostname;
+  const currentHost = window.location.hostname; // Ej: "www.revistacienciasestudiantes.com"
   
-  // Eliminar www. del host actual para comparar
-  const hostWithoutWww = currentHost.replace(/^www\./, '');
-  
-  // Dominios equivalentes (sin www)
+  // Dominios equivalentes (todos sin www)
   const equivalentDomains = [
     'revista1919.github.io',
+    'www.revistacienciasestudiantes.com',
     'revistacienciasestudiantes.com'
   ];
   
+  // Reemplazar cualquier dominio equivalente con el host actual EXACTO
   for (const domain of equivalentDomains) {
     if (url.includes(domain)) {
-      // Usar el host actual tal como está (con o sin www)
-      url = url.replace(domain, hostWithoutWww);
+      url = url.replace(domain, currentHost);
       break;
     }
   }
