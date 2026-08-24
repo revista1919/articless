@@ -4686,13 +4686,13 @@ blockquote cite {
           </div>
           <!-- Action Bar -->
           <div class="action-bar">
-            <a href="${article.pdfUrl}" target="_blank" rel="noopener noreferrer" class="btn-pdf">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
-                <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
-              </svg>
-              ${isSpanish ? 'Abrir PDF' : 'Open PDF'}
-            </a>
+            <a href="${isSpanish ? '/viewer.html' : '/viewerEN.html'}?url=${encodeURIComponent(article.pdfUrl)}&doi=${article.doi || ''}&title=${encodeURIComponent(title)}" target="_blank" rel="noopener noreferrer" class="btn-pdf">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+    <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+  </svg>
+  ${isSpanish ? 'Abrir PDF' : 'Open PDF'}
+</a>
             <span class="oa-label">
               ${oaSvg}
               Open Access
@@ -4777,7 +4777,7 @@ ${article.pdfUrl ? `
   
   <!-- Botones y controles -->
   <div style="display: flex; gap: 1rem; margin-top: 1rem; align-items: center; flex-wrap: wrap;">
-    <a href="${article.pdfUrl}" target="_blank" class="btn-pdf">${t.viewFullScreen}</a>
+   <a href="${isSpanish ? '/viewer.html' : '/viewerEN.html'}?url=${encodeURIComponent(article.pdfUrl)}&doi=${article.doi || ''}&title=${encodeURIComponent(title)}" target="_blank" class="btn-pdf">${t.viewFullScreen}</a>
     <a href="${article.pdfUrl}" download class="btn-pdf" style="background: var(--text-light);">${t.downloadPDF}</a>
     
     <!-- Controles de navegación -->
