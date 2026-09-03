@@ -1232,7 +1232,12 @@
       "Doctrina"
     ],
     "keywords_english": [
-      "Political sciences,Governor,Absolutist,Common wealth,Gentile,Doctrine"
+      "Political sciences",
+      "Governor",
+      "Absolutist",
+      "Commonwealth",
+      "Gentile",
+      "Doctrine"
     ],
     "specialized_codes": [
       "Teoría política",
@@ -1267,10 +1272,11 @@
     "referencias": "<div class=\"references-list\"><div class=\"reference-item\" id=\"ref-hobbes1651\"> Hobbes, Thomas. <em>Leviatán, o la materia, forma y poder de una república eclesiástica y civil</em>. 3.ª ed. Londres: Fondo de Cultura Económica, 1651. <a href=\"javascript:void(0)\" onclick=\"openCitationPicker(event, 'ref-hobbes1651')\" title=\"Volver a las citas\"></a> </div><div class=\"reference-item\" id=\"ref-aquino1260\"> de Aquino, Tomás. <em>Suma de Teología</em>. 4.ª ed. Roma: Biblioteca de Autores Cristianos, 1260/1264. <a href=\"javascript:void(0)\" onclick=\"openCitationPicker(event, 'ref-aquino1260')\" title=\"Volver a las citas\"></a> </div><div class=\"reference-item\" id=\"ref-gramsci1929\"> Gramsci, Antonio. <em>Prison Notebooks</em>. Italia: ElecBook, 1929/1935. <a href=\"javascript:void(0)\" onclick=\"openCitationPicker(event, 'ref-gramsci1929')\" title=\"Volver a las citas\"></a> </div><div class=\"reference-item\" id=\"ref-aristotelesIV\"> Aristóteles. <em>Metafísica</em>. 1.ª ed. Grecia: Editorial Gredos, S. A., Siglo IV a.C. <a href=\"javascript:void(0)\" onclick=\"openCitationPicker(event, 'ref-aristotelesIV')\" title=\"Volver a las citas\"></a> </div><div class=\"reference-item\" id=\"ref-montesquieu1742\"> Montesquieu. <em>The Spirit of Laws</em>. Francia: Batoche Books, 1742. <a href=\"javascript:void(0)\" onclick=\"openCitationPicker(event, 'ref-montesquieu1742')\" title=\"Volver a las citas\"></a> </div></div>\n",
     "pdfUrl": "https://revista1919.github.io/articless/pdfs/Article-leviatan-de-thomas-hobbes-sobre-los-gentiles-y-el-estado-18.pdf",
     "createdAt": "2026-09-03T22:25:32.561Z",
-    "updatedAt": "2026-09-03T22:25:32.561Z",
+    "updatedAt": "2026-09-03T22:43:31.930Z",
     "createdBy": "Wp9AbMocILX4UOy6il09qluhrL23",
     "status": "published",
     "publishedAt": "2026-09-03T22:25:32.561Z",
-    "publishedBy": "Wp9AbMocILX4UOy6il09qluhrL23"
+    "publishedBy": "Wp9AbMocILX4UOy6il09qluhrL23",
+    "updatedBy": "Wp9AbMocILX4UOy6il09qluhrL23"
   }
 ]
