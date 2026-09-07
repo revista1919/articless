@@ -1,47 +1,23 @@
 /**
- * Conversor de articles.json a JATS XML (v8.0 FINAL - Verificado y Corregido)
+ * Conversor de articles.json a JATS XML (v9.0 FINAL)
  * 
- * CORRECCIONES APLICADAS:
- * ✅ ORCID siempre con URL completa (https://orcid.org/...)
- * ✅ fn-type="COI-statement" (JATS4R recomendado)
- * ✅ Referencias: elimina javascript:void(0), mejor extracción de año/título
- * ✅ Tablas: mejor captura de caption y numeración automática
- * ✅ Afiliaciones: <aff> directo (sin aff-alternatives innecesario)
- * ✅ Correspondencia: @corresp="yes" + <corresp> en author-notes
- * ✅ Compatible con CommonJS y ES Modules (sin error __dirname)
- * ✅ DOMParser nativo o JSDOM como fallback
- * 
- * COMPATIBILIDAD:
- * - Node.js CommonJS (require)
- * - Node.js ES Modules (import)
- * - Navegadores web
- * - Deno, Bun
+ * CORRECCIONES v9.0:
+ * ✅ Eliminado import.meta (causaba SyntaxError en CommonJS)
+ * ✅ Manejo mejorado de figuras flotantes con imágenes
+ * ✅ Captura de atribución y fuente en figcaption
+ * ✅ Compatible 100% con Node.js CommonJS
+ * ✅ DOMParser nativo sin dependencias externas
  */
 
-// ─── DETECCIÓN DE ENTORNO Y CONFIGURACIÓN DE RUTAS ──────────────────────────
-const getDirname = () => {
-  if (typeof __dirname !== 'undefined') {
-    return __dirname;
-  }
-  // Para ES Modules
-  try {
-    if (typeof import.meta !== 'undefined' && import.meta.url) {
-      const { fileURLToPath } = require('url');
-      const { dirname } = require('path');
-      return dirname(fileURLToPath(import.meta.url));
-    }
-  } catch (e) {
-    // Ignorar
-  }
-  return '.';
-};
+// ─── CONFIGURACIÓN ───────────────────────────────────────────────────────────
+const fs = require('fs');
+const path = require('path');
 
-const __dir = getDirname();
-const INPUT_FILE = 'articles.json';
-const OUTPUT_FILE = 'articles.json';
-const BACKUP_FILE = 'articles.backup.json';
+const INPUT_FILE = path.join(__dirname, 'articles.json');
+const OUTPUT_FILE = path.join(__dirname, 'articles.json');
+const BACKUP_FILE = path.join(__dirname, 'articles.backup.json');
 
-// ─── CONFIGURACIÓN JATS ─────────────────────────────────────────────────────
+// ─── CONSTANTES JATS ────────────────────────────────────────────────────────
 const JATS_VERSION = '1.4';
 const JATS_DTD_PUBLIC = '-//NISO//DTD JATS (Z39.96) Journal Publishing DTD with MathML3 v1.4 2024//EN';
 const JATS_DTD_SYSTEM = 'https://jats.nlm.nih.gov/publishing/1.4/xsd/JATS-journalpublishing1-4-mathml3.xsd';
@@ -99,25 +75,15 @@ function generateSlugId(prefix, text, counter) {
   return `${prefix}-${counter}`;
 }
 
-/**
- * Normaliza ORCID: SIEMPRE devuelve URL completa
- */
 function normalizeOrcid(orcid) {
   if (!orcid) return '';
   let o = String(orcid).trim();
-  
-  // Si ya tiene URL, devolverla
   if (o.startsWith('https://orcid.org/')) return o;
   if (o.startsWith('http://orcid.org/')) return o.replace('http://', 'https://');
-  
-  // Si es solo el número, agregar URL
   if (/^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/i.test(o)) {
     return `https://orcid.org/${o}`;
   }
-  
-  // Si es URL alternativa
   if (o.startsWith('orcid.org/')) return `https://${o}`;
-  
   return o;
 }
 
@@ -147,50 +113,45 @@ function detectArticleType(articleType) {
   return ARTICLE_TYPES['original-research'];
 }
 
-// ─── PARSER DOM UNIVERSAL ───────────────────────────────────────────────────
+// ─── PARSER DOM ─────────────────────────────────────────────────────────────
 function createDOM(html) {
-  // Intentar con DOMParser nativo
+  if (!html) return null;
+  
+  // Usar DOMParser nativo de Node.js 20+
   if (typeof DOMParser !== 'undefined') {
     try {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
       if (doc && doc.body) return doc;
     } catch (e) {
-      // Continuar al fallback
+      // Continuar
     }
   }
   
-  // Intentar con JSDOM si está disponible
-  if (typeof JSDOM !== 'undefined') {
-    try {
-      const dom = new JSDOM(html);
-      return dom.window.document;
-    } catch (e) {
-      // Continuar al fallback
-    }
+  // Fallback: usar JSDOM si está disponible
+  try {
+    const { JSDOM } = require('jsdom');
+    const dom = new JSDOM(html);
+    return dom.window.document;
+  } catch (e) {
+    // Continuar
   }
   
   return null;
 }
 
-// ─── REFERENCIAS MEJORADAS ──────────────────────────────────────────────────
+// ─── REFERENCIAS ────────────────────────────────────────────────────────────
 function parseReferencesFromHtml(referencesHtml) {
   if (!referencesHtml) return [];
   
   const doc = createDOM(referencesHtml);
-  if (!doc) {
-    console.warn('No DOM parser available. Using simple text parsing.');
-    return [];
-  }
+  if (!doc) return [];
   
   const refItems = doc.querySelectorAll('.reference-item, .ref-item, li');
   const refs = [];
 
   refItems.forEach((item, index) => {
     const refId = item.id || `ref${index + 1}`;
-    
-    // Eliminar javascript:void(0) y obtener texto limpio
-    const cleanHtml = item.innerHTML.replace(/href="javascript:void\(0\)"/g, 'href=""');
     const fullText = cleanText(item.textContent);
     
     let authors = '', year = '', title = '', source = '', url = '', doi = '';
@@ -199,8 +160,6 @@ function parseReferencesFromHtml(referencesHtml) {
     const links = item.querySelectorAll('a[href]');
     links.forEach(link => {
       const href = link.getAttribute('href') || '';
-      
-      // Ignorar javascript:void(0)
       if (href.includes('javascript:')) return;
       
       if (href.includes('doi.org')) {
@@ -210,19 +169,19 @@ function parseReferencesFromHtml(referencesHtml) {
       }
     });
     
-    // Parsear año (buscar entre paréntesis o después de punto)
+    // Parsear año
     const yearMatch = fullText.match(/\((\d{4})\)|\.\s*(\d{4})[.,]|\s(\d{4})[.,]/);
     if (yearMatch) {
       year = yearMatch[1] || yearMatch[2] || yearMatch[3];
     }
     
-    // Parsear título (entre comillas, «», o después de punto)
+    // Parsear título
     const titleMatch = fullText.match(/[«"]([^»"]+)[»"]|«([^»]+)»|"([^"]+)"/);
     if (titleMatch) {
       title = cleanText(titleMatch[1] || titleMatch[2] || titleMatch[3]);
     }
     
-    // Parsear autores (texto antes del año o título)
+    // Parsear autores
     let authorsText = fullText;
     if (year) {
       const yearPos = fullText.indexOf(year);
@@ -241,7 +200,7 @@ function parseReferencesFromHtml(referencesHtml) {
       .replace(/,\s*$/, '')
       .trim();
     
-    // Parsear fuente (texto después del título, antes de URL)
+    // Parsear fuente
     if (title) {
       const titleEnd = fullText.indexOf(title) + title.length;
       let sourceText = fullText.substring(titleEnd);
@@ -275,8 +234,7 @@ function processInlineContent(node, footnotesMap = {}) {
   if (!node) return '';
 
   if (node.nodeType === 3) {
-    let text = node.textContent || '';
-    return escapeXml(text);
+    return escapeXml(node.textContent || '');
   }
 
   if (node.nodeType !== 1) return '';
@@ -325,7 +283,6 @@ function processInlineContent(node, footnotesMap = {}) {
     let content = '';
     for (const child of node.childNodes) content += processInlineContent(child, footnotesMap);
 
-    // Ignorar javascript:void(0)
     if (href.includes('javascript:') || !href) return content;
 
     if (classList.contains('citation-link') || href.startsWith('#ref') || href.startsWith('#R')) {
@@ -407,6 +364,100 @@ function convertList(listElement, listType, footnotesMap = {}) {
   return xml;
 }
 
+// ─── CONVERSIÓN DE FIGURAS MEJORADA ─────────────────────────────────────────
+function convertFigureElement(figureElement, figureCounter = 1, footnotesMap = {}) {
+  if (!figureElement) return '';
+  
+  const img = figureElement.querySelector('img');
+  const table = figureElement.querySelector('table');
+  const figcaption = figureElement.querySelector('figcaption, .caption, .fig-caption');
+  
+  // Si es tabla
+  if (table && !img) {
+    const captionText = figcaption ? cleanText(figcaption.textContent) : '';
+    return convertTableElement(table, String(figureCounter), captionText, footnotesMap);
+  }
+  
+  // Si es imagen
+  if (img) {
+    const figId = figureElement.id || figureElement.getAttribute('data-id') || `fig${figureCounter}`;
+    const imgSrc = img.getAttribute('src') || img.getAttribute('data-src') || '';
+    const imgAlt = img.getAttribute('alt') || '';
+    
+    // Procesar caption completo
+    let captionText = '';
+    let attributionText = '';
+    let sourceUrl = '';
+    
+    if (figcaption) {
+      // Obtener texto completo del caption
+      captionText = cleanText(figcaption.textContent);
+      
+      // Extraer atribución (texto después de "Fuente:" o "Foto por:")
+      const sourceMatch = captionText.match(/Fuente:\s*(.+)$|Foto por\s*(.+)$|Source:\s*(.+)$/i);
+      if (sourceMatch) {
+        attributionText = cleanText(sourceMatch[1] || sourceMatch[2] || sourceMatch[3] || '');
+        
+        // Extraer URL de la fuente
+        const sourceLink = figcaption.querySelector('a[href]');
+        if (sourceLink) {
+          sourceUrl = sourceLink.getAttribute('href') || '';
+        }
+        
+        // Limpiar caption (quitar atribución)
+        captionText = captionText.replace(/Fuente:\s*.+$|Foto por\s*.+$|Source:\s*.+$/i, '').trim();
+      }
+    }
+    
+    // Extraer número de figura
+    let label = `Figure ${figureCounter}`;
+    const labelMatch = captionText.match(/^(Figura?\s*\d+|Figure\s*\d+)/i);
+    if (labelMatch) {
+      label = labelMatch[1];
+      captionText = captionText.substring(label.length).replace(/^[:\s.-]+/, '').trim();
+    }
+    
+    let xml = `<fig id="${escapeXml(figId)}">\n`;
+    xml += `  <label>${escapeXml(label)}</label>\n`;
+    
+    if (captionText) {
+      xml += `  <caption><p>${escapeXml(captionText)}</p></caption>\n`;
+    }
+    
+    if (imgAlt) {
+      xml += `  <alt-text>${escapeXml(imgAlt)}</alt-text>\n`;
+    }
+    
+    if (imgSrc) {
+      let mime = 'image/jpeg';
+      const lowerSrc = imgSrc.toLowerCase();
+      if (lowerSrc.endsWith('.png')) mime = 'image/png';
+      else if (lowerSrc.endsWith('.gif')) mime = 'image/gif';
+      else if (lowerSrc.endsWith('.svg')) mime = 'image/svg+xml';
+      else if (lowerSrc.endsWith('.webp')) mime = 'image/webp';
+      
+      xml += `  <graphic xlink:href="${escapeXml(imgSrc)}" mimetype="${mime}"/>\n`;
+    }
+    
+    // Atribución
+    if (attributionText || sourceUrl) {
+      xml += '  <attrib>';
+      if (attributionText) {
+        xml += escapeXml(attributionText);
+      }
+      if (sourceUrl && sourceUrl.startsWith('http')) {
+        xml += ` <ext-link ext-link-type="uri" xlink:href="${escapeXml(sourceUrl)}">${escapeXml(sourceUrl)}</ext-link>`;
+      }
+      xml += '</attrib>\n';
+    }
+    
+    xml += '</fig>';
+    return xml;
+  }
+  
+  return '';
+}
+
 // ─── CONVERSIÓN DE TABLAS ──────────────────────────────────────────────────
 function convertTableElement(tableElement, tableNumber = '1', captionText = '', footnotesMap = {}) {
   if (!tableElement || tableElement.tagName.toLowerCase() !== 'table') return '';
@@ -483,12 +534,30 @@ function convertTableElement(tableElement, tableNumber = '1', captionText = '', 
   return xml;
 }
 
-// ─── RECORRIDO PRINCIPAL DEL CONTENIDO ──────────────────────────────────────
+// ─── CÓDIGO ─────────────────────────────────────────────────────────────────
+function convertCodeBlock(element) {
+  const pre = element.tagName.toLowerCase() === 'pre' ? element : element.querySelector('pre');
+  if (!pre) return '';
+
+  const language = element.querySelector('.code-language, .code-label, [data-lang]');
+  const caption = element.querySelector('.code-caption');
+  const codeId = element.id || '';
+
+  let xml = `<disp-quote${codeId ? ` id="${escapeXml(codeId)}"` : ''}>\n`;
+  if (caption) xml += `  <label>${escapeXml(cleanText(caption.textContent))}</label>\n`;
+  if (language) xml += `  <attrib>${escapeXml(cleanText(language.textContent || language.getAttribute('data-lang')))}</attrib>\n`;
+  xml += `  <preformat>${escapeXml(pre.textContent || '')}</preformat>\n`;
+  xml += `</disp-quote>`;
+  return xml;
+}
+
+// ─── RECORRIDO PRINCIPAL ───────────────────────────────────────────────────
 function convertContentSection(contentRoot, footnotesMap = {}, initialLevel = 0) {
   let bodyXml = '';
   let sectionStack = [];
   let secCounter = 0;
   let tableCounter = 0;
+  let figureCounter = 0;
 
   function getIndent() {
     return '  '.repeat(sectionStack.length + 1);
@@ -535,7 +604,7 @@ function convertContentSection(contentRoot, footnotesMap = {}, initialLevel = 0)
     if (['script', 'style', 'hr'].includes(tagName)) continue;
     if (classList.contains('footnotes') || classList.contains('references') || classList.contains('reference-list')) continue;
 
-    // Headings → sections
+    // Headings
     if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName)) {
       const level = parseInt(tagName.charAt(1)) + initialLevel;
       const actualLevel = Math.min(level, 6);
@@ -551,12 +620,19 @@ function convertContentSection(contentRoot, footnotesMap = {}, initialLevel = 0)
       continue;
     }
 
-    // Tables
+    // Figuras flotantes (clase floating-figure)
+    if (tagName === 'figure' || classList.contains('floating-figure') || classList.contains('image-figure') || classList.contains('figure')) {
+      ensureSection();
+      figureCounter++;
+      bodyXml += getIndent() + convertFigureElement(child, figureCounter, footnotesMap) + '\n';
+      continue;
+    }
+
+    // Tablas
     if (tagName === 'table') {
       ensureSection();
       tableCounter++;
       
-      // Buscar caption en el siguiente párrafo
       let captionText = '';
       const next = child.nextElementSibling;
       if (next && next.tagName.toLowerCase() === 'p') {
@@ -571,39 +647,14 @@ function convertContentSection(contentRoot, footnotesMap = {}, initialLevel = 0)
       continue;
     }
 
-    // Figures
-    if (tagName === 'figure' || classList.contains('floating-figure') || classList.contains('image-figure')) {
+    // Código
+    if (tagName === 'pre' || (tagName === 'div' && (classList.contains('code-block') || classList.contains('code-block-wrapper') || classList.contains('highlight')))) {
       ensureSection();
-      const table = child.querySelector('table');
-      const img = child.querySelector('img');
-      const figcaption = child.querySelector('figcaption, .caption');
-      const captionText = figcaption ? cleanText(figcaption.textContent) : '';
-      
-      if (table) {
-        tableCounter++;
-        bodyXml += getIndent() + convertTableElement(table, String(tableCounter), captionText, footnotesMap) + '\n';
-      } else if (img) {
-        const figId = child.id || `fig${secCounter}`;
-        const imgSrc = img.getAttribute('src') || '';
-        const imgAlt = img.getAttribute('alt') || '';
-        
-        let xml = `<fig id="${escapeXml(figId)}">\n  <label>Figure ${secCounter}</label>\n`;
-        if (captionText) xml += `  <caption><p>${escapeXml(captionText)}</p></caption>\n`;
-        if (imgAlt) xml += `  <alt-text>${escapeXml(imgAlt)}</alt-text>\n`;
-        if (imgSrc) {
-          let mime = 'image/jpeg';
-          if (imgSrc.endsWith('.png')) mime = 'image/png';
-          else if (imgSrc.endsWith('.gif')) mime = 'image/gif';
-          else if (imgSrc.endsWith('.svg')) mime = 'image/svg+xml';
-          xml += `  <graphic xlink:href="${escapeXml(imgSrc)}" mimetype="${mime}"/>\n`;
-        }
-        xml += '</fig>';
-        bodyXml += getIndent() + xml + '\n';
-      }
+      bodyXml += getIndent() + convertCodeBlock(child) + '\n';
       continue;
     }
 
-    // Paragraphs (skip if marked as processed)
+    // Paragraphs
     if (tagName === 'p') {
       if (child.getAttribute('data-jats-processed') === 'true') continue;
       ensureSection();
@@ -628,7 +679,7 @@ function convertContentSection(contentRoot, footnotesMap = {}, initialLevel = 0)
       continue;
     }
 
-    // Fallback recursivo
+    // Fallback
     if (child.children && child.children.length > 0) {
       bodyXml += convertContentSection(child, footnotesMap, sectionStack.length);
     }
@@ -638,9 +689,8 @@ function convertContentSection(contentRoot, footnotesMap = {}, initialLevel = 0)
   return bodyXml;
 }
 
-// ─── CONSTRUCCIÓN DEL JATS COMPLETO ─────────────────────────────────────────
+// ─── CONSTRUCCIÓN DEL JATS ─────────────────────────────────────────────────
 function buildJatsXml(article) {
-  // Extracción de campos
   const articleTitle = article.titulo || '';
   const articleTitleEn = article.tituloEnglish || '';
   const doi = article.doi || '';
@@ -695,7 +745,7 @@ function buildJatsXml(article) {
   }
   bodyXml += '</body>';
 
-  // Body inglés (solo si es realmente diferente)
+  // Body inglés (solo si es diferente)
   let hasEnglishBody = false;
   let bodyEnXml = '';
   if (htmlContentEn) {
@@ -716,17 +766,13 @@ function buildJatsXml(article) {
   const references = parseReferencesFromHtml(referenciasHtml);
   const isMultilingual = !!(articleTitleEn || abstractEn || keywordsEn.length || hasEnglishBody);
 
-  // ─── CONSTRUCCIÓN XML ────────────────────────────────────────────────────
+  // Construcción XML
   let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
   xml += `<!DOCTYPE article PUBLIC "${JATS_DTD_PUBLIC}" "${JATS_DTD_SYSTEM}">\n`;
   xml += `<article dtd-version="${JATS_VERSION}" article-type="${jatsArticleType}"`;
   xml += isMultilingual ? ' xml:lang="mul"' : ' xml:lang="es"';
   xml += '\n  xmlns:mml="http://www.w3.org/1998/Math/MathML"';
   xml += '\n  xmlns:xlink="http://www.w3.org/1999/xlink">\n';
-
-  if (isMultilingual) {
-    xml += '  <processing-meta lang-grouping="yes"/>\n';
-  }
 
   xml += '<front>\n';
 
@@ -788,7 +834,6 @@ function buildJatsXml(article) {
 
       xml += `      <contrib contrib-type="author" id="${authorId}"${isCorresp ? ' corresp="yes"' : ''}>\n`;
       
-      // ORCID SIEMPRE con URL completa
       if (autor.orcid) {
         const orcidNormalized = normalizeOrcid(autor.orcid);
         xml += `        <contrib-id contrib-id-type="orcid" authenticated="true">${escapeXml(orcidNormalized)}</contrib-id>\n`;
@@ -818,7 +863,6 @@ function buildJatsXml(article) {
       xml += '      </contrib>\n';
     });
 
-    // Afiliaciones directas (sin aff-alternatives)
     uniqueInstitutions.forEach(aff => {
       xml += `      <aff id="${aff.id}">\n        <institution>${escapeXml(aff.name)}</institution>\n      </aff>\n`;
     });
@@ -837,7 +881,6 @@ function buildJatsXml(article) {
         xml += `      <corresp id="cor1">Correspondence: <email>${escapeXml(corr.email)}</email></corresp>\n`;
       }
     }
-    // COI-statement (JATS4R recomendado)
     if (conflictsEs) xml += `      <fn fn-type="COI-statement" xml:lang="es"><p>${escapeXml(conflictsEs)}</p></fn>\n`;
     if (conflictsEn && conflictsEn !== conflictsEs) {
       xml += `      <fn fn-type="COI-statement" xml:lang="en"><p>${escapeXml(conflictsEn)}</p></fn>\n`;
@@ -965,7 +1008,6 @@ function buildJatsXml(article) {
         xml += `. <ext-link ext-link-type="uri" xlink:href="${escapeXml(ref.url)}">${escapeXml(ref.url)}</ext-link>`;
       }
       
-      // Fallback si no se pudo parsear
       if (!ref.authors && !ref.year && !ref.title && !ref.url && !ref.doi) {
         xml += escapeXml(ref.fullText);
       }
@@ -999,37 +1041,26 @@ function processArticle(article, index) {
 // ─── MAIN ───────────────────────────────────────────────────────────────────
 function main() {
   console.log('══════════════════════════════════════════════════════════════════');
-  console.log('  Conversor articles.json → JATS XML v8.0 FINAL');
-  console.log('  Todas las correcciones verificadas aplicadas');
-  console.log('  Compatible con CommonJS, ESM, y navegadores');
+  console.log('  Conversor articles.json → JATS XML v9.0 FINAL');
+  console.log('  Figuras flotantes, atribución, tablas y código mejorados');
   console.log('══════════════════════════════════════════════════════════════════\n');
-
-  // Verificar si estamos en Node.js
-  if (typeof fs === 'undefined') {
-    console.error('Error: Este script requiere Node.js para leer/escribir archivos.');
-    console.error('En un navegador, use la función buildJatsXml(article) directamente.');
-    return;
-  }
 
   if (!fs.existsSync(INPUT_FILE)) {
     console.error(`Error: No existe ${INPUT_FILE}`);
-    return;
+    process.exit(1);
   }
 
-  // Backup
   console.log('Creando backup...');
   fs.copyFileSync(INPUT_FILE, BACKUP_FILE);
 
-  // Leer JSON
   let articles;
   try {
     articles = JSON.parse(fs.readFileSync(INPUT_FILE, 'utf-8'));
   } catch (e) {
     console.error(`Error al parsear JSON: ${e.message}`);
-    return;
+    process.exit(1);
   }
 
-  // Normalizar a array
   if (!Array.isArray(articles)) {
     if (articles.titulo || articles.title || articles.doi) {
       articles = [articles];
@@ -1045,28 +1076,22 @@ function main() {
       }
       if (!found) {
         console.error('JSON no válido.');
-        return;
+        process.exit(1);
       }
     }
   }
 
   console.log(`Encontrados ${articles.length} artículo(s).\n`);
 
-  // Procesar
   let successCount = 0;
   let errorCount = 0;
-  const errors = [];
 
   articles.forEach((article, index) => {
     const result = processArticle(article, index);
     if (result.success) successCount++;
-    else {
-      errorCount++;
-      errors.push({ index: index + 1, title: article.titulo, error: result.error });
-    }
+    else errorCount++;
   });
 
-  // Guardar
   console.log('\nGuardando...');
   const originalData = JSON.parse(fs.readFileSync(INPUT_FILE, 'utf-8'));
 
@@ -1085,25 +1110,17 @@ function main() {
 
   fs.writeFileSync(OUTPUT_FILE, JSON.stringify(originalData, null, 2), 'utf-8');
 
-  // Resumen
   console.log('\n══════════════════════════════════════════════════════════════════');
-  console.log('  RESUMEN FINAL');
-  console.log('══════════════════════════════════════════════════════════════════');
   console.log(`  Total: ${articles.length} | Éxito: ${successCount} | Error: ${errorCount}`);
   console.log(`  Archivo: ${OUTPUT_FILE}`);
   console.log(`  Backup: ${BACKUP_FILE}`);
   console.log('══════════════════════════════════════════════════════════════════\n');
 }
 
-// ─── EXPORTACIONES PARA DIFERENTES ENTORNOS ─────────────────────────────────
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { buildJatsXml, processArticle, detectArticleType };
-} else if (typeof window !== 'undefined') {
-  window.buildJatsXml = buildJatsXml;
-  window.processArticle = processArticle;
-}
+// ─── EXPORTACIONES ──────────────────────────────────────────────────────────
+module.exports = { buildJatsXml, processArticle, detectArticleType };
 
 // ─── EJECUCIÓN ──────────────────────────────────────────────────────────────
-if (typeof require !== 'undefined' && require.main === module) {
+if (require.main === module) {
   main();
 }
