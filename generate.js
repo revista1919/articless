@@ -1265,14 +1265,109 @@ function processCodeBlocks(html) {
   
   return $3.html();
 }
-// ========== FUNCIÓN PRINCIPAL ==========
+// ========== FUNCIÓN PARA NORMALIZAR URLs EN ARTICLES.JSON ==========
+function normalizeUrlsInArticlesJson() {
+  console.log('🔄 Normalizando URLs en articles.json...');
+  
+  try {
+    // Leer el archivo articles.json
+    if (!fs.existsSync(ARTICLES_JSON)) {
+      throw new Error(`No se encuentra ${ARTICLES_JSON}`);
+    }
+    
+    const articles = JSON.parse(fs.readFileSync(ARTICLES_JSON, 'utf8'));
+    let changesCount = 0;
+    let articlesModified = 0;
+    
+    // Función recursiva para buscar y reemplazar URLs en cualquier propiedad
+    const replaceGitHubUrls = (obj, path = '') => {
+      if (obj === null || obj === undefined) return;
+      
+      if (typeof obj === 'string') {
+        // Detectar URLs de GitHub y reemplazarlas
+        if (obj.includes('revista1919.github.io')) {
+          const newUrl = obj.replace(/https:\/\/revista1919\.github\.io/g, 'https://www.revistacienciasestudiantes.com')
+                           .replace(/http:\/\/revista1919\.github\.io/g, 'https://www.revistacienciasestudiantes.com')
+                           .replace(/revista1919\.github\.io/g, 'www.revistacienciasestudiantes.com');
+          
+          if (newUrl !== obj) {
+            console.log(`  🔄 Cambiando: ${path}`);
+            console.log(`     De: ${obj}`);
+            console.log(`     A: ${newUrl}`);
+            changesCount++;
+            return newUrl;
+          }
+        }
+        return obj;
+      }
+      
+      if (Array.isArray(obj)) {
+        obj.forEach((item, index) => {
+          obj[index] = replaceGitHubUrls(item, `${path}[${index}]`);
+        });
+        return obj;
+      }
+      
+      if (typeof obj === 'object') {
+        Object.keys(obj).forEach(key => {
+          obj[key] = replaceGitHubUrls(obj[key], path ? `${path}.${key}` : key);
+        });
+        return obj;
+      }
+      
+      return obj;
+    };
+    
+    // Procesar cada artículo
+    articles.forEach((article, index) => {
+      const originalArticle = JSON.stringify(article);
+      const processedArticle = replaceGitHubUrls(article, `articles[${index}]`);
+      const newArticle = JSON.stringify(processedArticle);
+      
+      if (originalArticle !== newArticle) {
+        articlesModified++;
+      }
+    });
+    
+    // Guardar los cambios si hubo modificaciones
+    if (changesCount > 0) {
+      fs.writeFileSync(ARTICLES_JSON, JSON.stringify(articles, null, 2), 'utf8');
+      console.log(`✅ URLs normalizadas en articles.json:`);
+      console.log(`   - ${changesCount} URLs cambiadas`);
+      console.log(`   - ${articlesModified} artículos modificados`);
+      console.log(`   - Archivo guardado: ${ARTICLES_JSON}`);
+    } else {
+      console.log('✅ No se encontraron URLs de GitHub en articles.json');
+    }
+    
+    return {
+      totalChanges: changesCount,
+      articlesModified: articlesModified
+    };
+    
+  } catch (error) {
+    console.error('❌ Error al normalizar URLs en articles.json:', error.message);
+    return {
+      totalChanges: 0,
+      articlesModified: 0,
+      error: error.message
+    };
+  }
+}
+
+// ========== FUNCIÓN PRINCIPAL ACTUALIZADA ==========
 async function generateAll() {
   console.log('🚀 Iniciando generación de artículos estáticos...');
-   if (typeof document !== 'undefined') {
+  
+  if (typeof document !== 'undefined') {
     normalizeAllUrls();
   }
+  
   try {
-    // 1. Leer articles.json
+    // 0. NORMALIZAR URLs EN ARTICLES.JSON PRIMERO
+    normalizeUrlsInArticlesJson();
+    
+    // 1. Leer articles.json (ya normalizado)
     if (!fs.existsSync(ARTICLES_JSON)) {
       throw new Error(`No se encuentra ${ARTICLES_JSON}`);
     }
@@ -1299,6 +1394,18 @@ async function generateAll() {
   }
 }
 
+// ========== TAMBIÉN PUEDES USARLA DE FORMA INDEPENDIENTE ==========
+// Si solo quieres normalizar las URLs sin regenerar todo:
+if (require.main === module) {
+  const args = process.argv.slice(2);
+  if (args.includes('--normalize-only')) {
+    console.log('🔄 Ejecutando solo normalización de URLs...');
+    normalizeUrlsInArticlesJson();
+    process.exit(0);
+  } else {
+    generateAll();
+  }
+}
 async function generateArticleHtml(article) {
   // Procesar autores para meta tags de citación
   let authorsList = [];
