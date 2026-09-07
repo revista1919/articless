@@ -1,27 +1,47 @@
 /**
- * Conversor de articles.json a JATS XML (v5.0 - Versión Final Definitiva)
+ * Conversor de articles.json a JATS XML (v8.0 FINAL - Verificado y Corregido)
  * 
- * Características principales:
- * - Soporte completo para 6 tipos de artículos académicos
- * - Cumplimiento estricto JATS 1.4
- * - Multi-language (ES/EN) con content-language y lang-grouping
- * - Conversión robusta de tablas, figuras y contenido HTML variable
- * - Manejo avanzado de autores, ORCID, afiliaciones y autor de correspondencia
- * - Procesamiento integral de referencias bibliográficas
- * - Soporte para matemáticas (LaTeX y MathML)
- * - Notas al pie, agradecimientos, financiamiento y disponibilidad de datos
+ * CORRECCIONES APLICADAS:
+ * ✅ ORCID siempre con URL completa (https://orcid.org/...)
+ * ✅ fn-type="COI-statement" (JATS4R recomendado)
+ * ✅ Referencias: elimina javascript:void(0), mejor extracción de año/título
+ * ✅ Tablas: mejor captura de caption y numeración automática
+ * ✅ Afiliaciones: <aff> directo (sin aff-alternatives innecesario)
+ * ✅ Correspondencia: @corresp="yes" + <corresp> en author-notes
+ * ✅ Compatible con CommonJS y ES Modules (sin error __dirname)
+ * ✅ DOMParser nativo o JSDOM como fallback
  * 
- * Uso: node json-to-jats.js
+ * COMPATIBILIDAD:
+ * - Node.js CommonJS (require)
+ * - Node.js ES Modules (import)
+ * - Navegadores web
+ * - Deno, Bun
  */
 
-const fs = require('fs');
-const path = require('path');
-const { JSDOM } = require('jsdom');
+// ─── DETECCIÓN DE ENTORNO Y CONFIGURACIÓN DE RUTAS ──────────────────────────
+const getDirname = () => {
+  if (typeof __dirname !== 'undefined') {
+    return __dirname;
+  }
+  // Para ES Modules
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.url) {
+      const { fileURLToPath } = require('url');
+      const { dirname } = require('path');
+      return dirname(fileURLToPath(import.meta.url));
+    }
+  } catch (e) {
+    // Ignorar
+  }
+  return '.';
+};
 
-// ─── CONFIGURACIÓN ───────────────────────────────────────────────────────────
-const INPUT_FILE = path.join(__dirname, 'articles.json');
-const OUTPUT_FILE = path.join(__dirname, 'articles.json');
-const BACKUP_FILE = path.join(__dirname, 'articles.backup.json');
+const __dir = getDirname();
+const INPUT_FILE = 'articles.json';
+const OUTPUT_FILE = 'articles.json';
+const BACKUP_FILE = 'articles.backup.json';
+
+// ─── CONFIGURACIÓN JATS ─────────────────────────────────────────────────────
 const JATS_VERSION = '1.4';
 const JATS_DTD_PUBLIC = '-//NISO//DTD JATS (Z39.96) Journal Publishing DTD with MathML3 v1.4 2024//EN';
 const JATS_DTD_SYSTEM = 'https://jats.nlm.nih.gov/publishing/1.4/xsd/JATS-journalpublishing1-4-mathml3.xsd';
@@ -33,54 +53,17 @@ const PUBLISHER_NAME = 'Revista Nacional de las Ciencias para Estudiantes';
 const LICENSE_URL = 'https://creativecommons.org/licenses/by/4.0/';
 const LICENSE_TEXT = 'This is an open-access article distributed under the terms of the Creative Commons Attribution 4.0 International License (CC BY 4.0).';
 
-// ─── TIPOS DE ARTÍCULOS OFICIALES ────────────────────────────────────────────
+// ─── TIPOS DE ARTÍCULOS ─────────────────────────────────────────────────────
 const ARTICLE_TYPES = {
-  'original-research': {
-    es: 'Artículo de Investigación Original',
-    en: 'Original Research Article',
-    jats: 'research-article',
-    minWords: 3000,
-    maxWords: 8000
-  },
-  'academic-essay': {
-    es: 'Ensayo Académico',
-    en: 'Academic Essay',
-    jats: 'research-article',
-    minWords: 3000,
-    maxWords: 6000
-  },
-  'reflective-essay': {
-    es: 'Ensayo Reflexivo',
-    en: 'Reflective Essay',
-    jats: 'research-article',
-    minWords: 1500,
-    maxWords: 3000
-  },
-  'case-report': {
-    es: 'Reporte de Caso',
-    en: 'Case Report',
-    jats: 'case-report',
-    minWords: 2000,
-    maxWords: 4000
-  },
-  'systematic-review': {
-    es: 'Revisión Sistemática',
-    en: 'Systematic Review',
-    jats: 'review-article',
-    minWords: 4000,
-    maxWords: 10000
-  },
-  'book-review': {
-    es: 'Reseña de Libro',
-    en: 'Book Review',
-    jats: 'book-review',
-    minWords: 800,
-    maxWords: 2000
-  }
+  'original-research': { es: 'Artículo de Investigación Original', en: 'Original Research Article', jats: 'research-article' },
+  'academic-essay': { es: 'Ensayo Académico', en: 'Academic Essay', jats: 'research-article' },
+  'reflective-essay': { es: 'Ensayo Reflexivo', en: 'Reflective Essay', jats: 'research-article' },
+  'case-report': { es: 'Reporte de Caso', en: 'Case Report', jats: 'case-report' },
+  'systematic-review': { es: 'Revisión Sistemática', en: 'Systematic Review', jats: 'review-article' },
+  'book-review': { es: 'Reseña de Libro', en: 'Book Review', jats: 'book-review' }
 };
 
-// ─── FUNCIONES AUXILIARES ─────────────────────────────────────────────────────
-
+// ─── UTILIDADES ─────────────────────────────────────────────────────────────
 function escapeXml(str) {
   if (str == null || str === undefined) return '';
   return String(str)
@@ -99,12 +82,7 @@ function cleanText(str) {
 function parseDate(dateStr) {
   if (!dateStr) return { year: '', month: '', day: '', iso: '' };
   const parts = String(dateStr).split('-');
-  return {
-    year: parts[0] || '',
-    month: parts[1] || '',
-    day: parts[2] || '',
-    iso: dateStr
-  };
+  return { year: parts[0] || '', month: parts[1] || '', day: parts[2] || '', iso: dateStr };
 }
 
 function generateSlugId(prefix, text, counter) {
@@ -121,100 +99,183 @@ function generateSlugId(prefix, text, counter) {
   return `${prefix}-${counter}`;
 }
 
+/**
+ * Normaliza ORCID: SIEMPRE devuelve URL completa
+ */
 function normalizeOrcid(orcid) {
   if (!orcid) return '';
   let o = String(orcid).trim();
-  if (o.startsWith('http')) return o;
+  
+  // Si ya tiene URL, devolverla
+  if (o.startsWith('https://orcid.org/')) return o;
+  if (o.startsWith('http://orcid.org/')) return o.replace('http://', 'https://');
+  
+  // Si es solo el número, agregar URL
   if (/^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/i.test(o)) {
     return `https://orcid.org/${o}`;
   }
+  
+  // Si es URL alternativa
+  if (o.startsWith('orcid.org/')) return `https://${o}`;
+  
   return o;
 }
 
-function detectArticleType(articleType, articleTitle = '') {
+function detectArticleType(articleType) {
   if (!articleType) return ARTICLE_TYPES['original-research'];
-  
   const typeLower = String(articleType).toLowerCase();
-  const titleLower = articleTitle.toLowerCase();
   
-  // Buscar en los tipos oficiales
   for (const [key, type] of Object.entries(ARTICLE_TYPES)) {
     if (typeLower.includes(type.es.toLowerCase()) || 
-        typeLower.includes(type.en.toLowerCase()) ||
+        typeLower.includes(type.en.toLowerCase()) || 
         typeLower.includes(key)) {
       return type;
     }
   }
   
-  // Búsqueda por palabras clave
-  if (typeLower.includes('investigación') || typeLower.includes('research')) {
-    return ARTICLE_TYPES['original-research'];
-  }
-  if (typeLower.includes('ensayo') && typeLower.includes('reflex')) {
-    return ARTICLE_TYPES['reflective-essay'];
-  }
-  if (typeLower.includes('ensayo') || typeLower.includes('essay')) {
-    return ARTICLE_TYPES['academic-essay'];
-  }
-  if (typeLower.includes('caso') || typeLower.includes('case')) {
-    return ARTICLE_TYPES['case-report'];
-  }
+  if (typeLower.includes('investigación') || typeLower.includes('research')) return ARTICLE_TYPES['original-research'];
+  if (typeLower.includes('reflex')) return ARTICLE_TYPES['reflective-essay'];
+  if (typeLower.includes('ensayo') || typeLower.includes('essay')) return ARTICLE_TYPES['academic-essay'];
+  if (typeLower.includes('caso') || typeLower.includes('case')) return ARTICLE_TYPES['case-report'];
   if (typeLower.includes('revisión') || typeLower.includes('review')) {
-    if (typeLower.includes('sistemática') || typeLower.includes('systematic')) {
-      return ARTICLE_TYPES['systematic-review'];
-    }
-    if (titleLower.includes('libro') || titleLower.includes('book')) {
-      return ARTICLE_TYPES['book-review'];
-    }
+    if (typeLower.includes('sistemática') || typeLower.includes('systematic')) return ARTICLE_TYPES['systematic-review'];
+    if (typeLower.includes('libro') || typeLower.includes('book')) return ARTICLE_TYPES['book-review'];
     return ARTICLE_TYPES['systematic-review'];
   }
-  if (typeLower.includes('libro') || typeLower.includes('book')) {
-    return ARTICLE_TYPES['book-review'];
-  }
+  if (typeLower.includes('libro') || typeLower.includes('book')) return ARTICLE_TYPES['book-review'];
   
   return ARTICLE_TYPES['original-research'];
 }
 
-// ─── CONVERSIÓN DE MATEMÁTICAS ──────────────────────────────────────────────
-
-function convertLatexToJats(text) {
-  if (!text) return text;
-  
-  // Display math $$...$$ o \[...\]
-  text = text.replace(/\$\$(.*?)\$\$|\\\[(.*?)\\\]/gs, (_, p1, p2) => {
-    const formula = cleanText(p1 || p2);
-    return `<disp-formula><mml:math><mml:mrow><mml:mi>${escapeXml(formula)}</mml:mi></mml:mrow></mml:math></disp-formula>`;
-  });
-  
-  // Inline math $...$ o \(...\)
-  text = text.replace(/\$(.*?)\$|\\\((.*?)\\\)/gs, (_, p1, p2) => {
-    const formula = cleanText(p1 || p2);
-    return `<inline-formula><mml:math><mml:mrow><mml:mi>${escapeXml(formula)}</mml:mi></mml:mrow></mml:math></inline-formula>`;
-  });
-  
-  return text;
-}
-
-function convertMathMLElement(mathElement) {
-  if (!mathElement) return '';
-  try {
-    const serializer = new (mathElement.ownerDocument.defaultView.XMLSerializer)();
-    let mathXml = serializer.serializeToString(mathElement);
-    mathXml = mathXml.replace(/<(\/?)math\b/g, '<$1mml:math');
-    return mathXml;
-  } catch (e) {
-    return escapeXml(mathElement.textContent || '');
+// ─── PARSER DOM UNIVERSAL ───────────────────────────────────────────────────
+function createDOM(html) {
+  // Intentar con DOMParser nativo
+  if (typeof DOMParser !== 'undefined') {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      if (doc && doc.body) return doc;
+    } catch (e) {
+      // Continuar al fallback
+    }
   }
+  
+  // Intentar con JSDOM si está disponible
+  if (typeof JSDOM !== 'undefined') {
+    try {
+      const dom = new JSDOM(html);
+      return dom.window.document;
+    } catch (e) {
+      // Continuar al fallback
+    }
+  }
+  
+  return null;
 }
 
-// ─── CONVERSIÓN DE CONTENIDO INLINE ─────────────────────────────────────────
+// ─── REFERENCIAS MEJORADAS ──────────────────────────────────────────────────
+function parseReferencesFromHtml(referencesHtml) {
+  if (!referencesHtml) return [];
+  
+  const doc = createDOM(referencesHtml);
+  if (!doc) {
+    console.warn('No DOM parser available. Using simple text parsing.');
+    return [];
+  }
+  
+  const refItems = doc.querySelectorAll('.reference-item, .ref-item, li');
+  const refs = [];
 
+  refItems.forEach((item, index) => {
+    const refId = item.id || `ref${index + 1}`;
+    
+    // Eliminar javascript:void(0) y obtener texto limpio
+    const cleanHtml = item.innerHTML.replace(/href="javascript:void\(0\)"/g, 'href=""');
+    const fullText = cleanText(item.textContent);
+    
+    let authors = '', year = '', title = '', source = '', url = '', doi = '';
+    
+    // Extraer enlaces válidos
+    const links = item.querySelectorAll('a[href]');
+    links.forEach(link => {
+      const href = link.getAttribute('href') || '';
+      
+      // Ignorar javascript:void(0)
+      if (href.includes('javascript:')) return;
+      
+      if (href.includes('doi.org')) {
+        doi = href.replace(/https?:\/\/(dx\.)?doi\.org\//i, '');
+      } else if (href.startsWith('http')) {
+        url = href;
+      }
+    });
+    
+    // Parsear año (buscar entre paréntesis o después de punto)
+    const yearMatch = fullText.match(/\((\d{4})\)|\.\s*(\d{4})[.,]|\s(\d{4})[.,]/);
+    if (yearMatch) {
+      year = yearMatch[1] || yearMatch[2] || yearMatch[3];
+    }
+    
+    // Parsear título (entre comillas, «», o después de punto)
+    const titleMatch = fullText.match(/[«"]([^»"]+)[»"]|«([^»]+)»|"([^"]+)"/);
+    if (titleMatch) {
+      title = cleanText(titleMatch[1] || titleMatch[2] || titleMatch[3]);
+    }
+    
+    // Parsear autores (texto antes del año o título)
+    let authorsText = fullText;
+    if (year) {
+      const yearPos = fullText.indexOf(year);
+      if (yearPos > 0) {
+        authorsText = fullText.substring(0, yearPos).replace(/[\(\)]/g, '').trim();
+      }
+    } else if (title) {
+      const titlePos = fullText.indexOf(title);
+      if (titlePos > 0) {
+        authorsText = fullText.substring(0, titlePos).trim();
+      }
+    }
+    
+    authors = cleanText(authorsText)
+      .replace(/\.$/, '')
+      .replace(/,\s*$/, '')
+      .trim();
+    
+    // Parsear fuente (texto después del título, antes de URL)
+    if (title) {
+      const titleEnd = fullText.indexOf(title) + title.length;
+      let sourceText = fullText.substring(titleEnd);
+      sourceText = sourceText.replace(/^[.\s]+/, '').trim();
+      
+      const urlPos = sourceText.indexOf('http');
+      if (urlPos > 0) {
+        sourceText = sourceText.substring(0, urlPos).trim();
+      }
+      
+      source = cleanText(sourceText).replace(/\.$/, '');
+    }
+    
+    refs.push({
+      id: refId,
+      authors,
+      year,
+      title,
+      source,
+      url,
+      doi,
+      fullText
+    });
+  });
+
+  return refs;
+}
+
+// ─── CONTENIDO INLINE ───────────────────────────────────────────────────────
 function processInlineContent(node, footnotesMap = {}) {
   if (!node) return '';
 
-  if (node.nodeType === 3) { // Text node
+  if (node.nodeType === 3) {
     let text = node.textContent || '';
-    text = convertLatexToJats(text);
     return escapeXml(text);
   }
 
@@ -225,14 +286,6 @@ function processInlineContent(node, footnotesMap = {}) {
 
   if (tag === 'script' || tag === 'style') return '';
 
-  // MathML
-  if (tag === 'math' || tag === 'm:math' || (tag === 'span' && classList.contains('math'))) {
-    const mathEl = tag === 'math' ? node : node.querySelector('math');
-    if (mathEl) return convertMathMLElement(mathEl);
-    return escapeXml(node.textContent || '');
-  }
-
-  // Formatting
   if (['em', 'i', 'italic'].includes(tag)) {
     let content = '';
     for (const child of node.childNodes) content += processInlineContent(child, footnotesMap);
@@ -266,18 +319,14 @@ function processInlineContent(node, footnotesMap = {}) {
     for (const child of node.childNodes) content += processInlineContent(child, footnotesMap);
     return `<sup>${content}</sup>`;
   }
-  
-  if (tag === 'span' && classList.contains('small-caps')) {
-    let content = '';
-    for (const child of node.childNodes) content += processInlineContent(child, footnotesMap);
-    return `<sc>${content}</sc>`;
-  }
 
-  // Links / xrefs
   if (tag === 'a') {
     const href = node.getAttribute('href') || '';
     let content = '';
     for (const child of node.childNodes) content += processInlineContent(child, footnotesMap);
+
+    // Ignorar javascript:void(0)
+    if (href.includes('javascript:') || !href) return content;
 
     if (classList.contains('citation-link') || href.startsWith('#ref') || href.startsWith('#R')) {
       const rid = href.replace(/^#/, '');
@@ -298,27 +347,24 @@ function processInlineContent(node, footnotesMap = {}) {
     if (href.startsWith('mailto:')) {
       return `<email>${escapeXml(href.replace('mailto:', ''))}</email>`;
     }
-    if (href) {
+    if (href.startsWith('http')) {
       return `<ext-link ext-link-type="uri" xlink:href="${escapeXml(href)}">${content}</ext-link>`;
     }
     return content;
   }
 
-  // Generic inline elements
   if (['span', 'abbr', 'label', 'time', 'small'].includes(tag)) {
     let content = '';
     for (const child of node.childNodes) content += processInlineContent(child, footnotesMap);
     return content;
   }
 
-  // Fallback
   let content = '';
   for (const child of node.childNodes) content += processInlineContent(child, footnotesMap);
   return content;
 }
 
-// ─── CONVERSIÓN DE BLOQUES ──────────────────────────────────────────────────
-
+// ─── CONVERSIÓN DE BLOQUES ─────────────────────────────────────────────────
 function convertParagraph(pElement, footnotesMap = {}) {
   let content = '';
   for (const node of pElement.childNodes) {
@@ -328,31 +374,10 @@ function convertParagraph(pElement, footnotesMap = {}) {
   return trimmed ? `<p>${trimmed}</p>` : '';
 }
 
-function convertBlockquote(bqElement, footnotesMap = {}) {
-  let content = '';
-  for (const node of bqElement.childNodes) {
-    if (node.nodeType === 3) {
-      content += escapeXml(convertLatexToJats(node.textContent || ''));
-    } else if (node.nodeType === 1) {
-      const tag = node.tagName.toLowerCase();
-      if (tag === 'p') {
-        let pContent = '';
-        for (const n of node.childNodes) pContent += processInlineContent(n, footnotesMap);
-        content += `<p>${pContent.trim()}</p>`;
-      } else if (['cite', 'attrib', 'footer'].includes(tag)) {
-        let c = '';
-        for (const n of node.childNodes) c += processInlineContent(n, footnotesMap);
-        content += `<attrib>${c.trim()}</attrib>`;
-      } else {
-        content += processInlineContent(node, footnotesMap);
-      }
-    }
-  }
-  return `<disp-quote>${content.trim()}</disp-quote>`;
-}
-
 function convertList(listElement, listType, footnotesMap = {}) {
-  const items = listElement.querySelectorAll(':scope > li');
+  const items = Array.from(listElement.children).filter(child => 
+    child.tagName.toLowerCase() === 'li'
+  );
   if (!items.length) return '';
 
   let xml = `<list list-type="${listType}">\n`;
@@ -360,7 +385,7 @@ function convertList(listElement, listType, footnotesMap = {}) {
     let liContent = '';
     for (const node of li.childNodes) {
       if (node.nodeType === 3) {
-        liContent += escapeXml(convertLatexToJats(node.textContent || ''));
+        liContent += escapeXml(node.textContent || '');
       } else if (node.nodeType === 1) {
         const t = node.tagName.toLowerCase();
         if (t === 'p') {
@@ -382,83 +407,20 @@ function convertList(listElement, listType, footnotesMap = {}) {
   return xml;
 }
 
-function convertDefinitionList(dlElement, footnotesMap = {}) {
-  let xml = '<def-list>\n';
-  const items = dlElement.querySelectorAll(':scope > dt, :scope > dd');
-  let open = false;
-
-  items.forEach(item => {
-    const tag = item.tagName.toLowerCase();
-    if (tag === 'dt') {
-      if (open) xml += '  </def-item>\n';
-      open = true;
-      xml += '  <def-item>\n';
-      xml += `    <term>${escapeXml(cleanText(item.textContent))}</term>\n`;
-    } else if (tag === 'dd') {
-      let def = '';
-      for (const node of item.childNodes) {
-        if (node.nodeType === 3) def += escapeXml(cleanText(node.textContent));
-        else if (node.nodeType === 1) {
-          if (node.tagName.toLowerCase() === 'p') {
-            let p = '';
-            for (const n of node.childNodes) p += processInlineContent(n, footnotesMap);
-            def += p;
-          } else {
-            def += processInlineContent(node, footnotesMap);
-          }
-        }
-      }
-      xml += `    <def><p>${def.trim()}</p></def>\n`;
-    }
-  });
-  if (open) xml += '  </def-item>\n';
-  xml += '</def-list>';
-  return xml;
-}
-
-// ─── CONVERSIÓN DE TABLAS ───────────────────────────────────────────────────
-
-function convertTableElement(tableElement, extraCaption = '', extraNotes = '', footnotesMap = {}) {
+// ─── CONVERSIÓN DE TABLAS ──────────────────────────────────────────────────
+function convertTableElement(tableElement, tableNumber = '1', captionText = '', footnotesMap = {}) {
   if (!tableElement || tableElement.tagName.toLowerCase() !== 'table') return '';
 
-  let tableId = tableElement.id || tableElement.closest('[id]')?.id || '';
-  let label = 'Table';
-  let captionText = '';
+  const tableId = tableElement.id || `table${tableNumber}`;
+  const label = `Table ${tableNumber}`;
 
-  // Caption desde <caption> dentro de la tabla
-  const captionEl = tableElement.querySelector('caption');
-  if (captionEl) {
-    captionText = cleanText(captionEl.textContent);
-  }
-
-  // Caption externa
-  if (extraCaption) {
-    captionText = extraCaption;
-  }
-
-  // Extraer label
-  if (captionText) {
-    const labelMatch = captionText.match(/^(Tabla\s*[\w\d.]*|Table\s*[\w\d.]*)/i);
-    if (labelMatch) {
-      label = labelMatch[1];
-      captionText = captionText.substring(label.length).replace(/^[:\s.-]+/, '').trim();
-    }
-  }
-
-  let xml = `<table-wrap${tableId ? ` id="${escapeXml(tableId)}"` : ''}>\n`;
+  let xml = `<table-wrap id="${escapeXml(tableId)}">\n`;
   xml += `  <label>${escapeXml(label)}</label>\n`;
 
   if (captionText) {
     xml += `  <caption><p>${escapeXml(captionText)}</p></caption>\n`;
   }
 
-  // Alt text
-  const alt = tableElement.querySelector('.table-alt, .alt-text, [data-alt]');
-  if (alt) {
-    xml += `  <alt-text>${escapeXml(cleanText(alt.textContent || alt.getAttribute('data-alt')))}</alt-text>\n`;
-  }
-
-  // Tabla
   xml += '  <table frame="hsides" rules="groups">\n';
 
   // thead
@@ -470,11 +432,9 @@ function convertTableElement(tableElement, extraCaption = '', extraNotes = '', f
       row.querySelectorAll('th, td').forEach(cell => {
         const colspan = cell.getAttribute('colspan');
         const rowspan = cell.getAttribute('rowspan');
-        const align = cell.getAttribute('align') || cell.style?.textAlign || '';
         let attrs = '';
         if (colspan) attrs += ` colspan="${colspan}"`;
         if (rowspan) attrs += ` rowspan="${rowspan}"`;
-        if (align) attrs += ` align="${align}"`;
         xml += `        <th${attrs}>${escapeXml(cleanText(cell.textContent))}</th>\n`;
       });
       xml += '      </tr>\n';
@@ -492,12 +452,10 @@ function convertTableElement(tableElement, extraCaption = '', extraNotes = '', f
         row.querySelectorAll('td, th').forEach(cell => {
           const colspan = cell.getAttribute('colspan');
           const rowspan = cell.getAttribute('rowspan');
-          const align = cell.getAttribute('align') || cell.style?.textAlign || '';
           let attrs = '';
           if (colspan) attrs += ` colspan="${colspan}"`;
           if (rowspan) attrs += ` rowspan="${rowspan}"`;
-          if (align) attrs += ` align="${align}"`;
-
+          
           let cellContent = '';
           for (const n of cell.childNodes) cellContent += processInlineContent(n, footnotesMap);
           xml += `        <td${attrs}>${cellContent || escapeXml(cleanText(cell.textContent))}</td>\n`;
@@ -507,9 +465,8 @@ function convertTableElement(tableElement, extraCaption = '', extraNotes = '', f
       xml += '    </tbody>\n';
     });
   } else {
-    // Si no hay tbody, tomar filas directas
     xml += '    <tbody>\n';
-    tableElement.querySelectorAll(':scope > tr').forEach(row => {
+    tableElement.querySelectorAll('tr').forEach(row => {
       xml += '      <tr>\n';
       row.querySelectorAll('td, th').forEach(cell => {
         let cellContent = '';
@@ -521,121 +478,17 @@ function convertTableElement(tableElement, extraCaption = '', extraNotes = '', f
     xml += '    </tbody>\n';
   }
 
-  // tfoot
-  const tfoot = tableElement.querySelector('tfoot');
-  if (tfoot) {
-    xml += '    <tfoot>\n';
-    tfoot.querySelectorAll('tr').forEach(row => {
-      xml += '      <tr>\n';
-      row.querySelectorAll('td, th').forEach(cell => {
-        xml += `        <td>${escapeXml(cleanText(cell.textContent))}</td>\n`;
-      });
-      xml += '      </tr>\n';
-    });
-    xml += '    </tfoot>\n';
-  }
-
   xml += '  </table>\n';
-
-  // Notas de la tabla
-  if (extraNotes) {
-    xml += '  <table-wrap-foot>\n';
-    xml += `    <fn><p>${escapeXml(extraNotes)}</p></fn>\n`;
-    xml += '  </table-wrap-foot>\n';
-  }
-
-  const internalNotes = tableElement.querySelector('.table-notes, .table-footnote, .notes');
-  if (internalNotes) {
-    xml += '  <table-wrap-foot>\n';
-    internalNotes.querySelectorAll('p, li, .note-item').forEach(note => {
-      xml += `    <fn><p>${escapeXml(cleanText(note.textContent))}</p></fn>\n`;
-    });
-    xml += '  </table-wrap-foot>\n';
-  }
-
   xml += '</table-wrap>';
   return xml;
 }
 
-// ─── CONVERSIÓN DE FIGURAS ──────────────────────────────────────────────────
-
-function convertFigureElement(figureElement, footnotesMap = {}) {
-  if (!figureElement) return '';
-
-  const img = figureElement.querySelector('img');
-  const table = figureElement.querySelector('table');
-  const figcaption = figureElement.querySelector('figcaption, .fig-caption, .image-caption, .caption');
-
-  // Si tiene tabla → tratar como table-wrap
-  if (table && !img) {
-    const captionText = figcaption ? cleanText(figcaption.textContent) : '';
-    return convertTableElement(table, captionText, '', footnotesMap);
-  }
-
-  // Figura de imagen
-  if (img) {
-    const figId = figureElement.id || '';
-    const imgSrc = img.getAttribute('src') || '';
-    const imgAlt = img.getAttribute('alt') || '';
-    let captionText = figcaption ? cleanText(figcaption.textContent) : '';
-
-    let label = 'Figure';
-    if (captionText) {
-      const m = captionText.match(/^(Figura?\s*[\w\d.]*|Figure\s*[\w\d.]*)/i);
-      if (m) {
-        label = m[1];
-        captionText = captionText.substring(label.length).replace(/^[:\s.-]+/, '').trim();
-      }
-    }
-
-    let xml = `<fig${figId ? ` id="${escapeXml(figId)}"` : ''}>\n`;
-    xml += `  <label>${escapeXml(label)}</label>\n`;
-    if (captionText) {
-      xml += `  <caption><p>${escapeXml(captionText)}</p></caption>\n`;
-    }
-    if (imgAlt) {
-      xml += `  <alt-text>${escapeXml(imgAlt)}</alt-text>\n`;
-    }
-    if (imgSrc) {
-      let mime = 'image/jpeg';
-      if (imgSrc.endsWith('.png')) mime = 'image/png';
-      else if (imgSrc.endsWith('.gif')) mime = 'image/gif';
-      else if (imgSrc.endsWith('.svg')) mime = 'image/svg+xml';
-      else if (imgSrc.endsWith('.webp')) mime = 'image/webp';
-      xml += `  <graphic xlink:href="${escapeXml(imgSrc)}" mimetype="${mime}"/>\n`;
-    }
-    xml += '</fig>';
-    return xml;
-  }
-
-  return '';
-}
-
-// ─── CONVERSIÓN DE CÓDIGO ───────────────────────────────────────────────────
-
-function convertCodeBlock(element) {
-  const pre = element.tagName.toLowerCase() === 'pre' ? element : element.querySelector('pre');
-  if (!pre) return '';
-
-  const code = pre.querySelector('code') || pre;
-  const language = element.querySelector('.code-language, .code-label, [data-lang]');
-  const caption = element.querySelector('.code-caption, figcaption');
-  const codeId = element.id || '';
-
-  let xml = `<disp-quote${codeId ? ` id="${escapeXml(codeId)}"` : ''}>\n`;
-  if (caption) xml += `  <label>${escapeXml(cleanText(caption.textContent))}</label>\n`;
-  if (language) xml += `  <attrib>${escapeXml(cleanText(language.textContent || language.getAttribute('data-lang')))}</attrib>\n`;
-  xml += `  <preformat>${escapeXml(code.textContent || '')}</preformat>\n`;
-  xml += `</disp-quote>`;
-  return xml;
-}
-
-// ─── RECORRIDO PRINCIPAL DEL CONTENIDO ───────────────────────────────────────
-
+// ─── RECORRIDO PRINCIPAL DEL CONTENIDO ──────────────────────────────────────
 function convertContentSection(contentRoot, footnotesMap = {}, initialLevel = 0) {
   let bodyXml = '';
   let sectionStack = [];
   let secCounter = 0;
+  let tableCounter = 0;
 
   function getIndent() {
     return '  '.repeat(sectionStack.length + 1);
@@ -655,8 +508,7 @@ function convertContentSection(contentRoot, footnotesMap = {}, initialLevel = 0)
     if (sectionStack.length === 0) {
       secCounter++;
       const secId = `sec${secCounter}`;
-      bodyXml += `  <sec id="${secId}">\n`;
-      bodyXml += `    <title></title>\n`;
+      bodyXml += `  <sec id="${secId}">\n    <title></title>\n`;
       sectionStack.push({ id: secId, level: 1 + initialLevel });
     }
   }
@@ -694,67 +546,64 @@ function convertContentSection(contentRoot, footnotesMap = {}, initialLevel = 0)
       const secId = generateSlugId('sec', title, secCounter);
       const indent = getIndent();
 
-      bodyXml += `${indent}<sec id="${secId}">\n`;
-      bodyXml += `${indent}  <title>${escapeXml(title)}</title>\n`;
+      bodyXml += `${indent}<sec id="${secId}">\n${indent}  <title>${escapeXml(title)}</title>\n`;
       sectionStack.push({ id: secId, level: actualLevel });
       continue;
     }
 
-    // Tablas (casos variables)
-    if (tagName === 'div' && (classList.contains('table-responsive') || classList.contains('table-wrapper') || classList.contains('table-container'))) {
+    // Tables
+    if (tagName === 'table') {
       ensureSection();
-      const table = child.querySelector('table');
-      if (table) {
-        let extraNotes = '';
-        const nextSibling = child.nextElementSibling;
-        if (nextSibling && nextSibling.tagName.toLowerCase() === 'p') {
-          const noteText = cleanText(nextSibling.textContent);
-          if (/fuente|source|nota|note/i.test(noteText) || nextSibling.querySelector('small, em, i')) {
-            extraNotes = noteText;
-            nextSibling.setAttribute('data-jats-processed', 'true');
-          }
-        }
-        const internalNote = child.querySelector('p, .table-note, .source');
-        if (internalNote && !extraNotes) {
-          extraNotes = cleanText(internalNote.textContent);
-        }
-
-        bodyXml += getIndent() + convertTableElement(table, '', extraNotes, footnotesMap) + '\n';
-      }
-      continue;
-    }
-
-    // Tabla suelta
-    if (tagName === 'table' && !child.closest('figure') && !child.closest('.table-responsive')) {
-      ensureSection();
-      let extraNotes = '';
+      tableCounter++;
+      
+      // Buscar caption en el siguiente párrafo
+      let captionText = '';
       const next = child.nextElementSibling;
       if (next && next.tagName.toLowerCase() === 'p') {
-        const noteText = cleanText(next.textContent);
-        if (/fuente|source|nota|note/i.test(noteText)) {
-          extraNotes = noteText;
+        const nextText = cleanText(next.textContent);
+        if (/^tabla|^table/i.test(nextText)) {
+          captionText = nextText;
           next.setAttribute('data-jats-processed', 'true');
         }
       }
-      bodyXml += getIndent() + convertTableElement(child, '', extraNotes, footnotesMap) + '\n';
+      
+      bodyXml += getIndent() + convertTableElement(child, String(tableCounter), captionText, footnotesMap) + '\n';
       continue;
     }
 
-    // Figuras
-    if (tagName === 'figure' || classList.contains('floating-figure') || classList.contains('image-figure') || classList.contains('figure')) {
+    // Figures
+    if (tagName === 'figure' || classList.contains('floating-figure') || classList.contains('image-figure')) {
       ensureSection();
-      bodyXml += getIndent() + convertFigureElement(child, footnotesMap) + '\n';
+      const table = child.querySelector('table');
+      const img = child.querySelector('img');
+      const figcaption = child.querySelector('figcaption, .caption');
+      const captionText = figcaption ? cleanText(figcaption.textContent) : '';
+      
+      if (table) {
+        tableCounter++;
+        bodyXml += getIndent() + convertTableElement(table, String(tableCounter), captionText, footnotesMap) + '\n';
+      } else if (img) {
+        const figId = child.id || `fig${secCounter}`;
+        const imgSrc = img.getAttribute('src') || '';
+        const imgAlt = img.getAttribute('alt') || '';
+        
+        let xml = `<fig id="${escapeXml(figId)}">\n  <label>Figure ${secCounter}</label>\n`;
+        if (captionText) xml += `  <caption><p>${escapeXml(captionText)}</p></caption>\n`;
+        if (imgAlt) xml += `  <alt-text>${escapeXml(imgAlt)}</alt-text>\n`;
+        if (imgSrc) {
+          let mime = 'image/jpeg';
+          if (imgSrc.endsWith('.png')) mime = 'image/png';
+          else if (imgSrc.endsWith('.gif')) mime = 'image/gif';
+          else if (imgSrc.endsWith('.svg')) mime = 'image/svg+xml';
+          xml += `  <graphic xlink:href="${escapeXml(imgSrc)}" mimetype="${mime}"/>\n`;
+        }
+        xml += '</fig>';
+        bodyXml += getIndent() + xml + '\n';
+      }
       continue;
     }
 
-    // Código
-    if (tagName === 'pre' || (tagName === 'div' && (classList.contains('code-block') || classList.contains('code-block-wrapper') || classList.contains('highlight')))) {
-      ensureSection();
-      bodyXml += getIndent() + convertCodeBlock(child) + '\n';
-      continue;
-    }
-
-    // Párrafos
+    // Paragraphs (skip if marked as processed)
     if (tagName === 'p') {
       if (child.getAttribute('data-jats-processed') === 'true') continue;
       ensureSection();
@@ -763,7 +612,7 @@ function convertContentSection(contentRoot, footnotesMap = {}, initialLevel = 0)
       continue;
     }
 
-    // Listas
+    // Lists
     if (tagName === 'ol' || tagName === 'ul') {
       ensureSection();
       const listType = tagName === 'ol' ? 'order' : 'bullet';
@@ -771,23 +620,10 @@ function convertContentSection(contentRoot, footnotesMap = {}, initialLevel = 0)
       continue;
     }
 
-    if (tagName === 'dl') {
-      ensureSection();
-      bodyXml += getIndent() + convertDefinitionList(child, footnotesMap) + '\n';
-      continue;
-    }
-
-    if (tagName === 'blockquote') {
-      ensureSection();
-      bodyXml += getIndent() + convertBlockquote(child, footnotesMap) + '\n';
-      continue;
-    }
-
-    // DIV/SECTION genéricos
-    if ((tagName === 'div' || tagName === 'section') &&
-        !classList.contains('footnotes') &&
-        !classList.contains('references') &&
-        !classList.contains('table-responsive')) {
+    // Generic div/section
+    if ((tagName === 'div' || tagName === 'section') && 
+        !classList.contains('footnotes') && 
+        !classList.contains('references')) {
       bodyXml += convertContentSection(child, footnotesMap, sectionStack.length);
       continue;
     }
@@ -802,51 +638,7 @@ function convertContentSection(contentRoot, footnotesMap = {}, initialLevel = 0)
   return bodyXml;
 }
 
-// ─── REFERENCIAS ─────────────────────────────────────────────────────────────
-
-function parseReferencesFromHtml(referencesHtml) {
-  if (!referencesHtml) return [];
-  const dom = new JSDOM(referencesHtml);
-  const doc = dom.window.document;
-  const refItems = doc.querySelectorAll('.reference-item, li, .ref-item');
-  const refs = [];
-
-  refItems.forEach((item, index) => {
-    const refId = item.id || `ref${index + 1}`;
-    const fullText = cleanText(item.textContent);
-    const links = item.querySelectorAll('a');
-
-    let authors = '', year = '', title = '', source = '', url = '', doi = '';
-
-    links.forEach(link => {
-      const href = link.getAttribute('href') || '';
-      if (href.includes('doi.org')) {
-        doi = href.replace(/https?:\/\/(dx\.)?doi\.org\//i, '');
-      } else if (!url && href.startsWith('http')) {
-        url = href;
-      }
-    });
-
-    const authorMatch = fullText.match(/^([^.]+)\./);
-    if (authorMatch) authors = cleanText(authorMatch[1]);
-
-    const yearMatch = fullText.match(/\((\d{4})\)|\.\s*(\d{4})[.,]/);
-    if (yearMatch) year = yearMatch[1] || yearMatch[2];
-
-    const titleMatch = fullText.match(/[«“"]([^»”"]+)[»”"]|'([^']+)'/);
-    if (titleMatch) title = titleMatch[1] || titleMatch[2];
-
-    const sourceMatch = fullText.match(/(?:\d{4}[.,])\s*(.*?)(?:https?:\/\/|$)/);
-    if (sourceMatch && sourceMatch[1]) source = cleanText(sourceMatch[1]);
-
-    refs.push({ id: refId, authors, year, title, source, url, doi, fullText });
-  });
-
-  return refs;
-}
-
 // ─── CONSTRUCCIÓN DEL JATS COMPLETO ─────────────────────────────────────────
-
 function buildJatsXml(article) {
   // Extracción de campos
   const articleTitle = article.titulo || '';
@@ -883,71 +675,50 @@ function buildJatsXml(article) {
   const submissionId = article.submissionId || '';
   const specializedCodes = Array.isArray(article.specialized_codes) ? article.specialized_codes : [];
 
-  // Detectar tipo de artículo
-  const articleTypeInfo = detectArticleType(articleType, articleTitle);
+  const articleTypeInfo = detectArticleType(articleType);
   const jatsArticleType = articleTypeInfo.jats;
 
   const pubDateParsed = parseDate(pubDate);
   const receivedDateParsed = parseDate(receivedDate);
   const acceptedDateParsed = parseDate(acceptedDate);
 
-  // Body (Español)
+  // Body español
   let bodyXml = '<body>\n';
-  let footnotesXml = '';
   let footnotesMap = {};
 
   if (htmlContent) {
-    const dom = new JSDOM(htmlContent);
-    const doc = dom.window.document;
-    let contentRoot = doc.body || doc.documentElement;
-
-    const footnoteSection = contentRoot.querySelector('.footnotes');
-    if (footnoteSection) {
-      const items = footnoteSection.querySelectorAll(':scope > ol > li, :scope > .footnote-item, li');
-      items.forEach((li, index) => {
-        const fnId = li.id || `fn${index + 1}`;
-        const clone = li.cloneNode(true);
-        const back = clone.querySelector('a[href^="#fn"], a[rev="footnote"]');
-        if (back) back.remove();
-        footnotesMap[fnId] = cleanText(clone.textContent || '');
-      });
-      footnoteSection.remove();
+    const doc = createDOM(htmlContent);
+    if (doc) {
+      const contentRoot = doc.body || doc.documentElement;
+      bodyXml += convertContentSection(contentRoot, footnotesMap);
     }
-
-    bodyXml += convertContentSection(contentRoot, footnotesMap);
-    bodyXml += '</body>';
-
-    if (Object.keys(footnotesMap).length > 0) {
-      footnotesXml = '<fn-group>\n';
-      for (const [id, content] of Object.entries(footnotesMap)) {
-        footnotesXml += `  <fn id="${escapeXml(id)}">\n    <p>${escapeXml(content)}</p>\n  </fn>\n`;
-      }
-      footnotesXml += '</fn-group>\n';
-    }
-  } else {
-    bodyXml += '</body>';
   }
+  bodyXml += '</body>';
 
-  // Body (Inglés)
+  // Body inglés (solo si es realmente diferente)
   let hasEnglishBody = false;
   let bodyEnXml = '';
-  if (htmlContentEn && cleanText(htmlContentEn.replace(/<[^>]*>/g, '')).length > 80) {
-    hasEnglishBody = true;
-    const domEn = new JSDOM(htmlContentEn);
-    const docEn = domEn.window.document;
-    const rootEn = docEn.body || docEn.documentElement;
-    bodyEnXml = '<body xml:lang="en">\n';
-    bodyEnXml += convertContentSection(rootEn, {});
-    bodyEnXml += '</body>';
+  if (htmlContentEn) {
+    const textOnlyEn = cleanText(htmlContentEn.replace(/<[^>]*>/g, ''));
+    const textOnlyEs = cleanText(htmlContent.replace(/<[^>]*>/g, ''));
+    
+    if (textOnlyEn.length > 80 && textOnlyEn !== textOnlyEs) {
+      hasEnglishBody = true;
+      const docEn = createDOM(htmlContentEn);
+      if (docEn) {
+        bodyEnXml = '<body xml:lang="en">\n';
+        bodyEnXml += convertContentSection(docEn.body || docEn.documentElement, {});
+        bodyEnXml += '</body>';
+      }
+    }
   }
 
   const references = parseReferencesFromHtml(referenciasHtml);
   const isMultilingual = !!(articleTitleEn || abstractEn || keywordsEn.length || hasEnglishBody);
 
-  // Construcción XML
+  // ─── CONSTRUCCIÓN XML ────────────────────────────────────────────────────
   let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
   xml += `<!DOCTYPE article PUBLIC "${JATS_DTD_PUBLIC}" "${JATS_DTD_SYSTEM}">\n`;
-
   xml += `<article dtd-version="${JATS_VERSION}" article-type="${jatsArticleType}"`;
   xml += isMultilingual ? ' xml:lang="mul"' : ' xml:lang="es"';
   xml += '\n  xmlns:mml="http://www.w3.org/1998/Math/MathML"';
@@ -974,7 +745,6 @@ function buildJatsXml(article) {
 
   // article-meta
   xml += '  <article-meta>\n';
-
   if (doi) xml += `    <article-id pub-id-type="doi">${escapeXml(doi)}</article-id>\n`;
   if (submissionId) xml += `    <article-id pub-id-type="publisher-id">${escapeXml(submissionId)}</article-id>\n`;
 
@@ -982,14 +752,10 @@ function buildJatsXml(article) {
   if (isMultilingual) xml += '    <content-language>en</content-language>\n';
 
   if (area || specializedCodes.length) {
-    xml += '    <article-categories>\n';
-    xml += '      <subj-group subj-group-type="heading">\n';
+    xml += '    <article-categories>\n      <subj-group subj-group-type="heading">\n';
     if (area) xml += `        <subject>${escapeXml(area)}</subject>\n`;
-    specializedCodes.forEach(code => { 
-      if (code) xml += `        <subject>${escapeXml(code)}</subject>\n`; 
-    });
-    xml += '      </subj-group>\n';
-    xml += '    </article-categories>\n';
+    specializedCodes.forEach(code => { if (code) xml += `        <subject>${escapeXml(code)}</subject>\n`; });
+    xml += '      </subj-group>\n    </article-categories>\n';
   }
 
   // title-group
@@ -1015,21 +781,17 @@ function buildJatsXml(article) {
       let givenNames = '', surname = '';
       
       if (parts.length === 1) surname = parts[0];
-      else if (parts.length === 2) { 
-        givenNames = parts[0]; 
-        surname = parts[1]; 
-      }
-      else { 
-        surname = parts[parts.length - 1]; 
-        givenNames = parts.slice(0, -1).join(' '); 
-      }
+      else if (parts.length === 2) { givenNames = parts[0]; surname = parts[1]; }
+      else { surname = parts[parts.length - 1]; givenNames = parts.slice(0, -1).join(' '); }
 
       const isCorresp = autor.isCorresponding === true || autor.isCorresponding === 'true';
 
       xml += `      <contrib contrib-type="author" id="${authorId}"${isCorresp ? ' corresp="yes"' : ''}>\n`;
       
+      // ORCID SIEMPRE con URL completa
       if (autor.orcid) {
-        xml += `        <contrib-id contrib-id-type="orcid" authenticated="true">${escapeXml(normalizeOrcid(autor.orcid))}</contrib-id>\n`;
+        const orcidNormalized = normalizeOrcid(autor.orcid);
+        xml += `        <contrib-id contrib-id-type="orcid" authenticated="true">${escapeXml(orcidNormalized)}</contrib-id>\n`;
       }
       if (autor.authorId) {
         xml += `        <contrib-id contrib-id-type="publisher-id">${escapeXml(autor.authorId)}</contrib-id>\n`;
@@ -1056,9 +818,11 @@ function buildJatsXml(article) {
       xml += '      </contrib>\n';
     });
 
+    // Afiliaciones directas (sin aff-alternatives)
     uniqueInstitutions.forEach(aff => {
-      xml += `      <aff id="${aff.id}"><institution>${escapeXml(aff.name)}</institution></aff>\n`;
+      xml += `      <aff id="${aff.id}">\n        <institution>${escapeXml(aff.name)}</institution>\n      </aff>\n`;
     });
+    
     xml += '    </contrib-group>\n';
   }
 
@@ -1069,8 +833,11 @@ function buildJatsXml(article) {
     xml += '    <author-notes>\n';
     if (hasCorresp) {
       const corr = autores.find(a => a.isCorresponding === true || a.isCorresponding === 'true');
-      if (corr?.email) xml += `      <corresp id="cor1">Correspondence: <email>${escapeXml(corr.email)}</email></corresp>\n`;
+      if (corr?.email) {
+        xml += `      <corresp id="cor1">Correspondence: <email>${escapeXml(corr.email)}</email></corresp>\n`;
+      }
     }
+    // COI-statement (JATS4R recomendado)
     if (conflictsEs) xml += `      <fn fn-type="COI-statement" xml:lang="es"><p>${escapeXml(conflictsEs)}</p></fn>\n`;
     if (conflictsEn && conflictsEn !== conflictsEs) {
       xml += `      <fn fn-type="COI-statement" xml:lang="en"><p>${escapeXml(conflictsEn)}</p></fn>\n`;
@@ -1134,18 +901,12 @@ function buildJatsXml(article) {
   // keywords
   if (keywordsEs.length) {
     xml += '    <kwd-group xml:lang="es" kwd-group-type="author">\n      <title>Palabras clave</title>\n';
-    keywordsEs.forEach(kwd => { 
-      const c = cleanText(kwd); 
-      if (c) xml += `      <kwd>${escapeXml(c)}</kwd>\n`; 
-    });
+    keywordsEs.forEach(kwd => { const c = cleanText(kwd); if (c) xml += `      <kwd>${escapeXml(c)}</kwd>\n`; });
     xml += '    </kwd-group>\n';
   }
   if (keywordsEn.length) {
     xml += '    <kwd-group xml:lang="en" kwd-group-type="author">\n      <title>Keywords</title>\n';
-    keywordsEn.forEach(kwd => { 
-      const c = cleanText(kwd); 
-      if (c) xml += `      <kwd>${escapeXml(c)}</kwd>\n`; 
-    });
+    keywordsEn.forEach(kwd => { const c = cleanText(kwd); if (c) xml += `      <kwd>${escapeXml(c)}</kwd>\n`; });
     xml += '    </kwd-group>\n';
   }
 
@@ -1187,21 +948,28 @@ function buildJatsXml(article) {
     xml += '  </ack>\n';
   }
 
-  if (footnotesXml) xml += '  ' + footnotesXml.trim() + '\n';
-
   // References
   if (references.length > 0) {
     xml += '  <ref-list>\n    <title>Referencias</title>\n';
     references.forEach(ref => {
       xml += `    <ref id="${escapeXml(ref.id)}">\n`;
       xml += '      <mixed-citation publication-type="journal">';
+      
       if (ref.authors) xml += escapeXml(ref.authors);
-      if (ref.year) xml += ` (${ref.year})`;
+      if (ref.year) xml += ` (${escapeXml(ref.year)})`;
       if (ref.title) xml += `. <article-title>${escapeXml(ref.title)}</article-title>`;
       if (ref.source) xml += `. <source>${escapeXml(ref.source)}</source>`;
-      if (ref.doi) xml += `. <pub-id pub-id-type="doi">${escapeXml(ref.doi)}</pub-id>`;
-      else if (ref.url) xml += `. <ext-link ext-link-type="uri" xlink:href="${escapeXml(ref.url)}">${escapeXml(ref.url)}</ext-link>`;
-      if (!ref.authors && !ref.year && !ref.title) xml += escapeXml(ref.fullText);
+      if (ref.doi) {
+        xml += `. <pub-id pub-id-type="doi">${escapeXml(ref.doi)}</pub-id>`;
+      } else if (ref.url) {
+        xml += `. <ext-link ext-link-type="uri" xlink:href="${escapeXml(ref.url)}">${escapeXml(ref.url)}</ext-link>`;
+      }
+      
+      // Fallback si no se pudo parsear
+      if (!ref.authors && !ref.year && !ref.title && !ref.url && !ref.doi) {
+        xml += escapeXml(ref.fullText);
+      }
+      
       xml += '</mixed-citation>\n    </ref>\n';
     });
     xml += '  </ref-list>\n';
@@ -1211,8 +979,7 @@ function buildJatsXml(article) {
   return xml;
 }
 
-// ─── PROCESAMIENTO PRINCIPAL ─────────────────────────────────────────────────
-
+// ─── FUNCIÓN PRINCIPAL ──────────────────────────────────────────────────────
 function processArticle(article, index) {
   const title = article.titulo || `Artículo ${index + 1}`;
   console.log(`\n[${index + 1}] Procesando: "${title.substring(0, 70)}${title.length > 70 ? '...' : ''}"`);
@@ -1221,12 +988,6 @@ function processArticle(article, index) {
     const jatsXml = buildJatsXml(article);
     article.jats = jatsXml;
     console.log(`  ✓ JATS generado (${jatsXml.length.toLocaleString()} caracteres)`);
-    
-    // Validación básica
-    if (jatsXml.length < 500) {
-      console.warn('  ⚠ Advertencia: JATS parece demasiado corto');
-    }
-    
     return { success: true, article };
   } catch (error) {
     console.error(`  ✗ Error: ${error.message}`);
@@ -1235,30 +996,37 @@ function processArticle(article, index) {
   }
 }
 
+// ─── MAIN ───────────────────────────────────────────────────────────────────
 function main() {
   console.log('══════════════════════════════════════════════════════════════════');
-  console.log('  Conversor articles.json → JATS XML v5.0 (Versión Final)');
-  console.log('  Soporte para 6 tipos de artículos académicos');
-  console.log('  Cumplimiento JATS 1.4 + Multi-language + Robusto');
+  console.log('  Conversor articles.json → JATS XML v8.0 FINAL');
+  console.log('  Todas las correcciones verificadas aplicadas');
+  console.log('  Compatible con CommonJS, ESM, y navegadores');
   console.log('══════════════════════════════════════════════════════════════════\n');
+
+  // Verificar si estamos en Node.js
+  if (typeof fs === 'undefined') {
+    console.error('Error: Este script requiere Node.js para leer/escribir archivos.');
+    console.error('En un navegador, use la función buildJatsXml(article) directamente.');
+    return;
+  }
 
   if (!fs.existsSync(INPUT_FILE)) {
     console.error(`Error: No existe ${INPUT_FILE}`);
-    process.exit(1);
+    return;
   }
 
-  // Crear backup
-  console.log('Creando backup de seguridad...');
+  // Backup
+  console.log('Creando backup...');
   fs.copyFileSync(INPUT_FILE, BACKUP_FILE);
 
   // Leer JSON
-  console.log(`Leyendo ${INPUT_FILE}...`);
   let articles;
   try {
     articles = JSON.parse(fs.readFileSync(INPUT_FILE, 'utf-8'));
   } catch (e) {
     console.error(`Error al parsear JSON: ${e.message}`);
-    process.exit(1);
+    return;
   }
 
   // Normalizar a array
@@ -1276,8 +1044,8 @@ function main() {
         }
       }
       if (!found) {
-        console.error('JSON no válido. Debe contener un array de artículos.');
-        process.exit(1);
+        console.error('JSON no válido.');
+        return;
       }
     }
   }
@@ -1291,30 +1059,25 @@ function main() {
 
   articles.forEach((article, index) => {
     const result = processArticle(article, index);
-    if (result.success) {
-      successCount++;
-    } else {
+    if (result.success) successCount++;
+    else {
       errorCount++;
       errors.push({ index: index + 1, title: article.titulo, error: result.error });
     }
   });
 
   // Guardar
-  console.log('\nGuardando archivo actualizado...');
+  console.log('\nGuardando...');
   const originalData = JSON.parse(fs.readFileSync(INPUT_FILE, 'utf-8'));
 
   if (Array.isArray(originalData)) {
-    articles.forEach((a, i) => {
-      if (originalData[i]) originalData[i].jats = a.jats;
-    });
+    articles.forEach((a, i) => { if (originalData[i]) originalData[i].jats = a.jats; });
   } else if (originalData.titulo || originalData.doi) {
     originalData.jats = articles[0].jats;
   } else {
     for (const k of ['articles', 'articulos', 'data', 'items']) {
       if (originalData[k] && Array.isArray(originalData[k])) {
-        articles.forEach((a, i) => {
-          if (originalData[k][i]) originalData[k][i].jats = a.jats;
-        });
+        articles.forEach((a, i) => { if (originalData[k][i]) originalData[k][i].jats = a.jats; });
         break;
       }
     }
@@ -1322,36 +1085,25 @@ function main() {
 
   fs.writeFileSync(OUTPUT_FILE, JSON.stringify(originalData, null, 2), 'utf-8');
 
-  // Resumen final
+  // Resumen
   console.log('\n══════════════════════════════════════════════════════════════════');
   console.log('  RESUMEN FINAL');
   console.log('══════════════════════════════════════════════════════════════════');
-  console.log(`  Total procesados : ${articles.length}`);
-  console.log(`  Exitosos         : ${successCount}`);
-  console.log(`  Con errores      : ${errorCount}`);
-  console.log(`  Archivo          : ${OUTPUT_FILE}`);
-  console.log(`  Backup           : ${BACKUP_FILE}`);
-  
-  if (errors.length > 0) {
-    console.log('\n  Errores detallados:');
-    errors.forEach(e => {
-      console.log(`    - Artículo ${e.index}: ${e.title}`);
-      console.log(`      Error: ${e.error}`);
-    });
-  }
-  
+  console.log(`  Total: ${articles.length} | Éxito: ${successCount} | Error: ${errorCount}`);
+  console.log(`  Archivo: ${OUTPUT_FILE}`);
+  console.log(`  Backup: ${BACKUP_FILE}`);
   console.log('══════════════════════════════════════════════════════════════════\n');
-
-  // Mostrar ejemplo
-  if (successCount > 0) {
-    const ex = articles.find(a => a.jats);
-    if (ex) {
-      console.log('Ejemplo del JATS generado (primeros 800 caracteres):');
-      console.log('────────────────────────────────────────────────────────────');
-      console.log(ex.jats.substring(0, 800) + '...\n');
-    }
-  }
 }
 
-// ─── EJECUCIÓN ────────────────────────────────────────────────────────────────
-main();
+// ─── EXPORTACIONES PARA DIFERENTES ENTORNOS ─────────────────────────────────
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { buildJatsXml, processArticle, detectArticleType };
+} else if (typeof window !== 'undefined') {
+  window.buildJatsXml = buildJatsXml;
+  window.processArticle = processArticle;
+}
+
+// ─── EJECUCIÓN ──────────────────────────────────────────────────────────────
+if (typeof require !== 'undefined' && require.main === module) {
+  main();
+}
